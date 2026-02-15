@@ -176,12 +176,12 @@ static esp_err_t lcd_panel_init(void)
             .vsync_pulse_width = 4,
             .vsync_back_porch = 8,
             .vsync_front_porch = 8,
-            .flags.pclk_active_neg = 1,
+            .flags.pclk_active_neg = true,
         },
         .data_width = 16,
         .bits_per_pixel = 16,
-        .num_fbs = 1,  // Single frame buffer
-        .bounce_buffer_size_px = 0,  // No bounce buffer
+        .num_fbs = 1,
+        .bounce_buffer_size_px = 0,
         .hsync_gpio_num = LCD_PIN_NUM_HSYNC,
         .vsync_gpio_num = LCD_PIN_NUM_VSYNC,
         .de_gpio_num = LCD_PIN_NUM_DE,
@@ -205,7 +205,7 @@ static esp_err_t lcd_panel_init(void)
             LCD_PIN_NUM_DATA14,
             LCD_PIN_NUM_DATA15,
         },
-        .flags.fb_in_psram = 1,  // Allocate frame buffer in PSRAM
+        .flags.fb_in_psram = true,
     };
     
     ESP_ERROR_CHECK(esp_lcd_new_rgb_panel(&panel_config, &panel_handle));
