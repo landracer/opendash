@@ -79,7 +79,7 @@ static void create_rpm_arc(lv_obj_t *parent)
     /* Add RPM label */
     lv_obj_t *rpm_label = lv_label_create(rpm_arc);
     lv_label_set_text(rpm_label, "0 RPM");
-    lv_obj_set_style_text_font(rpm_label, &lv_font_montserrat_32, 0);
+    lv_obj_set_style_text_font(rpm_label, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_color(rpm_label, lv_color_hex(0xFFFFFF), 0);
     lv_obj_center(rpm_label);
     
@@ -113,7 +113,7 @@ static lv_obj_t* create_data_section(lv_obj_t *parent, const char *label_text,
     /* Create value label */
     lv_obj_t *value_label = lv_label_create(section);
     lv_label_set_text(value_label, "---");
-    lv_obj_set_style_text_font(value_label, &lv_font_montserrat_32, 0);
+    lv_obj_set_style_text_font(value_label, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_color(value_label, lv_color_hex(0xFFFFFF), 0);
     lv_obj_align(value_label, LV_ALIGN_CENTER, 0, 8);
     
