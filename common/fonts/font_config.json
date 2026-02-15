@@ -1,0 +1,15 @@
+{
+  "fonts": [
+    {
+      "name": "montserrat",
+      "source": "built-in",
+      "comment": "Uses LVGL's built-in Montserrat font - no conversion needed",
+      "sizes": [14, 18, 24, 32],
+      "bpp": 4,
+      "range": "0x20-0x7F"
+    }
+  ],
+  "default_bpp": 4,
+  "default_range": "0x20-0x7F",
+  "comment": "Add your custom fonts here. Example: { \"name\": \"opensans\", \"source\": \"OpenSans-Regular.ttf\", \"sizes\": [16, 24, 32], \"bpp\": 4, \"range\": \"0x20-0x7F\" }"
+}
