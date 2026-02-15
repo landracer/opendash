@@ -185,15 +185,15 @@ static void create_status_bar(lv_obj_t *parent)
 /**
  * @brief UI rendering task.
  *
- * Continuously calls lv_task_handler() to process LVGL events and rendering.
+ * Continuously calls lv_timer_handler() to process LVGL events and rendering.
  */
 static void ui_task(void *pvParameters)
 {
     ESP_LOGI(TAG, "UI task started");
     
     while (1) {
-        /* Process LVGL tasks */
-        lv_task_handler();
+        /* Process LVGL timers */
+        lv_timer_handler();
         
         /* Delay to allow other tasks to run */
         vTaskDelay(pdMS_TO_TICKS(10));
