@@ -53,13 +53,48 @@ else()
 endif()
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Step 2: Collect generated font files
+# Step 1b: Convert images (JPG/PNG) to LVGL C format (pre-build step)
 #
-# All *.c files in fonts/generated/ are automatically included.
-# This includes both the converted fonts and any future additions.
+# This runs once during CMake configuration for ANY display project.
+# Generated images are shared by ALL displays (center, left-right, gps).
+# Images are automatically scaled to fit display resolution.
+# ─────────────────────────────────────────────────────────────────────────────
+
+if(Python3_FOUND)
+    # Run image converter script before build
+    execute_process(
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_LIST_DIR}/images/convert_images.py
+        WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/images
+        RESULT_VARIABLE IMAGE_CONV_RESULT
+        OUTPUT_VARIABLE IMAGE_CONV_OUTPUT
+        ERROR_VARIABLE IMAGE_CONV_ERROR
+    )
+    
+    # Display image converter output
+    if(IMAGE_CONV_OUTPUT)
+        message(STATUS "Image Converter Output:")
+        message(STATUS "${IMAGE_CONV_OUTPUT}")
+    endif()
+    
+    # Check for errors (note: no images is not an error)
+    if(NOT IMAGE_CONV_RESULT EQUAL 0)
+        message(WARNING "Image conversion failed: ${IMAGE_CONV_ERROR}")
+        message(WARNING "Continuing with build - images may not be available")
+    endif()
+else()
+    message(WARNING "Python3 not found - skipping image conversion")
+    message(WARNING "To use custom images, install Python3 and run: common/images/convert_images.py")
+endif()
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Step 2: Collect generated font and image files
+#
+# All *.c files in fonts/generated/ and images/generated/ are automatically included.
+# This includes both the converted fonts/images and any future additions.
 # ─────────────────────────────────────────────────────────────────────────────
 
 file(GLOB FONT_SOURCES "${CMAKE_CURRENT_LIST_DIR}/fonts/generated/*.c")
+file(GLOB IMAGE_SOURCES "${CMAKE_CURRENT_LIST_DIR}/images/generated/*.c")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Step 3: Register component with all sources
@@ -75,9 +110,11 @@ idf_component_register(
         "src/opendash_checklist.c"
         "src/opendash_display_config.c"
         ${FONT_SOURCES}
+        ${IMAGE_SOURCES}
     INCLUDE_DIRS
         "include"
         "fonts/generated"
+        "images/generated"
     REQUIRES
         nvs_flash
 )
