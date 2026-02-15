@@ -13,6 +13,10 @@ Get up and running with OpenDash in 5 minutes!
 ### Software
 - **Visual Studio Code** — [Download](https://code.visualstudio.com/)
 - **ESP-IDF v5.3** — [Installation Guide](https://docs.espressif.com/projects/esp-idf/en/release-v5.3/esp32s3/get-started/index.html)
+- **Node.js + npm** — For font conversion
+- **Python 3 + Pillow + ImageMagick** — For image conversion
+
+> **📦 Full dependency details:** See [BUILD_DEPENDENCIES.md](BUILD_DEPENDENCIES.md) for complete installation instructions
 
 ---
 
@@ -28,14 +32,25 @@ Get up and running with OpenDash in 5 minutes!
 # 4. Install "Espressif IDF" extension
 ```
 
-### 2. Clone the Repository
+### 2. Install Build Dependencies
+
+See [BUILD_DEPENDENCIES.md](BUILD_DEPENDENCIES.md) for detailed instructions.
+
+**Quick install (Ubuntu/Debian):**
+```bash
+sudo apt-get install nodejs npm python3 python3-pip imagemagick
+pip3 install Pillow
+cd opendash/common/fonts && npm install && cd ../..
+```
+
+### 3. Clone the Repository
 
 ```bash
 git clone https://github.com/landracer/opendash.git
 cd opendash
 ```
 
-### 3. Open in VS Code
+### 4. Open in VS Code
 
 ```bash
 code opendash.code-workspace
@@ -43,7 +58,7 @@ code opendash.code-workspace
 
 Or: File → Open Workspace from File → Select `opendash.code-workspace`
 
-### 4. Build Your First Display
+### 5. Build Your First Display
 
 **Center Display:**
 ```bash
@@ -74,7 +89,7 @@ idf.py -p /dev/ttyUSB0 flash monitor
 - macOS: `/dev/cu.usbmodem*`
 - Windows: `COM3`, `COM4`, etc.
 
-### 5. See It Run!
+### 6. See It Run!
 
 After flashing, you should see:
 - **Center:** RPM gauge + 6 data sections + status bar
