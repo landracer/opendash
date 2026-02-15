@@ -37,10 +37,14 @@ cd opendash
 
 ## Building a Display Project
 
+> **Note:** The individual display projects (`center/`, `left-right/`, `gps/`)
+> are not yet present in the repository and will be added in future commits.
+> The build commands below are provided for reference once those projects exist.
+
 Each display project is a standalone ESP-IDF application. Navigate to the
 desired project directory and build:
 
-### Center Display (4.3" LCD)
+### Center Display (4.3" LCD) — *planned*
 
 ```bash
 cd center/
@@ -49,7 +53,7 @@ idf.py set-target esp32s3
 idf.py build
 ```
 
-### Left/Right Gauges (2.8" Round LCD)
+### Left/Right Gauges (2.8" Round LCD) — *planned*
 
 ```bash
 cd left-right/
@@ -58,7 +62,7 @@ idf.py set-target esp32s3
 idf.py build
 ```
 
-### GPS / Telemetry (1.75" AMOLED)
+### GPS / Telemetry (1.75" AMOLED) — *planned*
 
 ```bash
 cd gps/

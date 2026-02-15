@@ -87,8 +87,8 @@ typedef struct {
 /**
  * @brief Initialize the checklist system.
  *
- * Loads checklist items from NVS. If no items are stored, populates
- * with a default set of common pre-race checks.
+ * Populates the checklist with a default set of common pre-race checks.
+ * NVS-based persistence is planned but not yet implemented.
  *
  * @param[out] checklist  Pointer to checklist structure to initialize.
  *

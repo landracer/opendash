@@ -123,6 +123,11 @@ opendash_err_t opendash_i2c_serialize(const opendash_i2c_msg_t *msg,
         return OPENDASH_ERR_INVALID_ARG;
     }
 
+    /* Validate message length to prevent reading past payload buffer */
+    if (msg->length > OPENDASH_MSG_MAX_PAYLOAD) {
+        return OPENDASH_ERR_INVALID_ARG;
+    }
+
     uint16_t idx = 0;
 
     /* Write header: sync, cmd, length */
@@ -167,6 +172,11 @@ opendash_err_t opendash_i2c_deserialize(const uint8_t *buffer,
     /* Validate sync byte */
     if (msg->sync != OPENDASH_MSG_SYNC) {
         return OPENDASH_ERR_CHECKSUM;  /* Not a valid message */
+    }
+
+    /* Validate payload length before any copy to prevent buffer overflow */
+    if (msg->length > OPENDASH_MSG_MAX_PAYLOAD) {
+        return OPENDASH_ERR_INVALID_ARG;
     }
 
     /* Check that buffer is large enough for the declared payload + checksum */

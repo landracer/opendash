@@ -80,7 +80,9 @@ opendash_err_t opendash_checklist_init(opendash_checklist_t *checklist)
         checklist->items[i].name[OPENDASH_CHECKLIST_NAME_LEN - 1] = '\0';
     }
 
-    checklist->count        = (uint8_t)DEFAULT_ITEM_COUNT;
+    checklist->count        = (DEFAULT_ITEM_COUNT < OPENDASH_CHECKLIST_MAX_ITEMS)
+                              ? (uint8_t)DEFAULT_ITEM_COUNT
+                              : OPENDASH_CHECKLIST_MAX_ITEMS;
     checklist->all_complete = false;
 
     return OPENDASH_OK;
@@ -218,5 +220,6 @@ opendash_err_t opendash_checklist_save(const opendash_checklist_t *checklist)
      *   }
      */
 
-    return OPENDASH_OK;
+    /* NVS persistence not yet implemented — return error so callers know */
+    return OPENDASH_ERR_GENERAL;
 }
