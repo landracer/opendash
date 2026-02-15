@@ -127,22 +127,23 @@ esp_err_t display_init(void)
         return ret;
     }
 
-    /* Calculate buffer size (1/10th of screen for memory efficiency) */
-    size_t buf_size = LCD_H_RES * LCD_V_RES / 10;
+    /* Calculate buffer size in bytes (1/10th of screen for memory efficiency) */
+    size_t buf_size_bytes = LCD_H_RES * LCD_V_RES / 10 * sizeof(lv_color_t);
     
     /* Allocate draw buffers */
-    buf1 = heap_caps_malloc(buf_size * sizeof(lv_color_t), MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
-    buf2 = heap_caps_malloc(buf_size * sizeof(lv_color_t), MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
+    buf1 = heap_caps_malloc(buf_size_bytes, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
+    buf2 = heap_caps_malloc(buf_size_bytes, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
     
     if (buf1 == NULL || buf2 == NULL) {
         ESP_LOGE(TAG, "Failed to allocate LVGL draw buffers");
-        if (buf1) heap_caps_free(buf1);
-        if (buf2) heap_caps_free(buf2);
+        heap_caps_free(buf1);
+        heap_caps_free(buf2);
+        esp_timer_stop(lvgl_tick_timer);
         esp_timer_delete(lvgl_tick_timer);
         return ESP_ERR_NO_MEM;
     }
     
-    ESP_LOGI(TAG, "Allocated LVGL buffers: %zu bytes each", buf_size * sizeof(lv_color_t));
+    ESP_LOGI(TAG, "Allocated LVGL buffers: %zu bytes each", buf_size_bytes);
 
     /* Create a display */
     display = lv_display_create(LCD_H_RES, LCD_V_RES);
@@ -150,12 +151,13 @@ esp_err_t display_init(void)
         ESP_LOGE(TAG, "Failed to create LVGL display");
         heap_caps_free(buf1);
         heap_caps_free(buf2);
+        esp_timer_stop(lvgl_tick_timer);
         esp_timer_delete(lvgl_tick_timer);
         return ESP_FAIL;
     }
     
     /* Set display buffers */
-    lv_display_set_buffers(display, buf1, buf2, buf_size * sizeof(lv_color_t), LV_DISPLAY_RENDER_MODE_PARTIAL);
+    lv_display_set_buffers(display, buf1, buf2, buf_size_bytes, LV_DISPLAY_RENDER_MODE_PARTIAL);
     
     /* Set flush callback */
     lv_display_set_flush_cb(display, display_flush_cb);
