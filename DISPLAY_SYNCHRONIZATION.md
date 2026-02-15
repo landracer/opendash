@@ -55,7 +55,43 @@ cd ../left-right && idf.py build
 cd ../gps && idf.py build
 ```
 
-### 3. Shared Code Elements
+### 3. Image System (Auto-Scaling & Shared)
+
+The image system is **fully automated** with proportional scaling:
+
+**How it works:**
+1. Place images in `common/images/source/` with naming: `background_<display>.jpg`, `splash_<display>.png`
+2. During build, `common/CMakeLists.txt` runs `convert_images.py`
+3. Images are automatically scaled proportionally to fit display resolution (no stretching/skewing)
+4. Images are converted to RGB565 C arrays in `common/images/generated/`
+5. Displays can include generated headers and use images in LVGL
+
+**Auto-scaling features:**
+- ✅ Maintains aspect ratio (no distortion)
+- ✅ Centers image if dimensions don't match
+- ✅ Fills empty space with black
+- ✅ Skip scaling if image is exact resolution
+
+**To add images for displays:**
+```bash
+# Add a background for center display
+cp my-bg.jpg common/images/source/background_center.jpg
+
+# Add splash screens
+cp logo.png common/images/source/splash_center.png
+cp gps-logo.png common/images/source/splash_gps.png
+
+# Rebuild - images auto-convert and include
+cd center && idf.py build
+```
+
+**Supported image types:**
+- `background_center.jpg` / `background_center.png` - Center display background (800×480)
+- `background_leftright.jpg` / `background_leftright.png` - Left/Right gauge background (480×480)
+- `background_gps.jpg` / `background_gps.png` - GPS display background (466×466)
+- `splash_<display>.jpg` / `splash_<display>.png` - Boot splash screens
+
+### 4. Shared Code Elements
 
 All displays share:
 
@@ -63,6 +99,7 @@ All displays share:
 |-----------|----------|---------|
 | **Font System** | `common/fonts/` | TTF conversion, font declarations |
 | **Font Headers** | `common/include/opendash_fonts.h` | Font helper functions |
+| **Image System** | `common/images/` | JPG/PNG conversion, auto-scaling |
 | **I2C Protocol** | `common/src/opendash_i2c_protocol.c` | Communication between displays |
 | **Data Models** | `common/src/opendash_data_model.c` | Shared data structures |
 | **Display Config** | `common/src/opendash_display_config.c` | Display configuration |
@@ -88,6 +125,15 @@ When making changes to the common codebase, verify synchronization:
 
 ### ✅ Font System Changes
 - [ ] Update `common/fonts/font_config.json`
+- [ ] Run `python3 common/fonts/convert_fonts.py` to test
+- [ ] Verify `common/fonts/generated/opendash_font_config.h` is generated
+- [ ] All displays will auto-update on next build
+
+### ✅ Image System Changes
+- [ ] Place images in `common/images/source/` with correct naming
+- [ ] Run `python3 common/images/convert_images.py` to test
+- [ ] Verify `.h` and `.c` files are generated in `common/images/generated/`
+- [ ] All displays will auto-update on next build
 - [ ] Run `python3 common/fonts/convert_fonts.py` to test
 - [ ] Verify `common/fonts/generated/opendash_font_config.h` is generated
 - [ ] All displays will auto-update on next build
