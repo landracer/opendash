@@ -23,6 +23,11 @@
 extern "C" {
 #endif
 
+/* Declare converted Montserrat fonts */
+LV_FONT_DECLARE(montserrat_14);
+LV_FONT_DECLARE(montserrat_18);
+LV_FONT_DECLARE(montserrat_32);
+
 /**
  * @brief Font size enumeration for easier font selection
  */
@@ -36,7 +41,7 @@ typedef enum {
  * @brief Get LVGL font pointer based on size category
  * 
  * This function maps abstract font sizes to actual LVGL fonts.
- * By default, it uses LVGL's built-in Montserrat font.
+ * Uses converted Montserrat font as the default OpenDash font.
  * 
  * @param size Font size category
  * @return Pointer to lv_font_t, or NULL if invalid size
@@ -45,13 +50,13 @@ static inline const lv_font_t* opendash_get_font(opendash_font_size_t size)
 {
     switch (size) {
         case OPENDASH_FONT_SIZE_SMALL:
-            return &lv_font_montserrat_14;
+            return &montserrat_14;
         case OPENDASH_FONT_SIZE_MEDIUM:
-            return &lv_font_montserrat_18;
+            return &montserrat_18;
         case OPENDASH_FONT_SIZE_LARGE:
-            return &lv_font_montserrat_32;
+            return &montserrat_32;
         default:
-            return &lv_font_montserrat_14;
+            return &montserrat_14;
     }
 }
 

@@ -1,6 +1,14 @@
 {
   "fonts": [
     {
+      "name": "montserrat",
+      "source": "Montserrat-Regular.ttf",
+      "comment": "Montserrat font - default font for OpenDash",
+      "sizes": [14, 18, 32],
+      "bpp": 4,
+      "range": "0x20-0x7F"
+    },
+    {
       "name": "engebold",
       "source": "built-in",
       "comment": "Uses LVGL's built-in Engebold font - no conversion needed",
