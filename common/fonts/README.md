@@ -51,11 +51,13 @@ Common Unicode ranges:
 ## Automatic Conversion
 
 The build system automatically:
-1. Checks if `lv_font_conv` is installed (installs via npm if missing)
+1. Checks if `lv_font_conv` is installed (installs locally via npm if missing)
 2. Scans `font_config.json`
 3. Converts any fonts that are missing or outdated
 4. Generates C source files in `generated/`
 5. Includes them in the build
+
+**Note:** The font conversion tool installs `lv_font_conv` locally in the `fonts` directory to avoid requiring root/sudo permissions. The `node_modules` directory is automatically ignored by git.
 
 ## Manual Conversion
 
@@ -63,7 +65,17 @@ If you need to manually convert a font:
 
 ```bash
 cd common/fonts
-npm install -g lv_font_conv  # If not already installed
+# Install lv_font_conv locally (no sudo required)
+npm install lv_font_conv
+# Run conversion
+./node_modules/.bin/lv_font_conv --font ttf/YourFont.ttf --size 24 \
+  --range 0x20-0x7F --format lvgl --bpp 4 \
+  --output generated/your_font_24.c
+```
+
+Alternatively, you can install globally if you have permissions:
+```bash
+sudo npm install -g lv_font_conv
 lv_font_conv --font ttf/YourFont.ttf --size 24 \
   --range 0x20-0x7F --format lvgl --bpp 4 \
   --output generated/your_font_24.c
@@ -105,10 +117,21 @@ For OpenDash displays:
 ## Troubleshooting
 
 ### "lv_font_conv: command not found"
-Install Node.js and lv_font_conv:
+The build system will automatically install `lv_font_conv` locally if Node.js is available.
+
+If you need to install manually:
 ```bash
+# Install Node.js (if not already installed)
 sudo apt-get install nodejs npm
-npm install -g lv_font_conv
+
+# Install lv_font_conv locally (no sudo required)
+cd common/fonts
+npm install lv_font_conv
+```
+
+Or install globally (requires sudo):
+```bash
+sudo npm install -g lv_font_conv
 ```
 
 ### "undefined reference to font"
