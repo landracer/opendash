@@ -10,6 +10,7 @@ idf_component_register(
     INCLUDE_DIRS
         "."
     REQUIRES
+        common
         lvgl__lvgl
         espressif__esp_lvgl_port
 )
