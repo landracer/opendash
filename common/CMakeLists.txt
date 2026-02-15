@@ -5,12 +5,22 @@
 # display projects (center, left-right, gps). It is included via the
 # EXTRA_COMPONENT_DIRS mechanism in each project's top-level CMakeLists.txt.
 #
+# IMPORTANT: Any changes to this component automatically affect ALL displays.
+# This includes:
+#   - Font system (fonts/, convert_fonts.py, generated fonts)
+#   - Shared headers (include/opendash_fonts.h, etc.)
+#   - Shared implementations (src/*.c)
+#
+# @see DISPLAY_SYNCHRONIZATION.md for details on how displays stay synchronized
 # @see ESP-IDF Build System:
 #      https://docs.espressif.com/projects/esp-idf/en/release-v5.3/esp32s3/api-guides/build-system.html
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Step 1: Convert TrueType fonts to LVGL C format (pre-build step)
+#
+# This runs once during CMake configuration for ANY display project.
+# Generated fonts are shared by ALL displays (center, left-right, gps).
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Check if Python3 is available
@@ -44,12 +54,18 @@ endif()
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Step 2: Collect generated font files
+#
+# All *.c files in fonts/generated/ are automatically included.
+# This includes both the converted fonts and any future additions.
 # ─────────────────────────────────────────────────────────────────────────────
 
 file(GLOB FONT_SOURCES "${CMAKE_CURRENT_LIST_DIR}/fonts/generated/*.c")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Step 3: Register component with all sources
+#
+# This component is automatically linked to ALL display projects via
+# EXTRA_COMPONENT_DIRS. Any file added here becomes available to all displays.
 # ─────────────────────────────────────────────────────────────────────────────
 
 idf_component_register(
