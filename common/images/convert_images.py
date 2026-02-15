@@ -214,9 +214,12 @@ def process_image(source_path: Path, display: str, image_type: str,
     
     # Check if conversion needed
     if not force and header_path.exists() and scaled_path.exists():
-        # Reconvert if source is newer than either the scaled image or header
-        if (source_path.stat().st_mtime < scaled_path.stat().st_mtime and 
-            source_path.stat().st_mtime < header_path.stat().st_mtime):
+        # Skip if source is older than both generated files (meaning they're up to date)
+        source_mtime = source_path.stat().st_mtime
+        scaled_mtime = scaled_path.stat().st_mtime
+        header_mtime = header_path.stat().st_mtime
+        
+        if source_mtime <= scaled_mtime and source_mtime <= header_mtime:
             print_info(f"  {var_name}: Up to date, skipping")
             return 0
     
