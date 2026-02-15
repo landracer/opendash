@@ -62,13 +62,26 @@ def check_node_installed() -> bool:
         print_info("Install Node.js: sudo apt-get install nodejs npm")
         return False
 
-def check_lv_font_conv_installed() -> bool:
-    """Check if lv_font_conv is installed"""
+def check_lv_font_conv_installed(fonts_dir: Path) -> bool:
+    """Check if lv_font_conv is installed (locally or globally)"""
+    # Check local installation first
+    local_bin = fonts_dir / 'node_modules' / '.bin' / 'lv_font_conv'
+    if local_bin.exists():
+        try:
+            result = subprocess.run([str(local_bin), '--help'], 
+                                  capture_output=True, text=True)
+            if result.returncode == 0:
+                print_success("lv_font_conv is installed locally")
+                return True
+        except Exception:
+            pass
+    
+    # Check global installation
     try:
         result = subprocess.run(['lv_font_conv', '--help'], 
                               capture_output=True, text=True)
         if result.returncode == 0:
-            print_success("lv_font_conv is installed")
+            print_success("lv_font_conv is installed globally")
             return True
         else:
             print_warning("lv_font_conv found but may not be working correctly")
@@ -77,17 +90,24 @@ def check_lv_font_conv_installed() -> bool:
         print_warning("lv_font_conv is not installed")
         return False
 
-def install_lv_font_conv() -> bool:
-    """Install lv_font_conv via npm"""
-    print_info("Installing lv_font_conv via npm...")
+def install_lv_font_conv(fonts_dir: Path) -> bool:
+    """Install lv_font_conv via npm (locally to avoid permission issues)"""
+    print_info("Installing lv_font_conv locally via npm...")
     try:
-        subprocess.run(['npm', 'install', '-g', 'lv_font_conv'], 
-                      check=True)
+        # Install locally in the fonts directory
+        subprocess.run(['npm', 'install', 'lv_font_conv'], 
+                      cwd=str(fonts_dir),
+                      check=True,
+                      capture_output=True)
         print_success("lv_font_conv installed successfully")
         return True
     except subprocess.CalledProcessError as e:
-        print_error(f"Failed to install lv_font_conv: {e}")
-        print_info("Try manually: npm install -g lv_font_conv")
+        print_error(f"Failed to install lv_font_conv locally: {e}")
+        print_info("You can try manually:")
+        print_info(f"  cd {fonts_dir}")
+        print_info("  npm install lv_font_conv")
+        print_info("Or install globally (requires sudo):")
+        print_info("  sudo npm install -g lv_font_conv")
         return False
 
 def load_font_config(config_path: Path) -> Optional[Dict]:
@@ -125,8 +145,26 @@ def should_convert_font(ttf_path: Path, output_path: Path, force: bool = False) 
     
     return False
 
+def get_lv_font_conv_command(fonts_dir: Path) -> Optional[str]:
+    """Get the lv_font_conv command (local or global)"""
+    # Try local installation first
+    local_bin = fonts_dir / 'node_modules' / '.bin' / 'lv_font_conv'
+    if local_bin.exists():
+        return str(local_bin)
+    
+    # Try global installation
+    try:
+        result = subprocess.run(['which', 'lv_font_conv'], 
+                              capture_output=True, text=True)
+        if result.returncode == 0 and result.stdout.strip():
+            return 'lv_font_conv'
+    except Exception:
+        pass
+    
+    return None
+
 def convert_font(font_config: Dict, ttf_dir: Path, output_dir: Path, 
-                force: bool = False) -> int:
+                fonts_dir: Path, force: bool = False) -> int:
     """Convert a single font to all specified sizes"""
     name = font_config.get('name')
     source = font_config.get('source')
@@ -160,9 +198,15 @@ def convert_font(font_config: Dict, ttf_dir: Path, output_dir: Path,
         
         print_info(f"  Converting {output_name} (size={size}, bpp={bpp})...")
         
+        # Get lv_font_conv command
+        lv_font_conv_cmd = get_lv_font_conv_command(fonts_dir)
+        if not lv_font_conv_cmd:
+            print_error("lv_font_conv command not found")
+            return 1
+        
         # Build lv_font_conv command
         cmd = [
-            'lv_font_conv',
+            lv_font_conv_cmd,
             '--font', str(ttf_path),
             '--size', str(size),
             '--bpp', str(bpp),
@@ -207,13 +251,13 @@ def main():
     if not check_node_installed():
         return 1
     
-    if not check_lv_font_conv_installed():
+    if not check_lv_font_conv_installed(script_dir):
         if check_only:
             print_info("Skipping installation in check-only mode")
             return 1
         
         print_info("Attempting to install lv_font_conv...")
-        if not install_lv_font_conv():
+        if not install_lv_font_conv(script_dir):
             return 1
     
     if check_only:
@@ -239,7 +283,7 @@ def main():
     
     total_errors = 0
     for font_config in fonts:
-        result = convert_font(font_config, ttf_dir, output_dir, force)
+        result = convert_font(font_config, ttf_dir, output_dir, script_dir, force)
         total_errors += result
     
     print("=" * 60)
