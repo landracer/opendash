@@ -16,6 +16,7 @@
  */
 
 #include "display_init.h"
+#include <stdbool.h>
 #include "esp_log.h"
 #include "esp_lcd_panel_ops.h"
 #include "esp_lcd_panel_rgb.h"
