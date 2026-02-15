@@ -130,26 +130,30 @@ static void create_data_grid(lv_obj_t *parent)
     const int start_y = 140;
     const int spacing = 10;
     
+    /* Calculate centered starting position */
+    const int total_width = 3 * section_width + 2 * spacing;
+    const int start_x = (LCD_H_RES - total_width) / 2;
+    
     /* Row 1: Sections A, B, C */
     sections[0] = create_data_section(parent, "COOLANT °C", 
-                                      20, start_y, section_width, section_height);
+                                      start_x, start_y, section_width, section_height);
     sections[1] = create_data_section(parent, "GPS SPEED", 
-                                      20 + section_width + spacing, start_y, 
+                                      start_x + section_width + spacing, start_y, 
                                       section_width, section_height);
     sections[2] = create_data_section(parent, "BOOST kPa", 
-                                      20 + 2*(section_width + spacing), start_y, 
+                                      start_x + 2*(section_width + spacing), start_y, 
                                       section_width, section_height);
     
     /* Row 2: Sections D, E, F */
     sections[3] = create_data_section(parent, "OIL TEMP °C", 
-                                      20, start_y + section_height + spacing, 
+                                      start_x, start_y + section_height + spacing, 
                                       section_width, section_height);
     sections[4] = create_data_section(parent, "LAP TIME", 
-                                      20 + section_width + spacing, 
+                                      start_x + section_width + spacing, 
                                       start_y + section_height + spacing, 
                                       section_width, section_height);
     sections[5] = create_data_section(parent, "AFR", 
-                                      20 + 2*(section_width + spacing), 
+                                      start_x + 2*(section_width + spacing), 
                                       start_y + section_height + spacing, 
                                       section_width, section_height);
     
