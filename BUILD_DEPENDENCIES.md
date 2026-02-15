@@ -246,7 +246,15 @@ pip3 install Pillow
 
 ## Quick Dependency Check
 
-Run this script to verify all dependencies:
+Run the automated dependency checker:
+
+```bash
+./check_deps.sh
+```
+
+This script will verify all dependencies and show you what's missing.
+
+Or manually check each dependency:
 
 ```bash
 #!/bin/bash
