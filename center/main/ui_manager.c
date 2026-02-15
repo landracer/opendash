@@ -187,8 +187,8 @@ static void ui_task(void *pvParameters)
     ESP_LOGI(TAG, "UI task started");
     
     while (1) {
-        /* Process LVGL tasks */
-        lv_task_handler();
+        /* Process LVGL timers and rendering */
+        lv_timer_handler();
         
         /* Delay to allow other tasks to run */
         vTaskDelay(pdMS_TO_TICKS(10));
