@@ -92,21 +92,21 @@ static void create_primary_display(lv_obj_t *parent)
     /* Primary label (data point name) */
     primary_label = lv_label_create(container);
     lv_label_set_text(primary_label, "OIL TEMP");
-    lv_obj_set_style_text_font(primary_label, &lv_font_montserrat_20, 0);
+    lv_obj_set_style_text_font(primary_label, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_color(primary_label, lv_color_hex(0x808080), 0);
     lv_obj_align(primary_label, LV_ALIGN_TOP_MID, 0, 0);
     
     /* Primary value */
     primary_value = lv_label_create(container);
     lv_label_set_text(primary_value, "---");
-    lv_obj_set_style_text_font(primary_value, &lv_font_montserrat_48, 0);
+    lv_obj_set_style_text_font(primary_value, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_color(primary_value, lv_color_hex(0xFFFFFF), 0);
     lv_obj_align(primary_value, LV_ALIGN_CENTER, 0, 10);
     
     /* Unit label */
     lv_obj_t *unit_label = lv_label_create(container);
     lv_label_set_text(unit_label, "°C");
-    lv_obj_set_style_text_font(unit_label, &lv_font_montserrat_20, 0);
+    lv_obj_set_style_text_font(unit_label, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_color(unit_label, lv_color_hex(0x808080), 0);
     lv_obj_align(unit_label, LV_ALIGN_BOTTOM_MID, 0, 0);
     
@@ -130,14 +130,14 @@ static void create_secondary_display(lv_obj_t *parent)
     /* Secondary label */
     secondary_label = lv_label_create(container);
     lv_label_set_text(secondary_label, "BOOST");
-    lv_obj_set_style_text_font(secondary_label, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_font(secondary_label, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_color(secondary_label, lv_color_hex(0x808080), 0);
     lv_obj_align(secondary_label, LV_ALIGN_TOP_MID, 0, 10);
     
     /* Secondary value */
     secondary_value = lv_label_create(container);
     lv_label_set_text(secondary_value, "--- kPa");
-    lv_obj_set_style_text_font(secondary_value, &lv_font_montserrat_28, 0);
+    lv_obj_set_style_text_font(secondary_value, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_color(secondary_value, lv_color_hex(0xFFFFFF), 0);
     lv_obj_align(secondary_value, LV_ALIGN_CENTER, 0, 10);
     

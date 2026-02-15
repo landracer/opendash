@@ -67,14 +67,14 @@ static void create_speed_display(lv_obj_t *parent)
     /* Label */
     lv_obj_t *label = lv_label_create(container);
     lv_label_set_text(label, "GPS SPEED");
-    lv_obj_set_style_text_font(label, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_font(label, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_color(label, lv_color_hex(0x808080), 0);
     lv_obj_align(label, LV_ALIGN_TOP_MID, 0, 0);
     
     /* Speed value */
     speed_label = lv_label_create(container);
     lv_label_set_text(speed_label, "--- km/h");
-    lv_obj_set_style_text_font(speed_label, &lv_font_montserrat_48, 0);
+    lv_obj_set_style_text_font(speed_label, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_color(speed_label, lv_color_hex(0x00FF00), 0);
     lv_obj_align(speed_label, LV_ALIGN_CENTER, 0, 15);
     
@@ -97,14 +97,14 @@ static void create_lap_display(lv_obj_t *parent)
     /* Lap time */
     laptime_label = lv_label_create(container);
     lv_label_set_text(laptime_label, "LAP: --:--.---");
-    lv_obj_set_style_text_font(laptime_label, &lv_font_montserrat_20, 0);
+    lv_obj_set_style_text_font(laptime_label, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_color(laptime_label, lv_color_hex(0xFFFFFF), 0);
     lv_obj_align(laptime_label, LV_ALIGN_TOP_MID, 0, 10);
     
     /* Delta */
     delta_label = lv_label_create(container);
     lv_label_set_text(delta_label, "Δ: ---");
-    lv_obj_set_style_text_font(delta_label, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_font(delta_label, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_color(delta_label, lv_color_hex(0xFFFF00), 0);
     lv_obj_align(delta_label, LV_ALIGN_BOTTOM_MID, 0, -10);
     
@@ -127,7 +127,7 @@ static void create_gforce_display(lv_obj_t *parent)
     /* G-force label */
     lv_obj_t *g_label = lv_label_create(gforce_circle);
     lv_label_set_text(g_label, "G");
-    lv_obj_set_style_text_font(g_label, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_font(g_label, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_color(g_label, lv_color_hex(0x808080), 0);
     lv_obj_center(g_label);
     
