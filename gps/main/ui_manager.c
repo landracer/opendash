@@ -31,6 +31,7 @@
 #include "freertos/task.h"
 #include "lvgl.h"
 #include "opendash_common.h"
+#include "opendash_fonts.h"
 
 static const char *TAG = "ui_manager";
 
@@ -67,14 +68,14 @@ static void create_speed_display(lv_obj_t *parent)
     /* Label */
     lv_obj_t *label = lv_label_create(container);
     lv_label_set_text(label, "GPS SPEED");
-    lv_obj_set_style_text_font(label, &lv_font_montserrat_14, 0);
+    opendash_set_font(label, OPENDASH_FONT_SIZE_SMALL);
     lv_obj_set_style_text_color(label, lv_color_hex(0x808080), 0);
     lv_obj_align(label, LV_ALIGN_TOP_MID, 0, 0);
     
     /* Speed value */
     speed_label = lv_label_create(container);
     lv_label_set_text(speed_label, "--- km/h");
-    lv_obj_set_style_text_font(speed_label, &lv_font_montserrat_14, 0);
+    opendash_set_font(speed_label, OPENDASH_FONT_SIZE_LARGE);
     lv_obj_set_style_text_color(speed_label, lv_color_hex(0x00FF00), 0);
     lv_obj_align(speed_label, LV_ALIGN_CENTER, 0, 15);
     
@@ -97,14 +98,14 @@ static void create_lap_display(lv_obj_t *parent)
     /* Lap time */
     laptime_label = lv_label_create(container);
     lv_label_set_text(laptime_label, "LAP: --:--.---");
-    lv_obj_set_style_text_font(laptime_label, &lv_font_montserrat_14, 0);
+    opendash_set_font(laptime_label, OPENDASH_FONT_SIZE_MEDIUM);
     lv_obj_set_style_text_color(laptime_label, lv_color_hex(0xFFFFFF), 0);
     lv_obj_align(laptime_label, LV_ALIGN_TOP_MID, 0, 10);
     
     /* Delta */
     delta_label = lv_label_create(container);
     lv_label_set_text(delta_label, "Δ: ---");
-    lv_obj_set_style_text_font(delta_label, &lv_font_montserrat_14, 0);
+    opendash_set_font(delta_label, OPENDASH_FONT_SIZE_SMALL);
     lv_obj_set_style_text_color(delta_label, lv_color_hex(0xFFFF00), 0);
     lv_obj_align(delta_label, LV_ALIGN_BOTTOM_MID, 0, -10);
     
@@ -127,7 +128,7 @@ static void create_gforce_display(lv_obj_t *parent)
     /* G-force label */
     lv_obj_t *g_label = lv_label_create(gforce_circle);
     lv_label_set_text(g_label, "G");
-    lv_obj_set_style_text_font(g_label, &lv_font_montserrat_14, 0);
+    opendash_set_font(g_label, OPENDASH_FONT_SIZE_SMALL);
     lv_obj_set_style_text_color(g_label, lv_color_hex(0x808080), 0);
     lv_obj_center(g_label);
     
@@ -142,14 +143,14 @@ static void create_status_bar(lv_obj_t *parent)
     /* Satellite count (bottom left) */
     sat_label = lv_label_create(parent);
     lv_label_set_text(sat_label, "0 Sats");
-    lv_obj_set_style_text_font(sat_label, &lv_font_montserrat_14, 0);
+    opendash_set_font(sat_label, OPENDASH_FONT_SIZE_SMALL);
     lv_obj_set_style_text_color(sat_label, lv_color_hex(0x808080), 0);
     lv_obj_align(sat_label, LV_ALIGN_BOTTOM_LEFT, 20, -10);
     
     /* Heading (bottom right) */
     heading_label = lv_label_create(parent);
     lv_label_set_text(heading_label, "---°");
-    lv_obj_set_style_text_font(heading_label, &lv_font_montserrat_14, 0);
+    opendash_set_font(heading_label, OPENDASH_FONT_SIZE_SMALL);
     lv_obj_set_style_text_color(heading_label, lv_color_hex(0x808080), 0);
     lv_obj_align(heading_label, LV_ALIGN_BOTTOM_RIGHT, -20, -10);
     

@@ -28,6 +28,7 @@
 #include "freertos/task.h"
 #include "lvgl.h"
 #include "opendash_common.h"
+#include "opendash_fonts.h"
 
 static const char *TAG = "ui_manager";
 
@@ -79,7 +80,7 @@ static void create_rpm_arc(lv_obj_t *parent)
     /* Add RPM label */
     lv_obj_t *rpm_label = lv_label_create(rpm_arc);
     lv_label_set_text(rpm_label, "0 RPM");
-    lv_obj_set_style_text_font(rpm_label, &lv_font_montserrat_14, 0);
+    opendash_set_font(rpm_label, OPENDASH_FONT_SIZE_SMALL);
     lv_obj_set_style_text_color(rpm_label, lv_color_hex(0xFFFFFF), 0);
     lv_obj_center(rpm_label);
     
@@ -106,14 +107,14 @@ static lv_obj_t* create_data_section(lv_obj_t *parent, const char *label_text,
     /* Create label */
     lv_obj_t *label = lv_label_create(section);
     lv_label_set_text(label, label_text);
-    lv_obj_set_style_text_font(label, &lv_font_montserrat_14, 0);
+    opendash_set_font(label, OPENDASH_FONT_SIZE_SMALL);
     lv_obj_set_style_text_color(label, lv_color_hex(0x808080), 0);
     lv_obj_align(label, LV_ALIGN_TOP_LEFT, 8, 8);
     
     /* Create value label */
     lv_obj_t *value_label = lv_label_create(section);
     lv_label_set_text(value_label, "---");
-    lv_obj_set_style_text_font(value_label, &lv_font_montserrat_14, 0);
+    opendash_set_font(value_label, OPENDASH_FONT_SIZE_MEDIUM);
     lv_obj_set_style_text_color(value_label, lv_color_hex(0xFFFFFF), 0);
     lv_obj_align(value_label, LV_ALIGN_CENTER, 0, 8);
     
@@ -174,7 +175,7 @@ static void create_status_bar(lv_obj_t *parent)
     /* Status text */
     lv_obj_t *status_label = lv_label_create(status_bar);
     lv_label_set_text(status_label, "OpenDash v0.1.0 | System Ready | No Warnings");
-    lv_obj_set_style_text_font(status_label, &lv_font_montserrat_14, 0);
+    opendash_set_font(status_label, OPENDASH_FONT_SIZE_SMALL);
     lv_obj_set_style_text_color(status_label, lv_color_hex(0x00FF00), 0);
     lv_obj_center(status_label);
     
