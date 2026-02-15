@@ -73,7 +73,8 @@ def check_lv_font_conv_installed(fonts_dir: Path) -> bool:
             if result.returncode == 0:
                 print_success("lv_font_conv is installed locally")
                 return True
-        except Exception:
+        except (subprocess.CalledProcessError, FileNotFoundError, OSError) as e:
+            print_warning(f"Local lv_font_conv found but failed to run: {e}")
             pass
     
     # Check global installation
@@ -95,14 +96,17 @@ def install_lv_font_conv(fonts_dir: Path) -> bool:
     print_info("Installing lv_font_conv locally via npm...")
     try:
         # Install locally in the fonts directory
-        subprocess.run(['npm', 'install', 'lv_font_conv'], 
+        result = subprocess.run(['npm', 'install', 'lv_font_conv'], 
                       cwd=str(fonts_dir),
                       check=True,
-                      capture_output=True)
+                      capture_output=True,
+                      text=True)
         print_success("lv_font_conv installed successfully")
         return True
     except subprocess.CalledProcessError as e:
         print_error(f"Failed to install lv_font_conv locally: {e}")
+        if e.stderr:
+            print_error(f"npm error: {e.stderr}")
         print_info("You can try manually:")
         print_info(f"  cd {fonts_dir}")
         print_info("  npm install lv_font_conv")
