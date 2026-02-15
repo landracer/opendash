@@ -81,7 +81,7 @@ typedef struct {
  *
  * @return OPENDASH_OK on success.
  *
- * @note Uses esp_nvs_open() / esp_nvs_get_blob() internally.
+ * @note Uses nvs_open() / nvs_get_blob() internally.
  * @see https://docs.espressif.com/projects/esp-idf/en/release-v5.3/esp32s3/api-reference/storage/nvs_flash.html
  */
 opendash_err_t opendash_config_load(opendash_node_t node,

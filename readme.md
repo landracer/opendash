@@ -12,11 +12,13 @@
 
 | Display Unit | Hardware | Resolution | Directory |
 |---|---|---|---|
-| **Center** (Main Dash) | [ESP32-S3-Touch-LCD-4.3](https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4.3) | 800×480 IPS | [`center/`](./center/) |
-| **Left & Right** (Gauge Pods) | [ESP32-S3-LCD-2.8C](https://www.waveshare.com/wiki/ESP32-S3-LCD-2.8C) | 480×480 Round | [`left-right/`](./left-right/) |
-| **GPS / Telemetry** | [ESP32-S3-Touch-AMOLED-1.75](https://www.waveshare.com/wiki/ESP32-S3-Touch-AMOLED-1.75) | 466×466 AMOLED | [`gps/`](./gps/) |
+| **Center** (Main Dash) | [ESP32-S3-Touch-LCD-4.3](https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4.3) | 800×480 IPS | `center/` (planned) |
+| **Left & Right** (Gauge Pods) | [ESP32-S3-LCD-2.8C](https://www.waveshare.com/wiki/ESP32-S3-LCD-2.8C) | 480×480 Round | `left-right/` (planned) |
+| **GPS / Telemetry** | [ESP32-S3-Touch-AMOLED-1.75](https://www.waveshare.com/wiki/ESP32-S3-Touch-AMOLED-1.75) | 466×466 AMOLED | `gps/` (planned) |
 
 > **Shared code** lives in [`common/`](./common/) — I2C protocol, data models, OBD2 PIDs, display configuration, and the pre-flight checklist system.
+>
+> **Note:** The individual display unit projects (`center/`, `left-right/`, `gps/`) are planned and will be added in future commits.
 
 ---
 
@@ -24,7 +26,7 @@
 
 ```
 opendash/
-├── README.md                    ← You are here (landing page)
+├── readme.md                    ← You are here (landing page)
 ├── docs/                        ← Architecture, hardware, protocols, setup
 │   ├── architecture.md          — System-level architecture & data flow
 │   ├── hardware.md              — Hardware specifications & pin mappings
