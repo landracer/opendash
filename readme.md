@@ -133,8 +133,12 @@ opendash/
 ### Prerequisites
 
 1. **ESP-IDF v5.3** — [Installation Guide](https://docs.espressif.com/projects/esp-idf/en/release-v5.3/esp32s3/get-started/index.html)
-2. **Visual Studio Code** with the [ESP-IDF Extension](https://marketplace.visualstudio.com/items?itemName=espressif.esp-idf-extension) (recommended) — See [VS Code Setup Guide](docs/vscode-setup.md)
-3. **USB-C cable** and target hardware
+2. **Node.js + npm** — For font conversion (required)
+3. **Python 3 + Pillow + ImageMagick** — For image conversion (required)
+4. **Visual Studio Code** with the [ESP-IDF Extension](https://marketplace.visualstudio.com/items?itemName=espressif.esp-idf-extension) (recommended) — See [VS Code Setup Guide](docs/vscode-setup.md)
+5. **USB-C cable** and target hardware
+
+> **📦 Complete dependency installation guide:** [BUILD_DEPENDENCIES.md](BUILD_DEPENDENCIES.md)
 
 ### Build & Flash (Any Unit)
 
@@ -167,6 +171,7 @@ idf.py -p /dev/ttyUSB0 flash monitor
 | Document | Description |
 |---|---|
 | [**Quick Start Guide**](QUICKSTART.md) | **5-minute setup guide — start here!** |
+| [**Build Dependencies**](BUILD_DEPENDENCIES.md) | **Complete dependency installation guide** |
 | [`docs/vscode-setup.md`](docs/vscode-setup.md) | Visual Studio Code configuration guide |
 | [`docs/setup-guide.md`](docs/setup-guide.md) | Detailed development environment setup |
 | [`docs/architecture.md`](docs/architecture.md) | System architecture, data flow, and node roles |
