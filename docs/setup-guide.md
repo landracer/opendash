@@ -37,14 +37,15 @@ cd opendash
 
 ## Building a Display Project
 
-> **Note:** The individual display projects (`center/`, `left-right/`, `gps/`)
-> are not yet present in the repository and will be added in future commits.
-> The build commands below are provided for reference once those projects exist.
+Each display project is a standalone ESP-IDF application that can be built
+and flashed independently. This allows you to work on and update individual
+display units without affecting the others.
 
-Each display project is a standalone ESP-IDF application. Navigate to the
-desired project directory and build:
+### Command Line Build
 
-### Center Display (4.3" LCD) — *planned*
+Navigate to the desired project directory and build:
+
+#### Center Display (4.3" LCD)
 
 ```bash
 cd center/
@@ -53,7 +54,7 @@ idf.py set-target esp32s3
 idf.py build
 ```
 
-### Left/Right Gauges (2.8" Round LCD) — *planned*
+#### Left/Right Gauges (2.8" Round LCD)
 
 ```bash
 cd left-right/
@@ -62,7 +63,7 @@ idf.py set-target esp32s3
 idf.py build
 ```
 
-### GPS / Telemetry (1.75" AMOLED) — *planned*
+#### GPS / Telemetry (1.75" AMOLED)
 
 ```bash
 cd gps/
@@ -70,6 +71,131 @@ source ~/esp/esp-idf/export.sh
 idf.py set-target esp32s3
 idf.py build
 ```
+
+### Visual Studio Code Build
+
+VS Code with the ESP-IDF extension provides a streamlined workflow for
+building and flashing each display project.
+
+#### Initial Setup (One-Time)
+
+1. **Install Visual Studio Code**
+   - Download from https://code.visualstudio.com/
+
+2. **Install the ESP-IDF Extension**
+   - Open VS Code
+   - Go to Extensions (Ctrl+Shift+X)
+   - Search for "ESP-IDF"
+   - Install "Espressif IDF" extension
+   - Restart VS Code
+
+3. **Configure ESP-IDF Extension**
+   - Press **F1** (or Ctrl+Shift+P)
+   - Type "ESP-IDF: Configure ESP-IDF Extension"
+   - Select "Express" installation or "Use Existing Setup"
+   - If using existing: Point to your ESP-IDF installation (e.g., `~/esp/esp-idf`)
+   - Select ESP-IDF version **v5.3**
+   - Select Python executable
+   - Wait for setup to complete
+
+#### Building a Display Project
+
+1. **Open the Project Folder**
+   - File → Open Folder
+   - Navigate to one of the display project folders:
+     - `opendash/center/`
+     - `opendash/left-right/`
+     - `opendash/gps/`
+   - Click "Select Folder"
+
+2. **Set the Target Device**
+   - Press **F1**
+   - Type "ESP-IDF: Set Espressif device target"
+   - Select **ESP32-S3**
+
+3. **Build the Project**
+   - Press **F1**
+   - Type "ESP-IDF: Build your project"
+   - Or click the **Build** button in the status bar (looks like a wrench)
+   - Wait for build to complete
+
+4. **Flash to Device**
+   - Connect the ESP32-S3 board via USB-C
+   - Press **F1**
+   - Type "ESP-IDF: Select port to use"
+   - Select your device's serial port (e.g., `/dev/ttyUSB0`, `COM3`)
+   - Press **F1**
+   - Type "ESP-IDF: Flash your project"
+   - Or click the **Flash** button in the status bar (looks like a lightning bolt)
+
+5. **Monitor Serial Output**
+   - Press **F1**
+   - Type "ESP-IDF: Monitor device"
+   - Or click the **Monitor** button in the status bar (looks like a TV)
+   - Press **Ctrl+]** to exit monitor
+
+#### Switching Between Projects
+
+To work on a different display unit:
+
+1. **Close Current Folder**
+   - File → Close Folder
+
+2. **Open Different Project**
+   - File → Open Folder
+   - Select a different project folder (`center/`, `left-right/`, or `gps/`)
+
+VS Code remembers the build configuration for each project, so you don't need
+to reconfigure the target when switching between projects.
+
+#### Alternative: VS Code Workspace
+
+For advanced users who want to work on multiple projects simultaneously:
+
+1. **Create a Workspace File** (`opendash.code-workspace`):
+   ```json
+   {
+     "folders": [
+       { "path": "center" },
+       { "path": "left-right" },
+       { "path": "gps" }
+     ]
+   }
+   ```
+
+2. **Open the Workspace**
+   - File → Open Workspace from File
+   - Select `opendash.code-workspace`
+
+3. **Build Specific Projects**
+   - Each folder appears in the sidebar
+   - Right-click a folder → "Open in Terminal"
+   - Use command-line build commands for that specific project
+
+### PlatformIO Alternative (Advanced)
+
+While ESP-IDF extension is recommended, you can also use PlatformIO:
+
+1. **Install PlatformIO Extension** in VS Code
+
+2. **Create `platformio.ini` for Each Project** (example for center):
+   ```ini
+   [env:esp32-s3-devkitc-1]
+   platform = espressif32
+   board = esp32-s3-devkitc-1
+   framework = espidf
+   board_build.flash_size = 16MB
+   board_build.partitions = default_16MB.csv
+   monitor_speed = 115200
+   ```
+
+3. **Build and Flash**
+   - Click PlatformIO icon in sidebar
+   - Select your project
+   - Click "Build" or "Upload"
+
+**Note:** ESP-IDF extension is the recommended approach as it provides better
+integration with ESP-IDF toolchain and features.
 
 ---
 
