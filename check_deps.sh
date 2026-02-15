@@ -33,9 +33,9 @@ check_command() {
 echo "Checking Required Dependencies:"
 echo "--------------------------------------"
 if command -v idf.py &> /dev/null; then
-    IDF_VERSION=$(idf.py --version 2>&1 | head -1 | cut -d' ' -f2)
+    IDF_VERSION=$(idf.py --version 2>&1 | head -1 | cut -d' ' -f2 2>/dev/null || echo "unknown")
     echo "✅ ESP-IDF: Found (version $IDF_VERSION)"
-    if [[ ! "$IDF_VERSION" == v5.3* ]]; then
+    if [[ ! "$IDF_VERSION" == v5.3* ]] && [[ "$IDF_VERSION" != "unknown" ]]; then
         echo "   ⚠️  Warning: OpenDash requires ESP-IDF v5.3.x, found $IDF_VERSION"
     fi
 else

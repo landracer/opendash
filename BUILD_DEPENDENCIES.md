@@ -68,8 +68,8 @@ Download from: https://nodejs.org/
 
 **Verify installation:**
 ```bash
-node --version   # Should show v14+ or newer
-npm --version    # Should show 6+ or newer
+node --version   # Should show v18+ or newer (LTS)
+npm --version    # Should show 9+ or newer
 ```
 
 **Install lv_font_conv (automatically handled):**
@@ -252,63 +252,7 @@ Run the automated dependency checker:
 ./check_deps.sh
 ```
 
-This script will verify all dependencies and show you what's missing.
-
-Or manually check each dependency:
-
-```bash
-#!/bin/bash
-echo "Checking OpenDash Build Dependencies..."
-echo "========================================"
-
-# ESP-IDF
-if command -v idf.py &> /dev/null; then
-    echo "✅ ESP-IDF: $(idf.py --version 2>&1 | head -1)"
-else
-    echo "❌ ESP-IDF: NOT FOUND"
-fi
-
-# Node.js
-if command -v node &> /dev/null; then
-    echo "✅ Node.js: $(node --version)"
-else
-    echo "❌ Node.js: NOT FOUND"
-fi
-
-# npm
-if command -v npm &> /dev/null; then
-    echo "✅ npm: $(npm --version)"
-else
-    echo "❌ npm: NOT FOUND"
-fi
-
-# Python 3
-if command -v python3 &> /dev/null; then
-    echo "✅ Python 3: $(python3 --version)"
-else
-    echo "❌ Python 3: NOT FOUND"
-fi
-
-# Pillow
-if python3 -c "import PIL" 2> /dev/null; then
-    echo "✅ Pillow: $(python3 -c 'import PIL; print(PIL.__version__)')"
-else
-    echo "❌ Pillow: NOT FOUND"
-fi
-
-# ImageMagick
-if command -v magick &> /dev/null; then
-    echo "✅ ImageMagick: $(magick --version | head -1)"
-elif command -v convert &> /dev/null; then
-    echo "✅ ImageMagick: $(convert --version | head -1)"
-else
-    echo "❌ ImageMagick: NOT FOUND"
-fi
-
-echo "========================================"
-```
-
-Save as `check_deps.sh`, make executable with `chmod +x check_deps.sh`, and run `./check_deps.sh`.
+This script verifies all dependencies and shows you what's missing. See the script source for implementation details.
 
 ---
 

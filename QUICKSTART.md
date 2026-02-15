@@ -38,9 +38,10 @@ See [BUILD_DEPENDENCIES.md](BUILD_DEPENDENCIES.md) for detailed instructions.
 
 **Quick install (Ubuntu/Debian):**
 ```bash
+# From the opendash repository root directory:
 sudo apt-get install nodejs npm python3 python3-pip imagemagick
 pip3 install Pillow
-cd opendash/common/fonts && npm install && cd ../..
+cd common/fonts && npm install && cd ../..
 ```
 
 ### 3. Clone the Repository
