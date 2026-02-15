@@ -9,4 +9,7 @@ idf_component_register(
         "ui_manager.c"
     INCLUDE_DIRS
         "."
+    REQUIRES
+        lvgl__lvgl
+        espressif__esp_lvgl_port
 )
