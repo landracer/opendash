@@ -164,7 +164,7 @@ static esp_err_t lcd_panel_init(void)
         },
     };
     
-    /* Set flags after initialization to avoid duplicate field names */
+    /* Set flags after initialization due to C99 nested designated initializer limitations */
     panel_config.timings.flags.pclk_active_neg = true;
     panel_config.flags.fb_in_psram = true;
     
