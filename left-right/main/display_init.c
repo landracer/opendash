@@ -38,12 +38,16 @@ static const char *TAG = "display_init";
 #define LCD_PIXEL_CLOCK_HZ      (16 * 1000 * 1000)
 
 /* I2C Configuration for backlight control via CH422G */
-#define I2C_MASTER_NUM          0
-#define I2C_MASTER_SCL_IO       GPIO_NUM_9
-#define I2C_MASTER_SDA_IO       GPIO_NUM_8
-#define I2C_MASTER_FREQ_HZ      400000
-#define I2C_MASTER_TIMEOUT_MS   1000
-#define CH422G_I2C_ADDRESS      0x24
+#define I2C_MASTER_NUM              0
+#define I2C_MASTER_SCL_IO           GPIO_NUM_9
+#define I2C_MASTER_SDA_IO           GPIO_NUM_8
+#define I2C_MASTER_FREQ_HZ          400000
+#define I2C_MASTER_TIMEOUT_MS       1000
+#define CH422G_I2C_ADDRESS          0x24
+#define CH422G_BACKLIGHT_ADDRESS    0x38
+#define CH422G_OUTPUT_MODE_CMD      0x01
+#define CH422G_BACKLIGHT_ON_CMD     0x1E
+#define CH422G_BACKLIGHT_OFF_CMD    0x1A
 
 #define LCD_PIN_NUM_HSYNC       GPIO_NUM_46
 #define LCD_PIN_NUM_VSYNC       GPIO_NUM_3
@@ -133,7 +137,7 @@ static esp_err_t lcd_backlight_on(void)
     uint8_t write_buf;
     
     /* Configure CH422G to output mode */
-    write_buf = 0x01;
+    write_buf = CH422G_OUTPUT_MODE_CMD;
     esp_err_t ret = i2c_master_write_to_device(i2c_port, CH422G_I2C_ADDRESS, &write_buf, 1, 
                                                 I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
     if (ret != ESP_OK) {
@@ -141,8 +145,8 @@ static esp_err_t lcd_backlight_on(void)
     }
     
     /* Turn on backlight by pulling backlight pin high */
-    write_buf = 0x1E;
-    ret = i2c_master_write_to_device(i2c_port, 0x38, &write_buf, 1, 
+    write_buf = CH422G_BACKLIGHT_ON_CMD;
+    ret = i2c_master_write_to_device(i2c_port, CH422G_BACKLIGHT_ADDRESS, &write_buf, 1, 
                                      I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
     if (ret != ESP_OK) {
         ESP_LOGW(TAG, "Failed to turn on backlight: %s", esp_err_to_name(ret));
