@@ -1,0 +1,6 @@
+# Auto-generated font files - do not commit
+*.c
+*.h
+
+# Keep this directory but not the generated content
+!.gitignore
