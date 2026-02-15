@@ -61,10 +61,12 @@ The `font_config.json` file defines which fonts to convert:
 
 - `name`: Base name for the generated font (will create `{name}_{size}`)
 - `source`: Font file name in the `ttf/` directory
-- `sizes`: Array of font sizes in pixels to generate (must include 14, 18, and 32)
+- `sizes`: Array of font sizes in pixels to generate (recommended: 14, 18, and 32 for best compatibility)
 - `bpp`: Bits per pixel (1=monochrome, 2=2-bit, 4=4-bit antialiased, 8=8-bit)
 - `range`: Unicode character range (default: "0x20-0x7F" for basic ASCII)
 - `default`: Set to `true` to make this the system-wide default font (only one font should have this)
+
+**Note on sizes:** OpenDash uses three size categories (SMALL, MEDIUM, LARGE). For best results, include sizes 14, 18, and 32. If these exact sizes aren't available, the system will use the closest available sizes and issue a warning.
 
 ### Character Ranges
 

@@ -236,6 +236,10 @@ def convert_font(font_config: Dict, ttf_dir: Path, output_dir: Path,
     
     return 0
 
+def is_convertible_font(font: Dict) -> bool:
+    """Check if a font is convertible (not built-in)"""
+    return font.get('source') != 'built-in'
+
 def generate_font_header(config: Dict, output_dir: Path) -> bool:
     """Generate opendash_font_config.h with default font declarations"""
     
@@ -243,15 +247,16 @@ def generate_font_header(config: Dict, output_dir: Path) -> bool:
     fonts = config.get('fonts', [])
     default_font = None
     
+    # First, look for font marked as default
     for font in fonts:
-        if font.get('default', False) and font.get('source') != 'built-in':
+        if font.get('default', False) and is_convertible_font(font):
             default_font = font
             break
     
     # If no default found, use first non-built-in font
     if default_font is None:
         for font in fonts:
-            if font.get('source') != 'built-in':
+            if is_convertible_font(font):
                 default_font = font
                 break
     
@@ -262,17 +267,29 @@ def generate_font_header(config: Dict, output_dir: Path) -> bool:
     name = default_font.get('name')
     sizes = default_font.get('sizes', [])
     
-    # Ensure we have the required sizes (14, 18, 32)
-    required_sizes = [14, 18, 32]
-    missing_sizes = [s for s in required_sizes if s not in sizes]
-    if missing_sizes:
-        print_warning(f"Default font '{name}' missing required sizes: {missing_sizes}")
-        print_warning("OpenDash requires sizes 14, 18, and 32 for SMALL, MEDIUM, and LARGE")
+    # Validate we have sizes
+    if not sizes:
+        print_error(f"Default font '{name}' has no sizes defined")
+        return False
     
-    # Find closest sizes if exact ones aren't available
-    size_14 = min(sizes, key=lambda x: abs(x - 14)) if sizes else 14
-    size_18 = min(sizes, key=lambda x: abs(x - 18)) if sizes else 18
-    size_32 = min(sizes, key=lambda x: abs(x - 32)) if sizes else 32
+    # Check for required sizes (14, 18, 32)
+    required_sizes = [14, 18, 32]
+    has_exact_sizes = all(s in sizes for s in required_sizes)
+    
+    if has_exact_sizes:
+        # Use exact sizes
+        size_14, size_18, size_32 = 14, 18, 32
+    else:
+        # Find closest available sizes and warn user
+        missing_sizes = [s for s in required_sizes if s not in sizes]
+        print_warning(f"Default font '{name}' missing recommended sizes: {missing_sizes}")
+        print_warning("Using closest available sizes instead")
+        
+        size_14 = min(sizes, key=lambda x: abs(x - 14))
+        size_18 = min(sizes, key=lambda x: abs(x - 18))
+        size_32 = min(sizes, key=lambda x: abs(x - 32))
+        
+        print_info(f"  Mapping: SMALL={size_14}px, MEDIUM={size_18}px, LARGE={size_32}px")
     
     # Generate header content
     header_content = f"""/**
