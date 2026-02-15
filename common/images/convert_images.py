@@ -106,9 +106,6 @@ def convert_image_to_c_array(input_path: Path, output_path: Path,
                              var_name: str, width: int, height: int) -> bool:
     """Convert image to C array in RGB565 format"""
     try:
-        # First, ensure image is RGB and correct size
-        temp_raw = output_path.parent / f"{var_name}_temp.rgb"
-        
         # Convert to raw RGB888 format
         cmd_rgb = [
             'convert',
@@ -216,8 +213,10 @@ def process_image(source_path: Path, display: str, image_type: str,
     header_path = output_dir / f"{var_name}.h"
     
     # Check if conversion needed
-    if not force and header_path.exists():
-        if scaled_path.exists() and source_path.stat().st_mtime < scaled_path.stat().st_mtime:
+    if not force and header_path.exists() and scaled_path.exists():
+        # Reconvert if source is newer than either the scaled image or header
+        if (source_path.stat().st_mtime < scaled_path.stat().st_mtime and 
+            source_path.stat().st_mtime < header_path.stat().st_mtime):
             print_info(f"  {var_name}: Up to date, skipping")
             return 0
     

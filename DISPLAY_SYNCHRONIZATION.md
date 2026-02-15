@@ -134,9 +134,6 @@ When making changes to the common codebase, verify synchronization:
 - [ ] Run `python3 common/images/convert_images.py` to test
 - [ ] Verify `.h` and `.c` files are generated in `common/images/generated/`
 - [ ] All displays will auto-update on next build
-- [ ] Run `python3 common/fonts/convert_fonts.py` to test
-- [ ] Verify `common/fonts/generated/opendash_font_config.h` is generated
-- [ ] All displays will auto-update on next build
 
 ### ✅ Header Changes
 - [ ] Update header in `common/include/`
