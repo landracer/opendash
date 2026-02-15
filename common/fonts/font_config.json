@@ -1,9 +1,9 @@
 {
   "fonts": [
     {
-      "name": "montserrat",
+      "name": "engebold",
       "source": "built-in",
-      "comment": "Uses LVGL's built-in Montserrat font - no conversion needed",
+      "comment": "Uses LVGL's built-in Engebold font - no conversion needed",
       "sizes": [14, 18, 24, 32],
       "bpp": 4,
       "range": "0x20-0x7F"
