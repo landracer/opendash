@@ -11,4 +11,7 @@ idf_component_register(
         "imu_handler.c"
     INCLUDE_DIRS
         "."
+    REQUIRES
+        lvgl__lvgl
+        espressif__esp_lvgl_port
 )
