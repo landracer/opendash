@@ -138,6 +138,7 @@ esp_err_t display_init(void)
         ESP_LOGE(TAG, "Failed to allocate LVGL draw buffers");
         if (buf1) heap_caps_free(buf1);
         if (buf2) heap_caps_free(buf2);
+        esp_timer_delete(lvgl_tick_timer);
         return ESP_ERR_NO_MEM;
     }
     
@@ -149,6 +150,7 @@ esp_err_t display_init(void)
         ESP_LOGE(TAG, "Failed to create LVGL display");
         heap_caps_free(buf1);
         heap_caps_free(buf2);
+        esp_timer_delete(lvgl_tick_timer);
         return ESP_FAIL;
     }
     
