@@ -117,4 +117,6 @@ idf_component_register(
         "images/generated"
     REQUIRES
         nvs_flash
+        lvgl__lvgl
+        espressif__esp_lvgl_port
 )
