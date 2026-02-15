@@ -55,7 +55,7 @@ static const char *TAG = "display_init";
 #define LCD_PIN_NUM_PCLK        GPIO_NUM_7
 #define LCD_PIN_NUM_DISP_EN     -1  // Not used
 
-/* RGB Data pins - Same as 4.3" display */
+/* RGB Data pins - Same pin mapping as center display (4.3") */
 #define LCD_PIN_NUM_DATA0       GPIO_NUM_14  // B3
 #define LCD_PIN_NUM_DATA1       GPIO_NUM_38  // B4
 #define LCD_PIN_NUM_DATA2       GPIO_NUM_18  // B5
