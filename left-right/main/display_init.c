@@ -81,7 +81,7 @@ static const char *TAG = "display_init";
 /* Static handles */
 static esp_lcd_panel_handle_t panel_handle = NULL;
 static SemaphoreHandle_t lvgl_mux = NULL;
-static lv_disp_t *lvgl_disp = NULL;
+static lv_display_t *lvgl_disp = NULL;
 static i2c_port_t i2c_port = I2C_MASTER_NUM;
 
 /**
@@ -93,20 +93,20 @@ static void lvgl_tick_timer_cb(void *arg)
 }
 
 /**
- * @brief LVGL flush callback
+ * @brief LVGL flush callback for LVGL 9.x
  */
-static void lvgl_flush_cb(lv_disp_drv_t *drv, const lv_area_t *area, lv_color_t *color_map)
+static void lvgl_flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map)
 {
-    esp_lcd_panel_handle_t panel = (esp_lcd_panel_handle_t)drv->user_data;
+    esp_lcd_panel_handle_t panel = (esp_lcd_panel_handle_t)lv_display_get_user_data(disp);
     const int offsetx1 = area->x1;
     const int offsetx2 = area->x2;
     const int offsety1 = area->y1;
     const int offsety2 = area->y2;
     
     /* Copy rendered data to the RGB frame buffer */
-    esp_lcd_panel_draw_bitmap(panel, offsetx1, offsety1, offsetx2 + 1, offsety2 + 1, color_map);
+    esp_lcd_panel_draw_bitmap(panel, offsetx1, offsety1, offsetx2 + 1, offsety2 + 1, px_map);
     
-    lv_disp_flush_ready(drv);
+    lv_display_flush_ready(disp);
 }
 
 /**
@@ -237,7 +237,7 @@ static esp_err_t lvgl_init(void)
         return ESP_FAIL;
     }
     
-    /* Allocate LVGL draw buffers */
+    /* Allocate LVGL draw buffers in PSRAM */
     size_t buffer_size = LCD_H_RES * LVGL_BUFFER_HEIGHT * sizeof(lv_color_t);
     void *buf1 = heap_caps_malloc(buffer_size, MALLOC_CAP_SPIRAM);
     if (buf1 == NULL) {
@@ -245,23 +245,21 @@ static esp_err_t lvgl_init(void)
         return ESP_FAIL;
     }
     
-    /* Initialize LVGL display driver */
-    static lv_disp_draw_buf_t disp_buf;
-    lv_disp_draw_buf_init(&disp_buf, buf1, NULL, LCD_H_RES * LVGL_BUFFER_HEIGHT);
-    
-    static lv_disp_drv_t disp_drv;
-    lv_disp_drv_init(&disp_drv);
-    disp_drv.hor_res = LCD_H_RES;
-    disp_drv.ver_res = LCD_V_RES;
-    disp_drv.flush_cb = lvgl_flush_cb;
-    disp_drv.draw_buf = &disp_buf;
-    disp_drv.user_data = panel_handle;
-    
-    lvgl_disp = lv_disp_drv_register(&disp_drv);
+    /* Create LVGL display (LVGL 9.x API) */
+    lvgl_disp = lv_display_create(LCD_H_RES, LCD_V_RES);
     if (lvgl_disp == NULL) {
-        ESP_LOGE(TAG, "Failed to register LVGL display driver");
+        ESP_LOGE(TAG, "Failed to create LVGL display");
         return ESP_FAIL;
     }
+    
+    /* Set the flush callback */
+    lv_display_set_flush_cb(lvgl_disp, lvgl_flush_cb);
+    
+    /* Store panel handle as user data for the flush callback */
+    lv_display_set_user_data(lvgl_disp, panel_handle);
+    
+    /* Set the draw buffers (LVGL 9.x API) */
+    lv_display_set_buffers(lvgl_disp, buf1, NULL, buffer_size, LV_DISPLAY_RENDER_MODE_PARTIAL);
     
     /* Create and start LVGL tick timer */
     const esp_timer_create_args_t lvgl_tick_timer_args = {
