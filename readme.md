@@ -12,13 +12,11 @@
 
 | Display Unit | Hardware | Resolution | Directory |
 |---|---|---|---|
-| **Center** (Main Dash) | [ESP32-S3-Touch-LCD-4.3](https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4.3) | 800×480 IPS | `center/` (planned) |
-| **Left & Right** (Gauge Pods) | [ESP32-S3-LCD-2.8C](https://www.waveshare.com/wiki/ESP32-S3-LCD-2.8C) | 480×480 Round | `left-right/` (planned) |
-| **GPS / Telemetry** | [ESP32-S3-Touch-AMOLED-1.75](https://www.waveshare.com/wiki/ESP32-S3-Touch-AMOLED-1.75) | 466×466 AMOLED | `gps/` (planned) |
+| **Center** (Main Dash) | [ESP32-S3-Touch-LCD-4.3](https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4.3) | 800×480 IPS | [`center/`](./center/) |
+| **Left & Right** (Gauge Pods) | [ESP32-S3-LCD-2.8C](https://www.waveshare.com/wiki/ESP32-S3-LCD-2.8C) | 480×480 Round | [`left-right/`](./left-right/) |
+| **GPS / Telemetry** | [ESP32-S3-Touch-AMOLED-1.75](https://www.waveshare.com/wiki/ESP32-S3-Touch-AMOLED-1.75) | 466×466 AMOLED | [`gps/`](./gps/) |
 
 > **Shared code** lives in [`common/`](./common/) — I2C protocol, data models, OBD2 PIDs, display configuration, and the pre-flight checklist system.
->
-> **Note:** The individual display unit projects (`center/`, `left-right/`, `gps/`) are planned and will be added in future commits.
 
 ---
 
@@ -128,13 +126,19 @@ opendash/
 
 ## 🚀 Getting Started
 
+### Quick Start
+
+**New to OpenDash?** See the [**Quick Start Guide**](QUICKSTART.md) for a 5-minute setup!
+
 ### Prerequisites
 
 1. **ESP-IDF v5.3** — [Installation Guide](https://docs.espressif.com/projects/esp-idf/en/release-v5.3/esp32s3/get-started/index.html)
-2. **Visual Studio Code** with the [ESP-IDF Extension](https://marketplace.visualstudio.com/items?itemName=espressif.esp-idf-extension) (recommended)
+2. **Visual Studio Code** with the [ESP-IDF Extension](https://marketplace.visualstudio.com/items?itemName=espressif.esp-idf-extension) (recommended) — See [VS Code Setup Guide](docs/vscode-setup.md)
 3. **USB-C cable** and target hardware
 
 ### Build & Flash (Any Unit)
+
+#### Command Line
 
 ```bash
 # Example: Build and flash the center display
@@ -144,6 +148,16 @@ idf.py build
 idf.py -p /dev/ttyUSB0 flash monitor
 ```
 
+#### Visual Studio Code
+
+1. Open `opendash.code-workspace` in VS Code
+2. Open a file from the project you want to build (e.g., `center/main/main.c`)
+3. Press **F1** → "ESP-IDF: Set Espressif device target" → **ESP32-S3**
+4. Press **F1** → "ESP-IDF: Build your project"
+5. Press **F1** → "ESP-IDF: Flash your project"
+
+> See [`docs/vscode-setup.md`](docs/vscode-setup.md) for detailed VS Code setup instructions.
+
 > See [`docs/setup-guide.md`](./docs/setup-guide.md) for detailed setup instructions.
 
 ---
@@ -152,11 +166,16 @@ idf.py -p /dev/ttyUSB0 flash monitor
 
 | Document | Description |
 |---|---|
-| [`docs/architecture.md`](./docs/architecture.md) | System architecture, data flow, and node roles |
-| [`docs/hardware.md`](./docs/hardware.md) | Hardware specs, pin mappings, and wiring |
-| [`docs/i2c-protocol.md`](./docs/i2c-protocol.md) | I2C communication protocol between nodes |
-| [`docs/data-points.md`](./docs/data-points.md) | Full legend of displayable data points |
-| [`docs/setup-guide.md`](./docs/setup-guide.md) | Development environment setup |
+| [**Quick Start Guide**](QUICKSTART.md) | **5-minute setup guide — start here!** |
+| [`docs/vscode-setup.md`](docs/vscode-setup.md) | Visual Studio Code configuration guide |
+| [`docs/setup-guide.md`](docs/setup-guide.md) | Detailed development environment setup |
+| [`docs/architecture.md`](docs/architecture.md) | System architecture, data flow, and node roles |
+| [`docs/hardware.md`](docs/hardware.md) | Hardware specs, pin mappings, and wiring |
+| [`docs/i2c-protocol.md`](docs/i2c-protocol.md) | I2C communication protocol between nodes |
+| [`docs/data-points.md`](docs/data-points.md) | Full legend of displayable data points |
+| [`center/README.md`](center/README.md) | Center display project guide |
+| [`left-right/README.md`](left-right/README.md) | Left/Right gauge pods guide |
+| [`gps/README.md`](gps/README.md) | GPS/Telemetry unit guide |
 
 ---
 
