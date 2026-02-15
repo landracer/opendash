@@ -41,7 +41,7 @@ static const char *TAG = "display_init";
 
 /* Static handles */
 static SemaphoreHandle_t lvgl_mux = NULL;
-static lv_disp_t *lvgl_disp = NULL;
+static lv_display_t *lvgl_disp = NULL;
 
 /**
  * @brief LVGL tick timer callback
@@ -52,13 +52,13 @@ static void lvgl_tick_timer_cb(void *arg)
 }
 
 /**
- * @brief LVGL flush callback (simulated for baseline)
+ * @brief LVGL flush callback for LVGL 9.x (simulated for baseline)
  *
  * This is a stub flush callback that simply marks the flush as ready.
  * In a full implementation, this would send the pixel data to the QSPI
  * display controller.
  */
-static void lvgl_flush_cb(lv_disp_drv_t *drv, const lv_area_t *area, lv_color_t *color_map)
+static void lvgl_flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map)
 {
     /* Simulate display flush - in real implementation, this would:
      * 1. Set the display window (area->x1, y1, x2, y2)
@@ -67,7 +67,7 @@ static void lvgl_flush_cb(lv_disp_drv_t *drv, const lv_area_t *area, lv_color_t 
      */
     
     /* For now, just mark as ready to prevent blocking */
-    lv_disp_flush_ready(drv);
+    lv_display_flush_ready(disp);
 }
 
 /**
@@ -95,23 +95,21 @@ static esp_err_t lvgl_init(void)
         return ESP_FAIL;
     }
     
-    /* Initialize LVGL display driver */
-    static lv_disp_draw_buf_t disp_buf;
-    lv_disp_draw_buf_init(&disp_buf, buf1, NULL, LCD_H_RES * LVGL_BUFFER_HEIGHT);
-    
-    static lv_disp_drv_t disp_drv;
-    lv_disp_drv_init(&disp_drv);
-    disp_drv.hor_res = LCD_H_RES;
-    disp_drv.ver_res = LCD_V_RES;
-    disp_drv.flush_cb = lvgl_flush_cb;
-    disp_drv.draw_buf = &disp_buf;
-    disp_drv.user_data = NULL;  // No hardware handle in baseline
-    
-    lvgl_disp = lv_disp_drv_register(&disp_drv);
+    /* Create LVGL display (LVGL 9.x API) */
+    lvgl_disp = lv_display_create(LCD_H_RES, LCD_V_RES);
     if (lvgl_disp == NULL) {
-        ESP_LOGE(TAG, "Failed to register LVGL display driver");
+        ESP_LOGE(TAG, "Failed to create LVGL display");
         return ESP_FAIL;
     }
+    
+    /* Set the flush callback */
+    lv_display_set_flush_cb(lvgl_disp, lvgl_flush_cb);
+    
+    /* No hardware handle needed for baseline mode */
+    lv_display_set_user_data(lvgl_disp, NULL);
+    
+    /* Set the draw buffers (LVGL 9.x API) */
+    lv_display_set_buffers(lvgl_disp, buf1, NULL, buffer_size, LV_DISPLAY_RENDER_MODE_PARTIAL);
     
     /* Create and start LVGL tick timer */
     const esp_timer_create_args_t lvgl_tick_timer_args = {
