@@ -14,6 +14,9 @@ idf_component_register(
         "src/opendash_i2c_protocol.c"
         "src/opendash_data_model.c"
         "src/opendash_checklist.c"
+        "src/opendash_display_config.c"
     INCLUDE_DIRS
         "include"
+    REQUIRES
+        nvs_flash
 )
