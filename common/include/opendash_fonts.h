@@ -5,19 +5,22 @@
  * This header provides utilities for using custom fonts in OpenDash.
  * Fonts are automatically converted from TrueType format during build.
  * 
+ * The default font is configured in common/fonts/font_config.json.
+ * To change fonts system-wide, edit that file and mark a font with "default": true.
+ * 
  * Usage:
  * 1. Add your .ttf files to common/fonts/ttf/
  * 2. Configure fonts in common/fonts/font_config.json
- * 3. Build the project - fonts are automatically converted
- * 4. Use the fonts:
- *    LV_FONT_DECLARE(your_font_name_size);
- *    lv_obj_set_style_text_font(obj, &your_font_name_size, 0);
+ * 3. Mark one font as "default": true
+ * 4. Build the project - fonts are automatically converted
+ * 5. Use the opendash_set_font() helper functions in your UI code
  */
 
 #ifndef OPENDASH_FONTS_H
 #define OPENDASH_FONTS_H
 
 #include "lvgl.h"
+#include "opendash_font_config.h"  // Auto-generated font configuration
 
 #ifdef __cplusplus
 extern "C" {
@@ -35,8 +38,9 @@ typedef enum {
 /**
  * @brief Get LVGL font pointer based on size category
  * 
- * This function maps abstract font sizes to actual LVGL fonts.
- * By default, it uses LVGL's built-in Montserrat font.
+ * This function maps abstract font sizes to the default font configured
+ * in font_config.json. The font converter automatically generates the
+ * configuration based on which font is marked as "default": true.
  * 
  * @param size Font size category
  * @return Pointer to lv_font_t, or NULL if invalid size
@@ -45,13 +49,13 @@ static inline const lv_font_t* opendash_get_font(opendash_font_size_t size)
 {
     switch (size) {
         case OPENDASH_FONT_SIZE_SMALL:
-            return &lv_font_montserrat_14;
+            return &OPENDASH_FONT_DEFAULT_SMALL;
         case OPENDASH_FONT_SIZE_MEDIUM:
-            return &lv_font_montserrat_18;
+            return &OPENDASH_FONT_DEFAULT_MEDIUM;
         case OPENDASH_FONT_SIZE_LARGE:
-            return &lv_font_montserrat_32;
+            return &OPENDASH_FONT_DEFAULT_LARGE;
         default:
-            return &lv_font_montserrat_14;
+            return &OPENDASH_FONT_DEFAULT_SMALL;
     }
 }
 
