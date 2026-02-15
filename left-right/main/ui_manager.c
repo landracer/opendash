@@ -153,7 +153,7 @@ static void ui_task(void *pvParameters)
     ESP_LOGI(TAG, "UI task started");
     
     while (1) {
-        lv_task_handler();
+        lv_timer_handler();
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
