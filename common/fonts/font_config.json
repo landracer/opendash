@@ -2,14 +2,23 @@
   "fonts": [
     {
       "name": "engebold",
-      "source": "built-in",
-      "comment": "Uses LVGL's built-in Engebold font - no conversion needed",
-      "sizes": [14, 18, 24, 32],
+      "source": "engebold.ttf",
+      "comment": "Engebold font - default font for OpenDash",
+      "sizes": [14, 18, 32],
+      "bpp": 4,
+      "range": "0x20-0x7F",
+      "default": true
+    },
+    {
+      "name": "montserrat",
+      "source": "Montserrat-Regular.ttf",
+      "comment": "Montserrat font - alternative font",
+      "sizes": [14, 18, 32],
       "bpp": 4,
       "range": "0x20-0x7F"
     }
   ],
   "default_bpp": 4,
   "default_range": "0x20-0x7F",
-  "comment": "Add your custom fonts here. Example: { \"name\": \"opensans\", \"source\": \"OpenSans-Regular.ttf\", \"sizes\": [16, 24, 32], \"bpp\": 4, \"range\": \"0x20-0x7F\" }"
+  "comment": "The font marked with 'default: true' will be used as the system default. Change this to switch fonts system-wide."
 }

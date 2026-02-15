@@ -2,17 +2,34 @@
 
 This directory contains the font management system for OpenDash.
 
+## Quick Start: Changing Fonts
+
+**To change the default font system-wide:**
+
+1. Edit `font_config.json`
+2. Set `"default": true` on the font you want to use
+3. Rebuild the project
+
+That's it! All UI elements will automatically use the new font.
+
 ## Directory Structure
 
 - `ttf/` - Place your TrueType (.ttf) or OpenType (.otf) font files here
 - `generated/` - Auto-generated C files for LVGL (do not edit manually)
 - `font_config.json` - Font conversion configuration
 
-## How to Add Custom Fonts
+## How the Font System Works
 
-1. Copy your `.ttf` or `.otf` font file into the `ttf/` directory
-2. Edit `font_config.json` to specify which fonts and sizes you want to generate
-3. Run the build - fonts will be automatically converted before compilation
+The font system is **fully dynamic**:
+
+1. `font_config.json` defines available fonts and marks one as "default"
+2. The build system runs `convert_fonts.py` which:
+   - Converts TTF fonts to LVGL C format
+   - Generates `opendash_font_config.h` with declarations for the default font
+3. `opendash_fonts.h` includes the generated config and provides helper functions
+4. All UI code uses `opendash_set_font()` which automatically uses the default font
+
+**No code changes needed to switch fonts!** Just update `font_config.json` and rebuild.
 
 ## Font Configuration Format
 
@@ -22,9 +39,17 @@ The `font_config.json` file defines which fonts to convert:
 {
   "fonts": [
     {
+      "name": "engebold",
+      "source": "engebold.ttf",
+      "sizes": [14, 18, 32],
+      "bpp": 4,
+      "range": "0x20-0x7F",
+      "default": true
+    },
+    {
       "name": "opensans",
       "source": "OpenSans-Regular.ttf",
-      "sizes": [14, 18, 24, 32],
+      "sizes": [14, 18, 32],
       "bpp": 4,
       "range": "0x20-0x7F"
     }
@@ -36,9 +61,12 @@ The `font_config.json` file defines which fonts to convert:
 
 - `name`: Base name for the generated font (will create `{name}_{size}`)
 - `source`: Font file name in the `ttf/` directory
-- `sizes`: Array of font sizes in pixels to generate
+- `sizes`: Array of font sizes in pixels to generate (recommended: 14, 18, and 32 for best compatibility)
 - `bpp`: Bits per pixel (1=monochrome, 2=2-bit, 4=4-bit antialiased, 8=8-bit)
 - `range`: Unicode character range (default: "0x20-0x7F" for basic ASCII)
+- `default`: Set to `true` to make this the system-wide default font (only one font should have this)
+
+**Note on sizes:** OpenDash uses three size categories (SMALL, MEDIUM, LARGE). For best results, include sizes 14, 18, and 32. If these exact sizes aren't available, the system will use the closest available sizes and issue a warning.
 
 ### Character Ranges
 
@@ -54,8 +82,8 @@ The build system automatically:
 1. Checks if `lv_font_conv` is installed (installs locally via npm if missing)
 2. Scans `font_config.json`
 3. Converts any fonts that are missing or outdated
-4. Generates C source files in `generated/`
-5. Includes them in the build
+4. Generates `opendash_font_config.h` with the default font configuration
+5. Includes all fonts in the build
 
 **Note:** The font conversion tool installs `lv_font_conv` locally in the `fonts` directory to avoid requiring root/sudo permissions. The `node_modules` directory is automatically ignored by git.
 
@@ -83,7 +111,29 @@ lv_font_conv --font ttf/YourFont.ttf --size 24 \
 
 ## Using Fonts in Code
 
-After the font is generated, use it in your UI:
+### Using the Default Font (Recommended)
+
+The easiest way to use fonts is through the helper functions, which automatically use the default font from `font_config.json`:
+
+```c
+#include "opendash_fonts.h"
+
+// Create a label
+lv_obj_t *label = lv_label_create(parent);
+
+// Set font using size category - automatically uses default font
+opendash_set_font(label, OPENDASH_FONT_SIZE_SMALL);   // 14px
+opendash_set_font(label, OPENDASH_FONT_SIZE_MEDIUM);  // 18px
+opendash_set_font(label, OPENDASH_FONT_SIZE_LARGE);   // 32px
+
+lv_label_set_text(label, "Hello World");
+```
+
+**When you change the default font in `font_config.json` and rebuild, all UI elements automatically use the new font!**
+
+### Using a Specific Font (Advanced)
+
+If you need to use a non-default font directly:
 
 ```c
 // Declare the font (use the name from font_config.json + size)
