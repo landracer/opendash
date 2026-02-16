@@ -235,7 +235,7 @@ esp_err_t ui_manager_start(void)
     BaseType_t ret = xTaskCreatePinnedToCore(
         ui_task,
         "ui_task",
-        4096,
+        8192,
         NULL,
         5,  /* Priority */
         &ui_task_handle,

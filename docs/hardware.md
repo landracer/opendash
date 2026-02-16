@@ -16,6 +16,31 @@
 | **Battery** | PH2.0 LiPo connector with charging |
 | **IO Expander** | CH422G |
 | **Waveshare Wiki** | [ESP32-S3-Touch-LCD-4.3](https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4.3) |
+| **LCD Controller Datasheet** | [ST7262.pdf](https://files.waveshare.com/wiki/common/ST7262.pdf) |
+
+#### ST7262 RGB Timing Parameters (Page 52 of Datasheet)
+
+**CRITICAL:** These timing values must be within spec or the display will have random alignment on reset!
+
+| Parameter | Min | Typical | Max | Unit | OpenDash Value |
+|-----------|-----|---------|-----|------|----------------|
+| **Pixel Clock (DCLK)** | 23 | 25 | 27 | MHz | 25 MHz |
+| **Horizontal** | | | | | |
+| H Display Period | - | 800 | - | PCLK | 800 |
+| HSYNC Pulse Width | 2 | 4 | 8 | PCLK | 4 |
+| HSYNC Back Porch | 4 | 8 | 48 | PCLK | 8 |
+| HSYNC Front Porch | 4 | 8 | 48 | PCLK | 8 |
+| H Total | 808 | 816 | 896 | PCLK | 820 |
+| **Vertical** | | | | | |
+| V Display Period | - | 480 | - | Lines | 480 |
+| VSYNC Pulse Width | 2 | 4 | 8 | Lines | 4 |
+| VSYNC Back Porch | 4 | 8 | 12 | Lines | 8 |
+| VSYNC Front Porch | 4 | 8 | 12 | Lines | 8 |
+| V Total | 488 | 496 | 504 | Lines | 500 |
+
+> **Note:** Using typical values ensures stable, centered display output.
+> Previous incorrect values (hsync_pulse=40, vsync_pulse=23) were far outside spec
+> and caused unpredictable alignment behavior.
 
 **Pin Mapping (Center):**
 

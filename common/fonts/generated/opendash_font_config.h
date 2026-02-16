@@ -10,7 +10,7 @@
  * 2. Set "default": true on the font you want to use
  * 3. Rebuild the project
  * 
- * Current default font: engebold
+ * Current default font: unsi
  */
 
 #ifndef OPENDASH_FONT_CONFIG_H
@@ -22,15 +22,15 @@
 extern "C" {
 #endif
 
-/* Declare default font family: engebold */
-LV_FONT_DECLARE(engebold_14);
-LV_FONT_DECLARE(engebold_18);
-LV_FONT_DECLARE(engebold_32);
+/* Declare default font family: unsi */
+LV_FONT_DECLARE(unsi_14);
+LV_FONT_DECLARE(unsi_18);
+LV_FONT_DECLARE(unsi_32);
 
 /* Define default font pointers for OpenDash */
-#define OPENDASH_FONT_DEFAULT_SMALL   engebold_14
-#define OPENDASH_FONT_DEFAULT_MEDIUM  engebold_18
-#define OPENDASH_FONT_DEFAULT_LARGE   engebold_32
+#define OPENDASH_FONT_DEFAULT_SMALL   unsi_14
+#define OPENDASH_FONT_DEFAULT_MEDIUM  unsi_18
+#define OPENDASH_FONT_DEFAULT_LARGE   unsi_32
 
 #ifdef __cplusplus
 }

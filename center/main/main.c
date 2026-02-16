@@ -31,8 +31,41 @@
 #include "ui_manager.h"
 #include "opendash_common.h"
 #include "opendash_display_config.h"
+#include "splash_center.h"
+#include "background_center.h"
 
 static const char *TAG = "opendash_center";
+
+/**
+ * @brief Display splash screen for startup
+ *
+ * Shows the splash image for a brief period before transitioning
+ * to the main UI. This provides visual feedback during initialization.
+ */
+static void show_splash_screen(void)
+{
+    ESP_LOGI(TAG, "Displaying splash screen...");
+    
+    /* Create splash screen */
+    lv_obj_t *splash_screen = lv_obj_create(NULL);
+    lv_obj_set_style_bg_color(splash_screen, lv_color_hex(0x000000), 0);
+    
+    /* Add splash image */
+    lv_obj_t *splash_img = lv_image_create(splash_screen);
+    lv_image_set_src(splash_img, &splash_center_dsc);
+    lv_obj_center(splash_img);
+    
+    /* Load splash screen */
+    lv_scr_load(splash_screen);
+    
+    /* Process LVGL for a period to ensure screen renders */
+    for (int i = 0; i < 200; i++) {  /* ~2 seconds at 10ms per iteration */
+        lv_timer_handler();
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+    
+    ESP_LOGI(TAG, "Splash screen complete");
+}
 
 /**
  * @brief Main application entry point.
@@ -83,6 +116,11 @@ void app_main(void)
     ESP_LOGI(TAG, "Initializing display hardware...");
     ESP_ERROR_CHECK(display_init());
     ESP_LOGI(TAG, "Display hardware initialized (800×480 IPS LCD)");
+
+    /* ────────────────────────────────────────────────────────────────────────
+     * Step 3b: Display Splash Screen
+     * ──────────────────────────────────────────────────────────────────────── */
+    show_splash_screen();
 
     /* ────────────────────────────────────────────────────────────────────────
      * Step 4: Initialize LVGL UI Manager

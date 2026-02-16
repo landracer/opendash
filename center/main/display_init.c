@@ -9,6 +9,11 @@
  * This file initializes the display hardware using the ESP LCD RGB panel driver
  * and LVGL 9.x for rendering.
  *
+ * IMPORTANT: LCD timing values are derived from the ST7262 datasheet.
+ * Incorrect timing causes random display alignment on reset!
+ *
+ * @see ST7262 Datasheet (Page 52 - RGB Timing Table):
+ *      https://files.waveshare.com/wiki/common/ST7262.pdf
  * @see ESP32-S3 LCD API:
  *      https://docs.espressif.com/projects/esp-idf/en/latest/esp32s3/api-reference/peripherals/lcd.html
  * @see LVGL 9.x Documentation:
@@ -22,6 +27,7 @@
 #include "esp_lcd_panel_ops.h"
 #include "esp_lcd_panel_rgb.h"
 #include "driver/gpio.h"
+#include "driver/ledc.h"
 #include "esp_timer.h"
 #include "esp_heap_caps.h"
 #include "freertos/FreeRTOS.h"
@@ -36,7 +42,8 @@ static const char *TAG = "display_init";
 #define LCD_V_RES   480
 
 /* LCD RGB Interface GPIO pins for Waveshare ESP32-S3-Touch-LCD-4.3 */
-#define LCD_PIXEL_CLOCK_HZ      (16 * 1000 * 1000)
+/* ST7262 Datasheet (Page 52): DCLK Frequency = 23-25-27 MHz */
+#define LCD_PIXEL_CLOCK_HZ      (25 * 1000 * 1000)  /* 25 MHz (datasheet typical) */
 #define LCD_BK_LIGHT_GPIO       GPIO_NUM_2
 #define LCD_BK_LIGHT_ON_LEVEL   1
 
@@ -69,10 +76,18 @@ static const char *TAG = "display_init";
 #define LVGL_BUFFER_HEIGHT      50   /* Height of LVGL draw buffer (partial buffer) */
 #define LVGL_DRAW_BUF_LINES     LVGL_BUFFER_HEIGHT
 
+/* Backlight PWM Configuration */
+#define LCD_BK_LEDC_TIMER       LEDC_TIMER_0
+#define LCD_BK_LEDC_CHANNEL     LEDC_CHANNEL_0
+#define LCD_BK_LEDC_SPEED_MODE  LEDC_LOW_SPEED_MODE
+#define LCD_BK_LEDC_FREQ_HZ     5000   /* 5 kHz PWM frequency */
+#define LCD_BK_LEDC_RESOLUTION  LEDC_TIMER_10_BIT  /* 0-1023 duty range */
+
 /* Static handles */
 static esp_lcd_panel_handle_t panel_handle = NULL;
 static SemaphoreHandle_t lvgl_mux = NULL;
 static lv_display_t *lvgl_disp = NULL;
+static uint8_t current_brightness = 100;  /* Default to full brightness */
 
 /**
  * @brief LVGL tick timer callback
@@ -112,20 +127,36 @@ static void lvgl_flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px
 }
 
 /**
- * @brief Turn on backlight
+ * @brief Initialize backlight with PWM for brightness control
+ *
+ * Uses LEDC peripheral for smooth PWM-based brightness adjustment.
  */
-static esp_err_t lcd_backlight_on(void)
+static esp_err_t lcd_backlight_init(void)
 {
-    gpio_config_t bk_gpio_config = {
-        .pin_bit_mask = (1ULL << LCD_BK_LIGHT_GPIO),
-        .mode = GPIO_MODE_OUTPUT,
-        .pull_up_en = GPIO_PULLUP_DISABLE,
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_DISABLE,
+    /* Configure LEDC timer */
+    ledc_timer_config_t ledc_timer = {
+        .speed_mode       = LCD_BK_LEDC_SPEED_MODE,
+        .duty_resolution  = LCD_BK_LEDC_RESOLUTION,
+        .timer_num        = LCD_BK_LEDC_TIMER,
+        .freq_hz          = LCD_BK_LEDC_FREQ_HZ,
+        .clk_cfg          = LEDC_AUTO_CLK
     };
-    ESP_ERROR_CHECK(gpio_config(&bk_gpio_config));
-    ESP_ERROR_CHECK(gpio_set_level(LCD_BK_LIGHT_GPIO, LCD_BK_LIGHT_ON_LEVEL));
-    ESP_LOGI(TAG, "Backlight ON (GPIO %d)", LCD_BK_LIGHT_GPIO);
+    ESP_ERROR_CHECK(ledc_timer_config(&ledc_timer));
+
+    /* Configure LEDC channel */
+    ledc_channel_config_t ledc_channel = {
+        .speed_mode     = LCD_BK_LEDC_SPEED_MODE,
+        .channel        = LCD_BK_LEDC_CHANNEL,
+        .timer_sel      = LCD_BK_LEDC_TIMER,
+        .intr_type      = LEDC_INTR_DISABLE,
+        .gpio_num       = LCD_BK_LIGHT_GPIO,
+        .duty           = 1023,  /* Start at full brightness (100%) */
+        .hpoint         = 0
+    };
+    ESP_ERROR_CHECK(ledc_channel_config(&ledc_channel));
+
+    current_brightness = 100;
+    ESP_LOGI(TAG, "Backlight PWM initialized (GPIO %d, 100%% brightness)", LCD_BK_LIGHT_GPIO);
     return ESP_OK;
 }
 
@@ -142,12 +173,29 @@ static esp_err_t lcd_panel_init(void)
             .pclk_hz = LCD_PIXEL_CLOCK_HZ,
             .h_res = LCD_H_RES,
             .v_res = LCD_V_RES,
-            .hsync_pulse_width = 4,
-            .hsync_back_porch = 8,
-            .hsync_front_porch = 8,
-            .vsync_pulse_width = 4,
-            .vsync_back_porch = 8,
-            .vsync_front_porch = 8,
+            /* ST7262 Timing Values from Datasheet (Page 52)
+             * Source: ST7262.pdf - Parallel 24-bit RGB Interface Timing Table
+             *
+             * Horizontal Timing (units: PCLK cycles):
+             *   - Pulse Width:  Min=2, Typ=4, Max=8
+             *   - Back Porch:   Min=4, Typ=8, Max=48
+             *   - Front Porch:  Min=4, Typ=8, Max=48
+             *   - Total H:      Min=808, Typ=816, Max=896 (800 + porches + pulse)
+             *
+             * Vertical Timing (units: HSYNC lines):
+             *   - Pulse Width:  Min=2, Typ=4, Max=8
+             *   - Back Porch:   Min=4, Typ=8, Max=12
+             *   - Front Porch:  Min=4, Typ=8, Max=12
+             *   - Total V:      Min=488, Typ=496, Max=504 (480 + porches + pulse)
+             *
+             * Using TYPICAL values for stable, centered display.
+             */
+            .hsync_pulse_width = 4,   /* Datasheet: 2-4-8, using typical */
+            .hsync_back_porch = 8,    /* Datasheet: 4-8-48, using typical */
+            .hsync_front_porch = 8,   /* Datasheet: 4-8-48, using typical */
+            .vsync_pulse_width = 4,   /* Datasheet: 2-4-8, using typical */
+            .vsync_back_porch = 8,    /* Datasheet: 4-8-12, using typical */
+            .vsync_front_porch = 8,   /* Datasheet: 4-8-12, using typical */
         },
         .data_width = 16,  /* RGB565 = 16 bits */
         .num_fbs = 1,
@@ -214,21 +262,27 @@ static esp_err_t lvgl_init(void)
         return ESP_FAIL;
     }
     
+    /* Set color format to RGB565 to match the hardware panel.
+     * LVGL 9.x internal lv_color_t is RGB888 (3 bytes), but the
+     * RGB LCD panel uses 16-bit RGB565.  Setting this ensures LVGL
+     * renders into the draw buffers in the correct format. */
+    lv_display_set_color_format(lvgl_disp, LV_COLOR_FORMAT_RGB565);
+    
     /* Set the flush callback */
     lv_display_set_flush_cb(lvgl_disp, lvgl_flush_cb);
     
     /* Store panel handle as user data for the flush callback */
     lv_display_set_user_data(lvgl_disp, panel_handle);
     
-    /* Allocate LVGL draw buffers in PSRAM */
-    size_t buffer_size = LCD_H_RES * LVGL_DRAW_BUF_LINES * sizeof(lv_color_t);
-    void *buf1 = heap_caps_malloc(buffer_size, MALLOC_CAP_SPIRAM);
+    /* Allocate LVGL draw buffers in PSRAM — sized for RGB565 (2 bytes/pixel) */
+    size_t buffer_size = LCD_H_RES * LVGL_DRAW_BUF_LINES * sizeof(uint16_t);
+    void *buf1 = heap_caps_aligned_alloc(64, buffer_size, MALLOC_CAP_SPIRAM);
     if (buf1 == NULL) {
         ESP_LOGE(TAG, "Failed to allocate LVGL draw buffer 1 (%zu bytes)", buffer_size);
         return ESP_FAIL;
     }
     
-    void *buf2 = heap_caps_malloc(buffer_size, MALLOC_CAP_SPIRAM);
+    void *buf2 = heap_caps_aligned_alloc(64, buffer_size, MALLOC_CAP_SPIRAM);
     if (buf2 == NULL) {
         ESP_LOGW(TAG, "Failed to allocate LVGL draw buffer 2, using single buffer mode");
         /* Single buffer mode is fine, just less efficient */
@@ -279,8 +333,8 @@ esp_err_t display_init(void)
         return ret;
     }
     
-    /* Turn on backlight */
-    ret = lcd_backlight_on();
+    /* Initialize backlight with PWM */
+    ret = lcd_backlight_init();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Backlight init failed");
         return ret;
@@ -332,4 +386,46 @@ void display_lvgl_unlock(void)
 lv_display_t *display_get_lvgl_disp(void)
 {
     return lvgl_disp;
+}
+
+/**
+ * @brief Set display backlight brightness
+ *
+ * @param brightness Brightness level 0-100 (0 = off, 100 = max)
+ * @return ESP_OK on success, error code on failure.
+ */
+esp_err_t display_set_brightness(uint8_t brightness)
+{
+    if (brightness > 100) {
+        brightness = 100;
+    }
+    
+    /* Convert 0-100% to 0-1023 duty cycle (10-bit resolution) */
+    uint32_t duty = (brightness * 1023) / 100;
+    
+    esp_err_t ret = ledc_set_duty(LCD_BK_LEDC_SPEED_MODE, LCD_BK_LEDC_CHANNEL, duty);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to set backlight duty");
+        return ret;
+    }
+    
+    ret = ledc_update_duty(LCD_BK_LEDC_SPEED_MODE, LCD_BK_LEDC_CHANNEL);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to update backlight duty");
+        return ret;
+    }
+    
+    current_brightness = brightness;
+    ESP_LOGI(TAG, "Backlight brightness set to %d%%", brightness);
+    return ESP_OK;
+}
+
+/**
+ * @brief Get current backlight brightness
+ *
+ * @return Current brightness level 0-100
+ */
+uint8_t display_get_brightness(void)
+{
+    return current_brightness;
 }
