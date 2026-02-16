@@ -1,0 +1,34 @@
+{
+  "folders": [
+    {
+      "name": "📄 Documentation & Common",
+      "path": "."
+    },
+    {
+      "name": "🖥️ Center Display (4.3\" LCD)",
+      "path": "center"
+    },
+    {
+      "name": "⭕ Left/Right Gauges (2.8\" Round)",
+      "path": "left-right"
+    },
+    {
+      "name": "🛰️ GPS / Telemetry (1.75\" AMOLED)",
+      "path": "gps"
+    }
+  ],
+  "settings": {
+    "files.associations": {
+      "*.h": "c",
+      "*.c": "c"
+    },
+    "C_Cpp.default.configurationProvider": "espressif.esp-idf-extension"
+  },
+  "extensions": {
+    "recommendations": [
+      "espressif.esp-idf-extension",
+      "ms-vscode.cpptools",
+      "ms-vscode.cmake-tools"
+    ]
+  }
+}
