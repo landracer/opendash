@@ -7,19 +7,36 @@ set -e
 echo "Pushing synchronized feature branches..."
 echo ""
 
-# Define branches to push
-branches=("Center" "GPS" "Left" "Right")
+# Define branches to push (other than Center which comes from main)
+feature_branches=("GPS" "Left" "Right")
 
-# Verify branches exist locally
-for branch in "${branches[@]}"; do
+# Verify main branch exists locally (will be pushed to Center)
+if ! git rev-parse --verify "main" &>/dev/null; then
+    echo "Error: Branch 'main' does not exist locally"
+    exit 1
+fi
+
+# Verify feature branches exist locally
+for branch in "${feature_branches[@]}"; do
     if ! git rev-parse --verify "$branch" &>/dev/null; then
         echo "Error: Branch '$branch' does not exist locally"
         exit 1
     fi
 done
 
-# Push each branch
-for branch in "${branches[@]}"; do
+# Push main branch to Center
+main_commit_hash=$(git rev-parse --short "main")
+echo "Pushing main branch to Center (commit: $main_commit_hash)..."
+if git push origin "main:Center"; then
+    echo "✓ main branch pushed to Center successfully"
+else
+    echo "✗ Failed to push main branch to Center"
+    exit 1
+fi
+echo ""
+
+# Push each feature branch
+for branch in "${feature_branches[@]}"; do
     commit_hash=$(git rev-parse --short "$branch")
     echo "Pushing $branch branch (commit: $commit_hash)..."
     if git push origin "$branch:$branch"; then
