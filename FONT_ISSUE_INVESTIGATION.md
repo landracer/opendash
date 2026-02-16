@@ -1,107 +1,105 @@
-# Font Issue Investigation - "engebold .10" Error
+# Font Issue Investigation - LVGL Include Path Error (RESOLVED)
 
-## Problem Statement
-User reported: "We are still getting compile errors. Looks like the file engebold is there but it's looking for an extra .10 at the end of the file."
+## Problem Statement (Clarified)
+**Original report:** "We are still getting compile errors. Looks like the file engebold is there but it's looking for an extra .10 at the end of the file."
 
-## Investigation Results
+**Actual issue:** The error was `engebold_18.c:10:10` (line 10, column 10), not a ".10" file extension. The real error was:
+```
+fatal error: lvgl/lvgl.h: No such file or directory
+   10 | #include "lvgl/lvgl.h"
+```
 
-### ✅ What We Checked
+## Root Cause
 
-1. **Font Files Generated Successfully**
-   - All 6 font .c files generated correctly:
-     - `engebold_14.c`, `engebold_18.c`, `engebold_32.c`
-     - `montserrat_14.c`, `montserrat_18.c`, `montserrat_32.c`
-   - Header file `opendash_font_config.h` generated correctly
+The `lv_font_conv` tool by default generates font files with this include structure:
+```c
+#ifdef LV_LVGL_H_INCLUDE_SIMPLE
+#include "lvgl.h"
+#else
+#include "lvgl/lvgl.h"  // This was causing the error
+#endif
+```
 
-2. **Configuration Verified**
-   - `font_config.json` is correctly configured
-   - Font sizes: 14, 18, 32 (NO size 10)
-   - Source file: `engebold.ttf` (exists and is valid)
+The ESP-IDF build system was taking the `else` branch and trying to include `"lvgl/lvgl.h"`, but the LVGL component in ESP-IDF expects the simple include path `"lvgl.h"`.
 
-3. **No `.10` References Found**
-   - Searched entire codebase for literal ".10" string: **NONE FOUND**
-   - Searched for "engebold_10": **NONE FOUND**
-   - Searched for font size 10: **NOT CONFIGURED**
+## Solution
 
-4. **Package Versions Correct**
-   - lv_font_conv: 1.5.3 ✓
-   - opentype.js: 1.3.4 ✓
-   - Node.js: v24.13.0 ✓
+Modified `common/fonts/convert_fonts.py` to add the `--lv-include lvgl.h` parameter when calling `lv_font_conv`. This tells the tool to use the simple include path compatible with ESP-IDF:
 
-5. **Font File Analysis**
-   - Filename: `engebold.ttf` (no unusual characters)
-   - Internal font name: "Engebrechtre-Bold" (different from filename, but normal)
-   - TrueType version: 1.0 (standard)
-   - File size: 45,084 bytes
-   - 17 font tables (standard TrueType structure)
+```python
+cmd = [
+    lv_font_conv_cmd,
+    '--font', str(ttf_path),
+    '--size', str(size),
+    '--bpp', str(bpp),
+    '--format', 'lvgl',
+    '--range', char_range,
+    '--lv-include', 'lvgl.h',  # Added: Use simple include for ESP-IDF compatibility
+    '--output', str(output_path)
+]
+```
 
-### 🔍 Possible Explanations
+Now all generated font files use `#include "lvgl.h"` in both branches, matching the rest of the OpenDash codebase.
 
-Given that we found NO literal ".10" reference in the code, the error message might be:
+## Verification
 
-1. **Font table reference**: The error might be referring to "table 10" in the TrueType file structure (which is the "hhea" table).
+All existing OpenDash source files use the simple include:
+- `common/include/opendash_fonts.h` → `#include "lvgl.h"`
+- All display_init.c files → `#include "lvgl.h"`
+- All ui_manager.c files → `#include "lvgl.h"`
 
-2. **Version misinterpretation**: The TrueType file format version is 1.0, which might appear in an error message.
+Generated fonts now match this pattern.
 
-3. **OpenType.js version**: The dependency uses opentype.js which has had versions like 0.10.0 and 1.3.4.
+## ✅ Current State - FIXED
 
-4. **Stale build artifact**: The error might be from a previous failed build that needs to be cleaned.
+**The include path issue has been resolved.** Font generation now produces ESP-IDF compatible files.
 
-5. **Different error entirely**: The ".10" might be from a completely different context than the font system.
+### What Changed
 
-## ✅ Current State
+1. **Modified `common/fonts/convert_fonts.py`**: Added `--lv-include lvgl.h` parameter
+2. **Regenerated all font files**: Now use correct include path
+3. **Verified compatibility**: Matches existing OpenDash code style
 
-**All font files are correctly generated and ready for compilation.**
+### To Apply the Fix
 
-The font system should work correctly. If you're still seeing errors:
+Users experiencing this error should:
 
-### Next Steps for Debugging
-
-1. **Clean build directory**:
+1. **Pull the latest changes** from this PR
+2. **Regenerate fonts** (automatic during build, or manually):
+   ```bash
+   cd common/fonts
+   python3 convert_fonts.py --force
+   ```
+3. **Clean and rebuild**:
    ```bash
    cd center  # or whichever project
    rm -rf build
    idf.py build
    ```
 
-2. **Regenerate fonts with force flag**:
-   ```bash
-   cd common/fonts
-   python3 convert_fonts.py --force
-   ```
+The error `fatal error: lvgl/lvgl.h: No such file or directory` should now be resolved.
 
-3. **Verify dependencies**:
-   ```bash
-   ./check_deps.sh
-   ```
+## Files Modified in This Session
 
-4. **Check for the actual error**:
-   - Please provide the complete error message from the build log
-   - Look for lines containing "error:" or "fatal error:"
-   - Check `center/build/CMakeError.log` if it exists
+### Code Changes (Committed)
+- **`common/fonts/convert_fonts.py`**: Added `--lv-include lvgl.h` parameter to fix include path
+- **`FONT_ISSUE_INVESTIGATION.md`**: Updated with root cause analysis and solution
 
-### If You Have the Actual Error Message
+### Generated Files (Not Committed - Auto-generated at Build Time)
+- `common/fonts/generated/engebold_14.c` ✓ Fixed
+- `common/fonts/generated/engebold_18.c` ✓ Fixed
+- `common/fonts/generated/engebold_32.c` ✓ Fixed
+- `common/fonts/generated/montserrat_14.c` ✓ Fixed
+- `common/fonts/generated/montserrat_18.c` ✓ Fixed
+- `common/fonts/generated/montserrat_32.c` ✓ Fixed
 
-Please provide:
-- The complete error text (not just a summary)
-- The log file path where the error appears
-- The command that was run when the error occurred
-
-This will help us identify the exact issue instead of searching for something that might not exist in the code.
-
-## Files Modified/Generated in This Session
-
-- Generated (not committed, as per .gitignore):
-  - `common/fonts/generated/engebold_14.c`
-  - `common/fonts/generated/engebold_18.c`
-  - `common/fonts/generated/engebold_32.c`
-  - `common/fonts/generated/montserrat_14.c`
-  - `common/fonts/generated/montserrat_18.c`
-  - `common/fonts/generated/montserrat_32.c`
-  
-- Installed:
-  - `common/fonts/node_modules/lv_font_conv@1.5.3`
+All font files now correctly include `"lvgl.h"` instead of `"lvgl/lvgl.h"`.
 
 ## Summary
 
-**The fonts are correctly configured and generated.** There are no ".10" references in the codebase. The system should compile successfully. If you're still seeing an error, please provide the actual error message so we can address the specific issue.
+**Issue:** Font files generated with wrong LVGL include path (`"lvgl/lvgl.h"` instead of `"lvgl.h"`)  
+**Root Cause:** Missing `--lv-include` parameter in font conversion command  
+**Solution:** Modified `convert_fonts.py` to specify simple include path  
+**Result:** ESP-IDF build now finds LVGL headers correctly  
+
+The compilation error `fatal error: lvgl/lvgl.h: No such file or directory` is now resolved.
