@@ -5,22 +5,31 @@
 set -e
 
 echo "Pushing synchronized feature branches..."
+echo ""
 
-# Push Center branch
-echo "Pushing Center branch (commit: 2b45429)..."
-git push origin Center:Center
+# Define branches to push
+branches=("Center" "GPS" "Left" "Right")
 
-# Push GPS branch  
-echo "Pushing GPS branch (commit: 11dbbe8)..."
-git push origin GPS:GPS
+# Verify branches exist locally
+for branch in "${branches[@]}"; do
+    if ! git rev-parse --verify "$branch" &>/dev/null; then
+        echo "Error: Branch '$branch' does not exist locally"
+        exit 1
+    fi
+done
 
-# Push Left branch
-echo "Pushing Left branch (commit: 49bb856)..."
-git push origin Left:Left
-
-# Push Right branch
-echo "Pushing Right branch (commit: 9585267)..."
-git push origin Right:Right
+# Push each branch
+for branch in "${branches[@]}"; do
+    commit_hash=$(git rev-parse --short "$branch")
+    echo "Pushing $branch branch (commit: $commit_hash)..."
+    if git push origin "$branch:$branch"; then
+        echo "✓ $branch branch pushed successfully"
+    else
+        echo "✗ Failed to push $branch branch"
+        exit 1
+    fi
+    echo ""
+done
 
 echo "All feature branches have been pushed successfully!"
 echo ""
