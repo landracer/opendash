@@ -216,6 +216,7 @@ def convert_font(font_config: Dict, ttf_dir: Path, output_dir: Path,
             '--bpp', str(bpp),
             '--format', 'lvgl',
             '--range', char_range,
+            '--lv-include', 'lvgl.h',  # Use simple include for ESP-IDF compatibility
             '--output', str(output_path)
         ]
         
