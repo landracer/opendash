@@ -118,5 +118,14 @@ idf_component_register(
     REQUIRES
         nvs_flash
         lvgl__lvgl
-        espressif__esp_lvgl_port
 )
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Step 4: Add compile definitions for LVGL compatibility
+#
+# Generated font files use conditional includes. With ESP-IDF managed components,
+# the include path is set up to find "lvgl.h" directly (not "lvgl/lvgl.h").
+# This define tells generated fonts to use the simple include path.
+# ─────────────────────────────────────────────────────────────────────────────
+
+target_compile_definitions(${COMPONENT_LIB} PRIVATE LV_LVGL_H_INCLUDE_SIMPLE)

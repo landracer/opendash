@@ -12,5 +12,9 @@ idf_component_register(
     REQUIRES
         common
         lvgl__lvgl
-        espressif__esp_lvgl_port
+        esp_lcd
+        esp_timer
+        esp_driver_gpio
+        esp_driver_ledc
+        freertos
 )

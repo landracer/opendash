@@ -55,6 +55,23 @@ void display_lvgl_unlock(void);
  */
 lv_display_t *display_get_lvgl_disp(void);
 
+/**
+ * @brief Set display backlight brightness
+ *
+ * Uses PWM to control backlight level on GPIO2.
+ *
+ * @param brightness Brightness level 0-100 (0 = off, 100 = max)
+ * @return ESP_OK on success, error code on failure.
+ */
+esp_err_t display_set_brightness(uint8_t brightness);
+
+/**
+ * @brief Get current backlight brightness
+ *
+ * @return Current brightness level 0-100
+ */
+uint8_t display_get_brightness(void);
+
 #ifdef __cplusplus
 }
 #endif

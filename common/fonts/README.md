@@ -12,6 +12,17 @@ This directory contains the font management system for OpenDash.
 
 That's it! All UI elements will automatically use the new font.
 
+## Adding a New Font
+
+**To add a new font to the system:**
+
+1. Place your `.ttf` file in the `ttf/` directory
+2. Add an entry to `font_config.json` with the font name, source file, and sizes
+3. **Run `idf.py reconfigure`** (or `idf.py fullclean && idf.py build`)
+4. Then run `idf.py build`
+
+**IMPORTANT:** A simple `idf.py build` will NOT detect new fonts added to `font_config.json`. Font conversion happens during CMake configuration, not during the ninja build phase. You must run `idf.py reconfigure` (or delete the build directory) to trigger font conversion for newly added fonts.
+
 ## Directory Structure
 
 - `ttf/` - Place your TrueType (.ttf) or OpenType (.otf) font files here
