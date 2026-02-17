@@ -82,14 +82,15 @@ static lv_obj_t* create_outlined_label(lv_obj_t *parent, const char *text,
     lv_obj_t *container = lv_obj_create(parent);
     lv_obj_remove_style_all(container);
     lv_obj_set_size(container, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+    lv_obj_set_style_pad_all(container, outline_px, 0);  /* Add padding for outline */
     lv_obj_clear_flag(container, LV_OBJ_FLAG_SCROLLABLE);
     
-    /* Offset directions for outline: 8 directions */
+    /* Offset directions for outline: 8 directions - offset by outline_px to account for padding */
     const int8_t offsets[8][2] = {
-        {-outline_px, 0}, {outline_px, 0},  /* Left, Right */
-        {0, -outline_px}, {0, outline_px},  /* Up, Down */
-        {-outline_px, -outline_px}, {outline_px, -outline_px},  /* Diagonals */
-        {-outline_px, outline_px}, {outline_px, outline_px}
+        {0, outline_px}, {outline_px * 2, outline_px},  /* Left, Right */
+        {outline_px, 0}, {outline_px, outline_px * 2},  /* Up, Down */
+        {0, 0}, {outline_px * 2, 0},  /* Top-left, Top-right diagonals */
+        {0, outline_px * 2}, {outline_px * 2, outline_px * 2}  /* Bottom-left, Bottom-right diagonals */
     };
     
     /* Create outline/shadow labels first (behind) */
@@ -101,12 +102,12 @@ static lv_obj_t* create_outlined_label(lv_obj_t *parent, const char *text,
         lv_obj_set_pos(shadow, offsets[i][0], offsets[i][1]);
     }
     
-    /* Create main text on top */
+    /* Create main text on top - centered with padding offset */
     lv_obj_t *main_label = lv_label_create(container);
     lv_label_set_text(main_label, text);
     opendash_set_font(main_label, font_size);
     lv_obj_set_style_text_color(main_label, lv_color_hex(text_color), 0);
-    lv_obj_set_pos(main_label, 0, 0);
+    lv_obj_set_pos(main_label, outline_px, outline_px);
     
     return container;
 }
@@ -130,7 +131,7 @@ static void create_rpm_arc(lv_obj_t *parent)
     const int available_height = LCD_V_RES - STATUS_BAR_HEIGHT - 20;  /* ~410px */
     const int arc_size = (available_height < CENTER_WIDTH) ? available_height : CENTER_WIDTH;  /* Use smaller dimension */
     const int arc_width = 40;       /* Main arc thickness */
-    const int outline_width = 4;    /* Black outline thickness on each side */
+    const int outline_width = 8;    /* Black outline thickness on each side - thicker */
     const int arc_y_offset = -STATUS_BAR_HEIGHT / 2 + 30;  /* Lowered position */
     
     /* Create OUTER BLACK OUTLINE arc (larger, behind main arc) */
@@ -172,21 +173,21 @@ static void create_rpm_arc(lv_obj_t *parent)
     lv_obj_set_style_arc_rounded(rpm_arc, true, LV_PART_MAIN);
     lv_obj_set_style_arc_rounded(rpm_arc, true, LV_PART_INDICATOR);
     
-    /* Create RPM value with outlined text - XXLARGE font for big display */
+    /* Create RPM value with outlined text - XXXLARGE font for maximum visibility */
     rpm_value_container = create_outlined_label(parent, "0",
-                                                 OPENDASH_FONT_SIZE_XXLARGE,
+                                                 OPENDASH_FONT_SIZE_XXXLARGE,
                                                  OPENDASH_COLOR_RPM_TEXT,
                                                  OPENDASH_COLOR_RPM_OUTLINE,
-                                                 3);  /* Thicker outline for large font */
+                                                 6);  /* Thicker outline for larger font */
     lv_obj_align(rpm_value_container, LV_ALIGN_CENTER, 0, -STATUS_BAR_HEIGHT / 2 + 10);  /* Lowered with arc */
     
-    /* Add "RPM" unit label below the number - white text, black outline */
+    /* Add "RPM" unit label at bottom of arc - XLARGE font, white text, black outline */
     lv_obj_t *rpm_unit = create_outlined_label(parent, "RPM",
-                                                OPENDASH_FONT_SIZE_MEDIUM,
+                                                OPENDASH_FONT_SIZE_XLARGE,
                                                 OPENDASH_COLOR_TEXT_PRIMARY,
                                                 OPENDASH_COLOR_TEXT_OUTLINE,
-                                                1);
-    lv_obj_align(rpm_unit, LV_ALIGN_CENTER, 0, -STATUS_BAR_HEIGHT / 2 + 80);  /* Lowered with arc */
+                                                6);  /* Thicker outline for XLARGE */
+    lv_obj_align(rpm_unit, LV_ALIGN_CENTER, 0, arc_size / 2 - 80);  /* Moved up 50px */
     
     ESP_LOGI(TAG, "RPM arc created (centered, full-height, outlined text)");
 }
@@ -215,18 +216,18 @@ static lv_obj_t* create_data_section(lv_obj_t *parent, const char *label_text,
     
     /* Create label - CENTERED, hugging TOP edge */
     lv_obj_t *label_outlined = create_outlined_label(section, label_text,
-                                                      OPENDASH_FONT_SIZE_SMALL,
+                                                      OPENDASH_FONT_SIZE_MEDIUM,
                                                       OPENDASH_COLOR_TEXT_PRIMARY,
                                                       OPENDASH_COLOR_TEXT_OUTLINE,
                                                       1);
     lv_obj_align(label_outlined, LV_ALIGN_TOP_MID, OPENDASH_LABEL_OFFSET_X, OPENDASH_LABEL_OFFSET_Y);
     
-    /* Create value label - CENTERED, hugging BOTTOM edge */
+    /* Create value label - CENTERED, hugging BOTTOM edge - XLARGE to match RPM label */
     lv_obj_t *value_outlined = create_outlined_label(section, "---",
-                                                      OPENDASH_FONT_SIZE_MEDIUM,
+                                                      OPENDASH_FONT_SIZE_XLARGE,
                                                       OPENDASH_COLOR_TEXT_PRIMARY,
                                                       OPENDASH_COLOR_TEXT_OUTLINE,
-                                                      1);
+                                                      2);
     lv_obj_align(value_outlined, LV_ALIGN_BOTTOM_MID, OPENDASH_VALUE_OFFSET_X, OPENDASH_VALUE_OFFSET_Y);
     
     return section;
@@ -300,7 +301,7 @@ static void create_status_bar(lv_obj_t *parent)
     /* Status text - white text with black outline */
     lv_obj_t *status_outlined = create_outlined_label(status_bar,
                                                        "OpenDash v0.1.0 | System Ready | No Warnings",
-                                                       OPENDASH_FONT_SIZE_SMALL,
+                                                       OPENDASH_FONT_SIZE_MEDIUM,
                                                        OPENDASH_COLOR_TEXT_PRIMARY,
                                                        OPENDASH_COLOR_TEXT_OUTLINE,
                                                        1);
@@ -336,7 +337,7 @@ void ui_manager_set_warning(const char *warning_text)
         /* Normal state: regular size, white text with black outline */
         lv_obj_t *status_outlined = create_outlined_label(status_bar,
                                                            "OpenDash v0.1.0 | System Ready | No Warnings",
-                                                           OPENDASH_FONT_SIZE_SMALL,
+                                                           OPENDASH_FONT_SIZE_MEDIUM,
                                                            OPENDASH_COLOR_TEXT_PRIMARY,
                                                            OPENDASH_COLOR_TEXT_OUTLINE,
                                                            1);
@@ -379,13 +380,14 @@ esp_err_t ui_manager_init(const opendash_display_layout_t *layout)
     lv_obj_set_style_bg_color(screen_main, lv_color_hex(0x000000), 0);
     
 #if HAS_BACKGROUND_IMAGE
-    /* Add background image */
+    /* Add background image at 30% opacity */
     background_img = lv_img_create(screen_main);
     lv_img_set_src(background_img, &background_center_dsc);
     lv_obj_set_size(background_img, LCD_H_RES, LCD_V_RES);
     lv_obj_align(background_img, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_style_img_opa(background_img, 76, 0);  /* 30% opacity */
     lv_obj_move_to_index(background_img, 0);  /* Send to back */
-    ESP_LOGI(TAG, "Background image loaded");
+    ESP_LOGI(TAG, "Background image loaded at 30%% opacity");
 #else
     ESP_LOGW(TAG, "No background image available");
 #endif
