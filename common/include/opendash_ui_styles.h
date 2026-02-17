@@ -41,7 +41,7 @@ extern "C" {
 #define OPENDASH_COLOR_BG_DARK          0x000000    /**< Black background */
 #define OPENDASH_COLOR_BG_SECTION       0x101010    /**< Dark gray - section bg */
 #define OPENDASH_COLOR_BG_STATUSBAR     0x181818    /**< Status bar background */
-#define OPENDASH_COLOR_BORDER           0x000000    /**< Section border - black */
+#define OPENDASH_COLOR_BORDER           0xFFFFFF    /**< Section border - white */
 #define OPENDASH_COLOR_BORDER_STATUS    0xFFFFFF    /**< Status bar border - white */
 
 /* RPM Arc colors */
