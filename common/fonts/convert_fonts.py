@@ -293,6 +293,29 @@ def generate_font_header(config: Dict, output_dir: Path) -> bool:
         
         print_info(f"  Mapping: SMALL={size_14}px, MEDIUM={size_18}px, LARGE={size_32}px")
     
+    # Check for extended sizes (64, 96, 128) - optional
+    extended_sizes = [64, 96, 128]
+    has_extended = all(s in sizes for s in extended_sizes)
+    if has_extended:
+        size_64, size_96, size_128 = 64, 96, 128
+    else:
+        size_64 = min(sizes, key=lambda x: abs(x - 64)) if sizes else 32
+        size_96 = min(sizes, key=lambda x: abs(x - 96)) if sizes else 32
+        size_128 = min(sizes, key=lambda x: abs(x - 128)) if sizes else 32
+    
+    # Generate extended font declarations if available
+    extended_declares = ""
+    extended_defines = ""
+    if has_extended:
+        extended_declares = f"""LV_FONT_DECLARE({name}_{size_64});
+LV_FONT_DECLARE({name}_{size_96});
+LV_FONT_DECLARE({name}_{size_128});
+"""
+        extended_defines = f"""#define OPENDASH_FONT_DEFAULT_XLARGE   {name}_{size_64}
+#define OPENDASH_FONT_DEFAULT_XXLARGE  {name}_{size_96}
+#define OPENDASH_FONT_DEFAULT_XXXLARGE {name}_{size_128}
+"""
+    
     # Generate header content
     header_content = f"""/**
  * @file opendash_font_config.h
@@ -322,12 +345,12 @@ extern "C" {{
 LV_FONT_DECLARE({name}_{size_14});
 LV_FONT_DECLARE({name}_{size_18});
 LV_FONT_DECLARE({name}_{size_32});
-
+{extended_declares}
 /* Define default font pointers for OpenDash */
 #define OPENDASH_FONT_DEFAULT_SMALL   {name}_{size_14}
 #define OPENDASH_FONT_DEFAULT_MEDIUM  {name}_{size_18}
 #define OPENDASH_FONT_DEFAULT_LARGE   {name}_{size_32}
-
+{extended_defines}
 #ifdef __cplusplus
 }}
 #endif
@@ -343,6 +366,8 @@ LV_FONT_DECLARE({name}_{size_32});
         print_success(f"Generated font configuration header: {header_path.name}")
         print_info(f"  Default font: {name}")
         print_info(f"  Sizes: SMALL={size_14}px, MEDIUM={size_18}px, LARGE={size_32}px")
+        if has_extended:
+            print_info(f"  Extended: XLARGE={size_64}px, XXLARGE={size_96}px, XXXLARGE={size_128}px")
         return True
     except Exception as e:
         print_error(f"Failed to write header file: {e}")

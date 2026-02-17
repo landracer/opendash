@@ -53,6 +53,22 @@ typedef enum {
 #define OPENDASH_NVS_NAMESPACE  "od_config"
 
 /**
+ * @brief Temperature unit preference
+ */
+typedef enum {
+    OPENDASH_TEMP_CELSIUS    = 0,   /**< Celsius (°C) */
+    OPENDASH_TEMP_FAHRENHEIT = 1,   /**< Fahrenheit (°F) */
+} opendash_temp_unit_t;
+
+/**
+ * @brief Speed unit preference
+ */
+typedef enum {
+    OPENDASH_SPEED_KMH = 0,   /**< Kilometers per hour (km/h) */
+    OPENDASH_SPEED_MPH = 1,   /**< Miles per hour (mph) */
+} opendash_speed_unit_t;
+
+/**
  * @brief Full display layout configuration.
  *
  * Contains the configuration for all screen sections on a single display
@@ -63,7 +79,9 @@ typedef struct {
     uint8_t                   num_sections;                     /**< Active section count */
     uint8_t                   brightness;                       /**< Backlight level 0-255 */
     uint8_t                   theme;                            /**< Color theme index */
-    bool                      use_metric;                       /**< true=metric, false=imperial */
+    bool                      use_metric;                       /**< true=metric, false=imperial (legacy) */
+    opendash_temp_unit_t      temp_unit;                        /**< Temperature display unit */
+    opendash_speed_unit_t     speed_unit;                       /**< Speed display unit */
 } opendash_display_layout_t;
 
 /* ────────────────────────────────────────────────────────────────────────────

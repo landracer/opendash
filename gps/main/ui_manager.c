@@ -32,6 +32,7 @@
 #include "lvgl.h"
 #include "opendash_common.h"
 #include "opendash_fonts.h"
+#include "opendash_ui_styles.h"
 
 static const char *TAG = "ui_manager";
 
@@ -65,19 +66,19 @@ static void create_speed_display(lv_obj_t *parent)
     lv_obj_set_style_bg_opa(container, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(container, 0, 0);
     
-    /* Label */
+    /* Label - UPPER LEFT */
     lv_obj_t *label = lv_label_create(container);
     lv_label_set_text(label, "GPS SPEED");
     opendash_set_font(label, OPENDASH_FONT_SIZE_SMALL);
-    lv_obj_set_style_text_color(label, lv_color_hex(0x808080), 0);
-    lv_obj_align(label, LV_ALIGN_TOP_MID, 0, 0);
+    lv_obj_set_style_text_color(label, lv_color_hex(OPENDASH_COLOR_TEXT_SECONDARY), 0);
+    lv_obj_align(label, LV_ALIGN_TOP_LEFT, OPENDASH_LABEL_OFFSET_X, 0);
     
-    /* Speed value */
+    /* Speed value - WHITE with BLACK outline, shifted right */
     speed_label = lv_label_create(container);
     lv_label_set_text(speed_label, "--- km/h");
     opendash_set_font(speed_label, OPENDASH_FONT_SIZE_LARGE);
-    lv_obj_set_style_text_color(speed_label, lv_color_hex(0x00FF00), 0);
-    lv_obj_align(speed_label, LV_ALIGN_CENTER, 0, 15);
+    opendash_style_text_normal(speed_label);
+    lv_obj_align(speed_label, LV_ALIGN_CENTER, OPENDASH_VALUE_OFFSET_X, 15);
     
     ESP_LOGI(TAG, "Speed display created");
 }
@@ -90,23 +91,23 @@ static void create_lap_display(lv_obj_t *parent)
     lv_obj_t *container = lv_obj_create(parent);
     lv_obj_set_size(container, 300, 100);
     lv_obj_align(container, LV_ALIGN_CENTER, 0, -20);
-    lv_obj_set_style_bg_color(container, lv_color_hex(0x181818), 0);
-    lv_obj_set_style_border_color(container, lv_color_hex(0x303030), 0);
+    lv_obj_set_style_bg_color(container, lv_color_hex(OPENDASH_COLOR_BG_STATUSBAR), 0);
+    lv_obj_set_style_border_color(container, lv_color_hex(OPENDASH_COLOR_BORDER), 0);
     lv_obj_set_style_border_width(container, 2, 0);
     lv_obj_set_style_radius(container, 10, 0);
     
-    /* Lap time */
+    /* Lap time - WHITE with BLACK outline */
     laptime_label = lv_label_create(container);
     lv_label_set_text(laptime_label, "LAP: --:--.---");
     opendash_set_font(laptime_label, OPENDASH_FONT_SIZE_MEDIUM);
-    lv_obj_set_style_text_color(laptime_label, lv_color_hex(0xFFFFFF), 0);
+    opendash_style_text_normal(laptime_label);
     lv_obj_align(laptime_label, LV_ALIGN_TOP_MID, 0, 10);
     
     /* Delta */
     delta_label = lv_label_create(container);
     lv_label_set_text(delta_label, "Δ: ---");
     opendash_set_font(delta_label, OPENDASH_FONT_SIZE_SMALL);
-    lv_obj_set_style_text_color(delta_label, lv_color_hex(0xFFFF00), 0);
+    opendash_style_text_normal(delta_label);
     lv_obj_align(delta_label, LV_ALIGN_BOTTOM_MID, 0, -10);
     
     ESP_LOGI(TAG, "Lap display created");

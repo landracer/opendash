@@ -10,7 +10,7 @@
  * 2. Set "default": true on the font you want to use
  * 3. Rebuild the project
  * 
- * Current default font: unsi
+ * Current default font: kimbalt
  */
 
 #ifndef OPENDASH_FONT_CONFIG_H
@@ -22,15 +22,21 @@
 extern "C" {
 #endif
 
-/* Declare default font family: unsi */
-LV_FONT_DECLARE(unsi_14);
-LV_FONT_DECLARE(unsi_18);
-LV_FONT_DECLARE(unsi_32);
+/* Declare default font family: kimbalt */
+LV_FONT_DECLARE(kimbalt_14);
+LV_FONT_DECLARE(kimbalt_18);
+LV_FONT_DECLARE(kimbalt_32);
+LV_FONT_DECLARE(kimbalt_64);
+LV_FONT_DECLARE(kimbalt_96);
+LV_FONT_DECLARE(kimbalt_128);
 
 /* Define default font pointers for OpenDash */
-#define OPENDASH_FONT_DEFAULT_SMALL   unsi_14
-#define OPENDASH_FONT_DEFAULT_MEDIUM  unsi_18
-#define OPENDASH_FONT_DEFAULT_LARGE   unsi_32
+#define OPENDASH_FONT_DEFAULT_SMALL   kimbalt_14
+#define OPENDASH_FONT_DEFAULT_MEDIUM  kimbalt_18
+#define OPENDASH_FONT_DEFAULT_LARGE   kimbalt_32
+#define OPENDASH_FONT_DEFAULT_XLARGE   kimbalt_64
+#define OPENDASH_FONT_DEFAULT_XXLARGE  kimbalt_96
+#define OPENDASH_FONT_DEFAULT_XXXLARGE kimbalt_128
 
 #ifdef __cplusplus
 }

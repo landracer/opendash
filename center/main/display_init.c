@@ -9,8 +9,48 @@
  * This file initializes the display hardware using the ESP LCD RGB panel driver
  * and LVGL 9.x for rendering.
  *
- * IMPORTANT: LCD timing values are derived from the ST7262 datasheet.
- * Incorrect timing causes random display alignment on reset!
+ * ============================================================================
+ * CRITICAL DISPLAY CONFIGURATION - READ BEFORE MODIFYING
+ * ============================================================================
+ *
+ * These settings were carefully tuned to eliminate visual artifacts (noise,
+ * "humming", stripe patterns) and ensure crisp font rendering. Incorrect
+ * values can cause eye strain and headaches!
+ *
+ * KEY SETTINGS:
+ *
+ * 1. PIXEL CLOCK (LCD_PIXEL_CLOCK_HZ):
+ *    - Official Waveshare library uses: 16 MHz (conservative, stable)
+ *    - ST7262 datasheet allows: 23-25-27 MHz (min-typ-max)
+ *    - Higher values = faster refresh but may cause artifacts with PSRAM
+ *    - RECOMMENDED: 16 MHz for stability
+ *
+ * 2. BOUNCE BUFFER (LCD_BOUNCE_BUFFER_SIZE):
+ *    - Required when framebuffer is in PSRAM (fb_in_psram = true)
+ *    - Copies PSRAM data to internal SRAM before DMA transfer
+ *    - Prevents visual noise/artifacts from PSRAM bandwidth contention
+ *    - ESP-IDF recommends: 10-20 lines (e.g., 10 * LCD_H_RES)
+ *    - RECOMMENDED: 20 lines for best stability
+ *
+ * 3. TIMING VALUES (hsync/vsync porches):
+ *    - Values from ST7262 datasheet (Page 52)
+ *    - Using TYPICAL values (4/8/8/4/8/8) for stable, centered display
+ *    - DO NOT CHANGE unless you understand RGB LCD timing
+ *
+ * TROUBLESHOOTING:
+ *
+ * - Stripe artifacts / visual noise:
+ *   → Increase bounce buffer size (try 30 * LCD_H_RES)
+ *   → Decrease pixel clock (try 14 MHz)
+ *
+ * - Display drift / misalignment on reset:
+ *   → Check timing values match ST7262 datasheet
+ *   → Verify pclk_active_neg = true
+ *
+ * - Blurry fonts:
+ *   → Usually a font BPP issue, not display timing
+ *   → Use 4-bit BPP for fonts (see common/fonts/font_config.json)
+ *   → 8-bit BPP can cause blurring on RGB565 displays
  *
  * @see ST7262 Datasheet (Page 52 - RGB Timing Table):
  *      https://files.waveshare.com/wiki/common/ST7262.pdf
@@ -43,7 +83,12 @@ static const char *TAG = "display_init";
 
 /* LCD RGB Interface GPIO pins for Waveshare ESP32-S3-Touch-LCD-4.3 */
 /* ST7262 Datasheet (Page 52): DCLK Frequency = 23-25-27 MHz */
-#define LCD_PIXEL_CLOCK_HZ      (25 * 1000 * 1000)  /* 25 MHz (datasheet typical) */
+/* Waveshare official library uses 16 MHz for stability */
+#define LCD_PIXEL_CLOCK_HZ      (16 * 1000 * 1000)  /* 16 MHz (Waveshare official) */
+
+/* Bounce buffer for PSRAM stability - prevents visual noise/artifacts */
+/* ESP-IDF recommends 10-20 lines when framebuffer is in PSRAM */
+#define LCD_BOUNCE_BUFFER_SIZE  (20 * LCD_H_RES)  /* 16000 pixels = 20 lines */
 #define LCD_BK_LIGHT_GPIO       GPIO_NUM_2
 #define LCD_BK_LIGHT_ON_LEVEL   1
 
@@ -199,7 +244,8 @@ static esp_err_t lcd_panel_init(void)
         },
         .data_width = 16,  /* RGB565 = 16 bits */
         .num_fbs = 1,
-        .bounce_buffer_size_px = 0,
+        /* Bounce buffer: copies PSRAM->SRAM in chunks before DMA, prevents visual noise */
+        .bounce_buffer_size_px = LCD_BOUNCE_BUFFER_SIZE,
         .hsync_gpio_num = LCD_PIN_NUM_HSYNC,
         .vsync_gpio_num = LCD_PIN_NUM_VSYNC,
         .de_gpio_num = LCD_PIN_NUM_DE,

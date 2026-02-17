@@ -23,6 +23,34 @@ That's it! All UI elements will automatically use the new font.
 
 **IMPORTANT:** A simple `idf.py build` will NOT detect new fonts added to `font_config.json`. Font conversion happens during CMake configuration, not during the ninja build phase. You must run `idf.py reconfigure` (or delete the build directory) to trigger font conversion for newly added fonts.
 
+## Modifying Existing Font Settings
+
+**To change sizes, BPP, or other settings for an existing font:**
+
+The font converter only regenerates fonts when:
+- The output `.c` file is missing, OR
+- The source `.ttf` file is newer than the output
+
+**It does NOT automatically detect changes to `font_config.json`** (sizes, bpp, range, etc.). You must force reconversion:
+
+```bash
+cd common/fonts
+# Edit font_config.json (change sizes, bpp, etc.)
+python3 convert_fonts.py --force   # Forces reconversion of ALL fonts
+cd ../../center                     # Or left-right, gps, etc.
+idf.py reconfigure && idf.py build
+```
+
+**Why `--force` is required:**
+- Without `--force`, the script sees existing `.c` files and skips conversion
+- The `--force` flag deletes and regenerates all font files
+
+**Tip:** If you only changed one font, you can manually delete its `.c` files from `generated/` instead of using `--force`:
+```bash
+rm generated/myfont_*.c
+python3 convert_fonts.py
+```
+
 ## Directory Structure
 
 - `ttf/` - Place your TrueType (.ttf) or OpenType (.otf) font files here
@@ -63,6 +91,7 @@ The `font_config.json` file defines which fonts to convert:
       "sizes": [14, 18, 32],
       "bpp": 4,
       "range": "0x20-0x7F"
+      "default": false
     }
   ]
 }
@@ -82,10 +111,16 @@ The `font_config.json` file defines which fonts to convert:
 ### Character Ranges
 
 Common Unicode ranges:
-- `0x20-0x7F` - Basic ASCII (printable characters)
-- `0x20-0x7E,0xB0,0xB1,0xB7,0x2022` - ASCII + common symbols (°, ±, ·, •)
+- `0x20-0x7F` - Basic ASCII (printable characters only)
+- `0x20-0x7F,0xB0` - **OpenDash default** — ASCII + degree symbol (°)
+- `0x20-0x7F,0xB0,0xB1` - ASCII + degree (°) + plus-minus (±) — if font supports it
 - `0x20-0xFF` - Latin-1 Supplement (includes accented characters)
 - `0x20-0x7F,0x400-0x4FF` - ASCII + Cyrillic
+
+**Important for Automotive Dashboards:**
+The degrees symbol (°) is Unicode `0xB0`, which is **outside** basic ASCII (0x20-0x7F). If temperature readings show garbled text instead of "°C" or "°F", update the font range to include `0xB0`.
+
+**Note:** Not all fonts support all Unicode characters. If font conversion fails with "doesn't have any characters included in range", remove unsupported characters from the range.
 
 ## Automatic Conversion
 
@@ -203,6 +238,24 @@ LV_FONT_DECLARE(your_font_name);
 
 ### Font file not found
 Ensure the font file exists in `common/fonts/ttf/` and the path in `font_config.json` is correct.
+
+### Font sizes/settings not updating after rebuild
+The converter only regenerates fonts when source files change, not when config changes. Use `--force`:
+```bash
+cd common/fonts
+python3 convert_fonts.py --force
+cd ../../center
+idf.py reconfigure && idf.py build
+```
+
+### JSON syntax errors (silent failure)
+If fonts aren't converting, validate your JSON:
+```bash
+python3 -m json.tool font_config.json
+```
+Common mistakes:
+- Missing comma after `"range": "0x20-0x7F"` (before `"default"`)
+- Typos like `"defaut"` instead of `"default"`
 
 ### Build fails with font errors
 Check the `generated/` directory for any error messages in the generated files.
