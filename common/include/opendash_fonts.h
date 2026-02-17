@@ -30,9 +30,12 @@ extern "C" {
  * @brief Font size enumeration for easier font selection
  */
 typedef enum {
-    OPENDASH_FONT_SIZE_SMALL = 0,   ///< Small font (typically 14-16px)
-    OPENDASH_FONT_SIZE_MEDIUM = 1,  ///< Medium font (typically 18-24px)
-    OPENDASH_FONT_SIZE_LARGE = 2,   ///< Large font (typically 32-48px)
+    OPENDASH_FONT_SIZE_SMALL = 0,    ///< Small font (14px)
+    OPENDASH_FONT_SIZE_MEDIUM = 1,   ///< Medium font (18px)
+    OPENDASH_FONT_SIZE_LARGE = 2,    ///< Large font (32px)
+    OPENDASH_FONT_SIZE_XLARGE = 3,   ///< Extra large font (64px)
+    OPENDASH_FONT_SIZE_XXLARGE = 4,  ///< Extra extra large font (96px)
+    OPENDASH_FONT_SIZE_XXXLARGE = 5, ///< Maximum size font (128px)
 } opendash_font_size_t;
 
 /**
@@ -54,6 +57,18 @@ static inline const lv_font_t* opendash_get_font(opendash_font_size_t size)
             return &OPENDASH_FONT_DEFAULT_MEDIUM;
         case OPENDASH_FONT_SIZE_LARGE:
             return &OPENDASH_FONT_DEFAULT_LARGE;
+#ifdef OPENDASH_FONT_DEFAULT_XLARGE
+        case OPENDASH_FONT_SIZE_XLARGE:
+            return &OPENDASH_FONT_DEFAULT_XLARGE;
+#endif
+#ifdef OPENDASH_FONT_DEFAULT_XXLARGE
+        case OPENDASH_FONT_SIZE_XXLARGE:
+            return &OPENDASH_FONT_DEFAULT_XXLARGE;
+#endif
+#ifdef OPENDASH_FONT_DEFAULT_XXXLARGE
+        case OPENDASH_FONT_SIZE_XXXLARGE:
+            return &OPENDASH_FONT_DEFAULT_XXXLARGE;
+#endif
         default:
             return &OPENDASH_FONT_DEFAULT_SMALL;
     }

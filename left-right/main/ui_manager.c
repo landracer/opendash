@@ -29,6 +29,7 @@
 #include "lvgl.h"
 #include "opendash_common.h"
 #include "opendash_fonts.h"
+#include "opendash_ui_styles.h"
 
 static const char *TAG = "ui_manager";
 
@@ -72,7 +73,7 @@ static void create_arc_gauge(lv_obj_t *parent)
     /* Style the arc */
     lv_obj_set_style_arc_width(arc_gauge, 30, LV_PART_MAIN);
     lv_obj_set_style_arc_width(arc_gauge, 30, LV_PART_INDICATOR);
-    lv_obj_set_style_arc_color(arc_gauge, lv_color_hex(0x202020), LV_PART_MAIN);
+    lv_obj_set_style_arc_color(arc_gauge, lv_color_hex(OPENDASH_COLOR_BG_SECTION), LV_PART_MAIN);
     lv_obj_set_style_arc_color(arc_gauge, lv_color_hex(0x00AAFF), LV_PART_INDICATOR);
     
     ESP_LOGI(TAG, "Arc gauge created");
@@ -90,25 +91,25 @@ static void create_primary_display(lv_obj_t *parent)
     lv_obj_set_style_bg_opa(container, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(container, 0, 0);
     
-    /* Primary label (data point name) */
+    /* Primary label (data point name) - UPPER LEFT */
     primary_label = lv_label_create(container);
     lv_label_set_text(primary_label, "OIL TEMP");
     opendash_set_font(primary_label, OPENDASH_FONT_SIZE_SMALL);
-    lv_obj_set_style_text_color(primary_label, lv_color_hex(0x808080), 0);
-    lv_obj_align(primary_label, LV_ALIGN_TOP_MID, 0, 0);
+    lv_obj_set_style_text_color(primary_label, lv_color_hex(OPENDASH_COLOR_TEXT_SECONDARY), 0);
+    lv_obj_align(primary_label, LV_ALIGN_TOP_LEFT, OPENDASH_LABEL_OFFSET_X, 0);
     
-    /* Primary value */
+    /* Primary value - WHITE with BLACK outline */
     primary_value = lv_label_create(container);
     lv_label_set_text(primary_value, "---");
     opendash_set_font(primary_value, OPENDASH_FONT_SIZE_LARGE);
-    lv_obj_set_style_text_color(primary_value, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_align(primary_value, LV_ALIGN_CENTER, 0, 10);
+    opendash_style_text_normal(primary_value);
+    lv_obj_align(primary_value, LV_ALIGN_CENTER, OPENDASH_VALUE_OFFSET_X, 10);
     
     /* Unit label */
     lv_obj_t *unit_label = lv_label_create(container);
     lv_label_set_text(unit_label, "°C");
     opendash_set_font(unit_label, OPENDASH_FONT_SIZE_SMALL);
-    lv_obj_set_style_text_color(unit_label, lv_color_hex(0x808080), 0);
+    lv_obj_set_style_text_color(unit_label, lv_color_hex(OPENDASH_COLOR_TEXT_SECONDARY), 0);
     lv_obj_align(unit_label, LV_ALIGN_BOTTOM_MID, 0, 0);
     
     ESP_LOGI(TAG, "Primary display created");
@@ -128,19 +129,19 @@ static void create_secondary_display(lv_obj_t *parent)
     lv_obj_set_style_border_width(container, 2, 0);
     lv_obj_set_style_radius(container, 10, 0);
     
-    /* Secondary label */
+    /* Secondary label - UPPER LEFT */
     secondary_label = lv_label_create(container);
     lv_label_set_text(secondary_label, "BOOST");
     opendash_set_font(secondary_label, OPENDASH_FONT_SIZE_SMALL);
-    lv_obj_set_style_text_color(secondary_label, lv_color_hex(0x808080), 0);
-    lv_obj_align(secondary_label, LV_ALIGN_TOP_MID, 0, 10);
+    lv_obj_set_style_text_color(secondary_label, lv_color_hex(OPENDASH_COLOR_TEXT_SECONDARY), 0);
+    lv_obj_align(secondary_label, LV_ALIGN_TOP_LEFT, OPENDASH_LABEL_OFFSET_X, 10);
     
-    /* Secondary value */
+    /* Secondary value - WHITE with BLACK outline */
     secondary_value = lv_label_create(container);
     lv_label_set_text(secondary_value, "--- kPa");
     opendash_set_font(secondary_value, OPENDASH_FONT_SIZE_MEDIUM);
-    lv_obj_set_style_text_color(secondary_value, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_align(secondary_value, LV_ALIGN_CENTER, 0, 10);
+    opendash_style_text_normal(secondary_value);
+    lv_obj_align(secondary_value, LV_ALIGN_CENTER, OPENDASH_VALUE_OFFSET_X, 10);
     
     ESP_LOGI(TAG, "Secondary display created");
 }

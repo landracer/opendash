@@ -65,19 +65,15 @@ center/
 ## Default UI Layout
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│  RPM Bar — Full Width Arc (Top Section)                  │
-├──────────────┬───────────────────────┬───────────────────┤
-│  Section A   │     Section B         │    Section C      │
-│  Coolant °C  │     SPEED (GPS)       │    Boost kPa      │
-│              │    (Large numeric)    │                   │
-├──────────────┼───────────────────────┼───────────────────┤
-│  Section D   │     Section E         │    Section F      │
-│  Oil Temp    │    Lap Time/Delta     │    AFR            │
-│              │                       │                   │
-├──────────────┴───────────────────────┴───────────────────┤
-│  Status Bar — Warnings, Alarms, Checklist Status         │
-└──────────────────────────────────────────────────────────┘
+┌────────────┬─────────────────────┬────────────┐
+│ GPS SPEED  │                     │ LAP TIME   │
+├────────────┤   ARC + RPM         ├────────────┤
+│ COOLANT °C │    (centered)       │ BOOST kPa  │
+├────────────┤                     ├────────────┤
+│ OIL TEMP   │                     │ AFR        │
+├────────────┴─────────────────────┴────────────┤
+│                  Status Bar                   │
+└───────────────────────────────────────────────┘
 ```
 
 ## Configuration
@@ -115,6 +111,48 @@ idf.py fullclean
 # Reconfigure and rebuild
 idf.py set-target esp32s3
 idf.py build
+```
+
+## Display Quality Tuning
+
+The display configuration has been carefully tuned to eliminate visual artifacts and ensure crisp rendering. These settings are **critical** for a comfortable viewing experience — incorrect values can cause eye strain and headaches.
+
+### Current Optimized Settings
+
+| Parameter | Value | Notes |
+|-----------|-------|-------|
+| Pixel Clock | 16 MHz | Waveshare official library value |
+| Bounce Buffer | 20 lines | Eliminates PSRAM-related artifacts |
+| Font BPP | 4-bit | Best balance for RGB565 displays |
+| Timing (H/V) | 4/8/8 | ST7262 datasheet typical values |
+
+### Common Display Issues
+
+| Symptom | Likely Cause | Solution |
+|---------|-------------|----------|
+| Stripe artifacts / visual "hum" | PSRAM bandwidth | Increase bounce buffer, decrease pixel clock |
+| Blurry fonts | Wrong font BPP | Use 4-bit BPP (not 8-bit) |
+| Missing symbols (°, ±) | Character range | Update font_config.json range to include 0xB0,0xB1 |
+| Display drift on reset | Timing mismatch | Verify pclk_active_neg = true |
+
+### Modifying Display Settings
+
+**WARNING:** Only modify these if you understand RGB LCD timing!
+
+1. Edit `main/display_init.c` — see the header comments for guidance
+2. Key defines: `LCD_PIXEL_CLOCK_HZ`, `LCD_BOUNCE_BUFFER_SIZE`
+3. Rebuild: `idf.py build && idf.py flash`
+
+### Modifying Fonts
+
+See [`../common/fonts/README.md`](../common/fonts/README.md) for font configuration. Key points:
+
+```bash
+cd ../common/fonts
+# Edit font_config.json (change sizes, bpp, range, etc.)
+python3 convert_fonts.py --force   # REQUIRED to regenerate fonts
+cd ../../center
+idf.py reconfigure && idf.py build
 ```
 
 ## Next Steps

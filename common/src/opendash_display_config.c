@@ -36,6 +36,8 @@ static void get_center_defaults(opendash_display_layout_t *layout)
     layout->brightness = 200;
     layout->theme = 0;
     layout->use_metric = false;
+    layout->temp_unit = OPENDASH_TEMP_FAHRENHEIT;  /* Default to Fahrenheit */
+    layout->speed_unit = OPENDASH_SPEED_MPH;       /* Default to MPH */
 
     /* Section 0: RPM (large arc gauge in center) */
     layout->sections[0].data_point_id = OPENDASH_DP_RPM;
@@ -70,6 +72,8 @@ static void get_gauge_defaults(opendash_display_layout_t *layout, opendash_node_
     layout->brightness = 200;
     layout->theme = 0;
     layout->use_metric = false;
+    layout->temp_unit = OPENDASH_TEMP_FAHRENHEIT;
+    layout->speed_unit = OPENDASH_SPEED_MPH;
 
     if (node == OPENDASH_NODE_LEFT) {
         /* Left pod: Oil pressure primary */
@@ -104,6 +108,8 @@ static void get_gps_defaults(opendash_display_layout_t *layout)
     layout->brightness = 255;  /* Max brightness for outdoor visibility */
     layout->theme = 0;
     layout->use_metric = false;
+    layout->temp_unit = OPENDASH_TEMP_FAHRENHEIT;
+    layout->speed_unit = OPENDASH_SPEED_MPH;
 
     /* Section 0: Current lap time */
     layout->sections[0].data_point_id = OPENDASH_DP_LAP_TIME;
