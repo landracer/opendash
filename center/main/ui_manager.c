@@ -85,16 +85,14 @@ static lv_obj_t* create_outlined_label(lv_obj_t *parent, const char *text,
     lv_obj_set_style_pad_all(container, outline_px, 0);  /* Add padding for outline */
     lv_obj_clear_flag(container, LV_OBJ_FLAG_SCROLLABLE);
     
-    /* Offset directions for outline: 8 directions - offset by outline_px to account for padding */
-    const int8_t offsets[8][2] = {
+    /* Offset directions for outline: 4 directions (lighter load) - offset by outline_px to account for padding */
+    const int8_t offsets[4][2] = {
         {0, outline_px}, {outline_px * 2, outline_px},  /* Left, Right */
-        {outline_px, 0}, {outline_px, outline_px * 2},  /* Up, Down */
-        {0, 0}, {outline_px * 2, 0},  /* Top-left, Top-right diagonals */
-        {0, outline_px * 2}, {outline_px * 2, outline_px * 2}  /* Bottom-left, Bottom-right diagonals */
+        {outline_px, 0}, {outline_px, outline_px * 2}   /* Up, Down */
     };
     
-    /* Create outline/shadow labels first (behind) */
-    for (int i = 0; i < 8; i++) {
+    /* Create outline/shadow labels first (behind) - reduced from 8 to 4 for performance */
+    for (int i = 0; i < 4; i++) {
         lv_obj_t *shadow = lv_label_create(container);
         lv_label_set_text(shadow, text);
         opendash_set_font(shadow, font_size);
@@ -178,7 +176,7 @@ static void create_rpm_arc(lv_obj_t *parent)
                                                  OPENDASH_FONT_SIZE_XXXLARGE,
                                                  OPENDASH_COLOR_RPM_TEXT,
                                                  OPENDASH_COLOR_RPM_OUTLINE,
-                                                 6);  /* Thicker outline for larger font */
+                                                 3);  /* Reduced outline thickness for performance */
     lv_obj_align(rpm_value_container, LV_ALIGN_CENTER, 0, -STATUS_BAR_HEIGHT / 2 + 10);  /* Lowered with arc */
     
     /* Add "RPM" unit label at bottom of arc - XLARGE font, white text, black outline */
@@ -186,18 +184,19 @@ static void create_rpm_arc(lv_obj_t *parent)
                                                 OPENDASH_FONT_SIZE_XLARGE,
                                                 OPENDASH_COLOR_TEXT_PRIMARY,
                                                 OPENDASH_COLOR_TEXT_OUTLINE,
-                                                6);  /* Thicker outline for XLARGE */
+                                                4);  /* Thicker outline */
     lv_obj_align(rpm_unit, LV_ALIGN_CENTER, 0, arc_size / 2 - 80);  /* Moved up 50px */
     
     ESP_LOGI(TAG, "RPM arc created (centered, full-height, outlined text)");
 }
 
 /**
- * @brief Create a data section with label and value display.
+ * @brief Create a data section with label, value, and max/peak display.
  *
  * Each section displays a configurable data point with:
  * - Label centered horizontally, hugging the top edge
- * - Value centered horizontally, hugging the bottom edge
+ * - Value centered horizontally, in the middle area
+ * - Max/peak value at the bottom in small font with outline
  */
 static lv_obj_t* create_data_section(lv_obj_t *parent, const char *label_text, 
                                       int x, int y, int width, int height)
@@ -222,13 +221,21 @@ static lv_obj_t* create_data_section(lv_obj_t *parent, const char *label_text,
                                                       1);
     lv_obj_align(label_outlined, LV_ALIGN_TOP_MID, OPENDASH_LABEL_OFFSET_X, OPENDASH_LABEL_OFFSET_Y);
     
-    /* Create value label - CENTERED, hugging BOTTOM edge - XLARGE to match RPM label */
+    /* Create value label - CENTERED, positioned above max - XLARGE */
     lv_obj_t *value_outlined = create_outlined_label(section, "---",
                                                       OPENDASH_FONT_SIZE_XLARGE,
                                                       OPENDASH_COLOR_TEXT_PRIMARY,
                                                       OPENDASH_COLOR_TEXT_OUTLINE,
-                                                      2);
-    lv_obj_align(value_outlined, LV_ALIGN_BOTTOM_MID, OPENDASH_VALUE_OFFSET_X, OPENDASH_VALUE_OFFSET_Y);
+                                                      1);  /* Reduced outline for performance */
+    lv_obj_align(value_outlined, LV_ALIGN_CENTER, 0, 25);  /* Positioned below center, above max */
+    
+    /* Create max/peak value label - shifted left, hugging BOTTOM edge - MEDIUM font, white text */
+    lv_obj_t *max_outlined = create_outlined_label(section, "Max: ---",
+                                                     OPENDASH_FONT_SIZE_MEDIUM,
+                                                     OPENDASH_COLOR_TEXT_PRIMARY,
+                                                     OPENDASH_COLOR_TEXT_OUTLINE,
+                                                     1);
+    lv_obj_align(max_outlined, LV_ALIGN_BOTTOM_MID, -35, OPENDASH_VALUE_OFFSET_Y);
     
     return section;
 }
@@ -358,8 +365,8 @@ static void ui_task(void *pvParameters)
         /* Process LVGL timers */
         lv_timer_handler();
         
-        /* Delay to allow other tasks to run */
-        vTaskDelay(pdMS_TO_TICKS(10));
+        /* Delay to allow other tasks to run and prevent watchdog timeout */
+        vTaskDelay(pdMS_TO_TICKS(20));
     }
 }
 
