@@ -37,6 +37,11 @@ extern "C" {
 #define OPENDASH_COLOR_OK               0x00FF00    /**< Green - system ok */
 #define OPENDASH_COLOR_CAUTION          0xFFAA00    /**< Orange - caution state */
 
+/* Warning Box colors (hard solid, no bleed-through) */
+#define OPENDASH_COLOR_WARNING_BOX_RED      0xFF0000    /**< Bright red - critical warning */
+#define OPENDASH_COLOR_WARNING_BOX_ORANGE   0xFF6600    /**< Orange - caution warning */
+#define OPENDASH_COLOR_WARNING_BOX_BG       0x000000    /**< Black background for boxes */
+
 /* Background colors */
 #define OPENDASH_COLOR_BG_DARK          0x000000    /**< Black background */
 #define OPENDASH_COLOR_BG_SECTION       0x101010    /**< Dark gray - section bg */
