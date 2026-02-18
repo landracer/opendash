@@ -2,7 +2,7 @@
  * @file ui_manager.c
  * @brief OpenDash GPS / Telemetry Unit — UI Manager Implementation
  *
- * Creates a professional baseline layout for the GPS display (466×466):
+ * Creates a professional, fully functional layout for the GPS display (466×466):
  * 
  * Layout:
  *         ┌──────────────────┐
@@ -15,24 +15,29 @@
  *       │ │   1:32.456       │ │
  *       │ │   Lap Delta      │ │
  *       │ │   +0.234s        │ │
- *       │ │                  │ │
- *       │ │   G-Force Circle │ │
- *       │ │     [Viz]        │ │
+ *       │ │   G-Force: 1.2G  │ │
  *       │ └──────────────────┘ │
  *        ╲ 12 Sats   275°     ╱
  *         └──────────────────┘
  *
+ * Real-time data updates from GPS and IMU sensors.
+ * 
  * @see LVGL Documentation: https://docs.lvgl.io/master/
  */
 
 #include "ui_manager.h"
+#include "gps_handler.h"
+#include "imu_handler.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/semphr.h"
 #include "lvgl.h"
 #include "opendash_common.h"
 #include "opendash_fonts.h"
 #include "opendash_ui_styles.h"
+#include <stdio.h>
+#include <math.h>
 
 static const char *TAG = "ui_manager";
 
@@ -40,14 +45,22 @@ static const char *TAG = "ui_manager";
 #define LCD_H_RES   466
 #define LCD_V_RES   466
 
+/* Update intervals (ms) */
+#define UI_UPDATE_INTERVAL_MS       500  /* Update display every 500ms */
+#define DATA_FETCH_TIMEOUT_MS       100  /* Timeout when fetching sensor data */
+
 /* UI component references */
 static lv_obj_t *screen_main = NULL;
 static lv_obj_t *speed_label = NULL;
+static lv_obj_t *speed_unit_label = NULL;
 static lv_obj_t *laptime_label = NULL;
 static lv_obj_t *delta_label = NULL;
-static lv_obj_t *gforce_circle = NULL;
+static lv_obj_t *gforce_label = NULL;
 static lv_obj_t *sat_label = NULL;
 static lv_obj_t *heading_label = NULL;
+static lv_obj_t *fix_status_label = NULL;
+static lv_obj_t *coords_label = NULL;
+static lv_obj_t *info_panel = NULL;
 
 /* Configuration */
 static opendash_display_layout_t current_layout;
@@ -55,118 +68,262 @@ static opendash_display_layout_t current_layout;
 /* UI task handle */
 static TaskHandle_t ui_task_handle = NULL;
 
+/* Mutex for thread-safe LVGL access */
+static SemaphoreHandle_t lvgl_mutex = NULL;
+
+/* Lap timing simulation */
+static uint32_t lap_start_ticks = 0;
+static uint32_t lap_best_time_ms = 0;
+static bool lap_in_progress = false;
+
 /**
- * @brief Create the GPS speed display (large numeric at top).
+ * @brief Lock LVGL mutex
+ */
+static inline void lvgl_lock(void)
+{
+    if (lvgl_mutex) {
+        xSemaphoreTake(lvgl_mutex, portMAX_DELAY);
+    }
+}
+
+/**
+ * @brief Unlock LVGL mutex
+ */
+static inline void lvgl_unlock(void)
+{
+    if (lvgl_mutex) {
+        xSemaphoreGive(lvgl_mutex);
+    }
+}
+
+/**
+ * @brief Create the primary speed display area.
  */
 static void create_speed_display(lv_obj_t *parent)
 {
-    lv_obj_t *container = lv_obj_create(parent);
-    lv_obj_set_size(container, 300, 120);
-    lv_obj_align(container, LV_ALIGN_TOP_MID, 0, 30);
-    lv_obj_set_style_bg_opa(container, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(container, 0, 0);
+    /* Speed label ("---") */
+    speed_label = lv_label_create(parent);
+    lv_label_set_text(speed_label, "---");
+    lv_obj_set_style_text_font(speed_label, &lv_font_montserrat_48, 0);
+    lv_obj_set_style_text_color(speed_label, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_align(speed_label, LV_ALIGN_TOP_MID, 0, 40);
     
-    /* Label - UPPER LEFT */
-    lv_obj_t *label = lv_label_create(container);
-    lv_label_set_text(label, "GPS SPEED");
-    opendash_set_font(label, OPENDASH_FONT_SIZE_SMALL);
-    lv_obj_set_style_text_color(label, lv_color_hex(OPENDASH_COLOR_TEXT_SECONDARY), 0);
-    lv_obj_align(label, LV_ALIGN_TOP_LEFT, OPENDASH_LABEL_OFFSET_X, 0);
-    
-    /* Speed value - WHITE with BLACK outline, shifted right */
-    speed_label = lv_label_create(container);
-    lv_label_set_text(speed_label, "--- km/h");
-    opendash_set_font(speed_label, OPENDASH_FONT_SIZE_LARGE);
-    opendash_style_text_normal(speed_label);
-    lv_obj_align(speed_label, LV_ALIGN_CENTER, OPENDASH_VALUE_OFFSET_X, 15);
+    /* Unit label */
+    speed_unit_label = lv_label_create(parent);
+    lv_label_set_text(speed_unit_label, "km/h");
+    lv_obj_set_style_text_font(speed_unit_label, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_color(speed_unit_label, lv_color_hex(0xAAAAAA), 0);
+    lv_obj_align(speed_unit_label, LV_ALIGN_TOP_MID, 0, 110);
     
     ESP_LOGI(TAG, "Speed display created");
 }
 
 /**
- * @brief Create the lap timing display.
+ * @brief Create the info panel (lap time, delta, g-force).
  */
-static void create_lap_display(lv_obj_t *parent)
+static void create_info_panel(lv_obj_t *parent)
 {
-    lv_obj_t *container = lv_obj_create(parent);
-    lv_obj_set_size(container, 300, 100);
-    lv_obj_align(container, LV_ALIGN_CENTER, 0, -20);
-    lv_obj_set_style_bg_color(container, lv_color_hex(OPENDASH_COLOR_BG_STATUSBAR), 0);
-    lv_obj_set_style_border_color(container, lv_color_hex(OPENDASH_COLOR_BORDER), 0);
-    lv_obj_set_style_border_width(container, 2, 0);
-    lv_obj_set_style_radius(container, 10, 0);
+    info_panel = lv_obj_create(parent);
+    lv_obj_set_size(info_panel, 380, 140);
+    lv_obj_align(info_panel, LV_ALIGN_CENTER, 0, 30);
+    lv_obj_set_style_bg_color(info_panel, lv_color_hex(0x1a1a1a), 0);
+    lv_obj_set_style_border_color(info_panel, lv_color_hex(0x444444), 0);
+    lv_obj_set_style_border_width(info_panel, 1, 0);
+    lv_obj_set_style_radius(info_panel, 8, 0);
+    lv_obj_set_style_pad_all(info_panel, 12, 0);
     
-    /* Lap time - WHITE with BLACK outline */
-    laptime_label = lv_label_create(container);
-    lv_label_set_text(laptime_label, "LAP: --:--.---");
-    opendash_set_font(laptime_label, OPENDASH_FONT_SIZE_MEDIUM);
-    opendash_style_text_normal(laptime_label);
-    lv_obj_align(laptime_label, LV_ALIGN_TOP_MID, 0, 10);
+    /* Lap time line: "LAP: 01:23.456" */
+    laptime_label = lv_label_create(info_panel);
+    lv_label_set_text(laptime_label, "LAP: --:--.---;");
+    lv_obj_set_style_text_font(laptime_label, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_color(laptime_label, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_align(laptime_label, LV_ALIGN_TOP_LEFT, 0, 0);
     
-    /* Delta */
-    delta_label = lv_label_create(container);
-    lv_label_set_text(delta_label, "Δ: ---");
-    opendash_set_font(delta_label, OPENDASH_FONT_SIZE_SMALL);
-    opendash_style_text_normal(delta_label);
-    lv_obj_align(delta_label, LV_ALIGN_BOTTOM_MID, 0, -10);
+    /* Delta line: "Δ: +0.123s" */
+    delta_label = lv_label_create(info_panel);
+    lv_label_set_text(delta_label, "Δ: --.---;");
+    lv_obj_set_style_text_font(delta_label, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_color(delta_label, lv_color_hex(0xFFFF00), 0);
+    lv_obj_align(delta_label, LV_ALIGN_TOP_RIGHT, 0, 0);
     
-    ESP_LOGI(TAG, "Lap display created");
+    /* G-force line: "G: -.-- (x: -.--, y: -.--, z: --.--)" */
+    gforce_label = lv_label_create(info_panel);
+    lv_label_set_text(gforce_label, "G: -.-");
+    lv_obj_set_style_text_font(gforce_label, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_color(gforce_label, lv_color_hex(0x00FF00), 0);
+    lv_obj_align(gforce_label, LV_ALIGN_BOTTOM_LEFT, 0, 0);
+    
+    /* Coordinates line: "Lat: dd.ddddd Lon: dd.ddddd" */
+    coords_label = lv_label_create(info_panel);
+    lv_label_set_text(coords_label, "Lat: --.- Lon: --.-");
+    lv_obj_set_style_text_font(coords_label, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_color(coords_label, lv_color_hex(0x888888), 0);
+    lv_obj_align(coords_label, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
+    
+    ESP_LOGI(TAG, "Info panel created");
 }
 
 /**
- * @brief Create the G-force visualization circle.
- */
-static void create_gforce_display(lv_obj_t *parent)
-{
-    gforce_circle = lv_obj_create(parent);
-    lv_obj_set_size(gforce_circle, 150, 150);
-    lv_obj_align(gforce_circle, LV_ALIGN_CENTER, 0, 100);
-    lv_obj_set_style_bg_color(gforce_circle, lv_color_hex(0x101010), 0);
-    lv_obj_set_style_border_color(gforce_circle, lv_color_hex(0x00FF00), 0);
-    lv_obj_set_style_border_width(gforce_circle, 3, 0);
-    lv_obj_set_style_radius(gforce_circle, LV_RADIUS_CIRCLE, 0);
-    
-    /* G-force label */
-    lv_obj_t *g_label = lv_label_create(gforce_circle);
-    lv_label_set_text(g_label, "G");
-    opendash_set_font(g_label, OPENDASH_FONT_SIZE_SMALL);
-    lv_obj_set_style_text_color(g_label, lv_color_hex(0x808080), 0);
-    lv_obj_center(g_label);
-    
-    ESP_LOGI(TAG, "G-force display created");
-}
-
-/**
- * @brief Create the status bar (satellites and heading).
+ * @brief Create the status bar (satellites, heading, GPS fix status).
  */
 static void create_status_bar(lv_obj_t *parent)
 {
+    /* GPS Fix status indicator (top right corner) */
+    fix_status_label = lv_label_create(parent);
+    lv_label_set_text(fix_status_label, "NO FIX");
+    lv_obj_set_style_text_font(fix_status_label, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_color(fix_status_label, lv_color_hex(0xFF3333), 0);
+    lv_obj_align(fix_status_label, LV_ALIGN_TOP_RIGHT, -15, 10);
+    
     /* Satellite count (bottom left) */
     sat_label = lv_label_create(parent);
-    lv_label_set_text(sat_label, "0 Sats");
-    opendash_set_font(sat_label, OPENDASH_FONT_SIZE_SMALL);
-    lv_obj_set_style_text_color(sat_label, lv_color_hex(0x808080), 0);
-    lv_obj_align(sat_label, LV_ALIGN_BOTTOM_LEFT, 20, -10);
+    lv_label_set_text(sat_label, "-- Sats");
+    lv_obj_set_style_text_font(sat_label, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_color(sat_label, lv_color_hex(0xAAAAAA), 0);
+    lv_obj_align(sat_label, LV_ALIGN_BOTTOM_LEFT, 15, -15);
     
     /* Heading (bottom right) */
     heading_label = lv_label_create(parent);
     lv_label_set_text(heading_label, "---°");
-    opendash_set_font(heading_label, OPENDASH_FONT_SIZE_SMALL);
-    lv_obj_set_style_text_color(heading_label, lv_color_hex(0x808080), 0);
-    lv_obj_align(heading_label, LV_ALIGN_BOTTOM_RIGHT, -20, -10);
+    lv_obj_set_style_text_font(heading_label, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_color(heading_label, lv_color_hex(0xAAAAAA), 0);
+    lv_obj_align(heading_label, LV_ALIGN_BOTTOM_RIGHT, -15, -15);
     
     ESP_LOGI(TAG, "Status bar created");
 }
 
 /**
- * @brief UI rendering task.
+ * @brief Update display with current GPS and IMU data.
  */
-static void ui_task(void *pvParameters)
+static void update_display_data(void)
 {
-    ESP_LOGI(TAG, "UI task started");
+    /* Fetch GPS data */
+    gps_data_t gps_data = {0};
+    if (gps_handler_get_data(&gps_data) != ESP_OK) {
+        ESP_LOGD(TAG, "Failed to fetch GPS data");
+        return;
+    }
+    
+    /* Fetch IMU data */
+    imu_data_t imu_data = {0};
+    if (imu_handler_get_data(&imu_data) != ESP_OK) {
+        ESP_LOGD(TAG, "Failed to fetch IMU data");
+    }
+    
+    lvgl_lock();
+    
+    /* Update speed */
+    char speed_str[16];
+    if (gps_data.fix_valid) {
+        snprintf(speed_str, sizeof(speed_str), "%.0f", gps_data.speed);
+    } else {
+        snprintf(speed_str, sizeof(speed_str), "---");
+    }
+    lv_label_set_text(speed_label, speed_str);
+    
+    /* Update GPS fix status */
+    if (gps_data.fix_valid) {
+        lv_label_set_text(fix_status_label, "3D FIX");
+        lv_obj_set_style_text_color(fix_status_label, lv_color_hex(0x33FF33), 0);
+    } else {
+        lv_label_set_text(fix_status_label, "NO FIX");
+        lv_obj_set_style_text_color(fix_status_label, lv_color_hex(0xFF3333), 0);
+    }
+    
+    /* Update satellite count */
+    char sat_str[16];
+    snprintf(sat_str, sizeof(sat_str), "%d Sats", gps_data.satellites);
+    lv_label_set_text(sat_label, sat_str);
+    
+    /* Update heading */
+    char heading_str[16];
+    if (gps_data.fix_valid && gps_data.speed > 1.0f) {
+        snprintf(heading_str, sizeof(heading_str), "%.0f°", gps_data.heading);
+    } else {
+        snprintf(heading_str, sizeof(heading_str), "---°");
+    }
+    lv_label_set_text(heading_label, heading_str);
+    
+    /* Update coordinates */
+    char coords_str[64];
+    snprintf(coords_str, sizeof(coords_str), "Lat: %.4f Lon: %.4f",
+             gps_data.latitude, gps_data.longitude);
+    lv_label_set_text(coords_label, coords_str);
+    
+    /* Update lap timing (simulated) */
+    if (gps_data.fix_valid && gps_data.speed > 5.0f && !lap_in_progress) {
+        /* Start new lap */
+        lap_in_progress = true;
+        lap_start_ticks = xTaskGetTickCount();
+    }
+    
+    char laptime_str[32];
+    char delta_str[32];
+    
+    if (lap_in_progress) {
+        uint32_t elapsed_ms = (xTaskGetTickCount() - lap_start_ticks) * portTICK_PERIOD_MS;
+        uint32_t minutes = elapsed_ms / 60000;
+        uint32_t seconds = (elapsed_ms % 60000) / 1000;
+        uint32_t millis = elapsed_ms % 1000;
+        
+        snprintf(laptime_str, sizeof(laptime_str), "LAP: %02lu:%02lu.%03lu",
+                 minutes, seconds, millis);
+        
+        if (lap_best_time_ms > 0) {
+            int32_t delta_ms = (int32_t)elapsed_ms - (int32_t)lap_best_time_ms;
+            snprintf(delta_str, sizeof(delta_str), "Δ: %+.2f",
+                     delta_ms / 1000.0f);
+        } else {
+            snprintf(delta_str, sizeof(delta_str), "Δ: --.-");
+        }
+    } else {
+        snprintf(laptime_str, sizeof(laptime_str), "LAP: --:--.---");
+        snprintf(delta_str, sizeof(delta_str), "Δ: --.-");
+    }
+    
+    lv_label_set_text(laptime_label, laptime_str);
+    lv_label_set_text(delta_label, delta_str);
+    
+    /* Update G-force */
+    char gforce_str[64];
+    float total_g = sqrtf(imu_data.accel_x * imu_data.accel_x +
+                          imu_data.accel_y * imu_data.accel_y +
+                          imu_data.accel_z * imu_data.accel_z);
+    snprintf(gforce_str, sizeof(gforce_str), "G: %.2f (x:%.2f y:%.2f z:%.2f)",
+             total_g, imu_data.accel_x, imu_data.accel_y, imu_data.accel_z);
+    lv_label_set_text(gforce_label, gforce_str);
+    
+    lvgl_unlock();
+}
+
+/**
+ * @brief UI update task - periodically refreshes sensor data on display.
+ */
+static void ui_update_task(void *pvParameters)
+{
+    ESP_LOGI(TAG, "UI update task started");
+    TickType_t last_wake = xTaskGetTickCount();
     
     while (1) {
+        update_display_data();
+        
+        /* Wait for next update interval */
+        vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(UI_UPDATE_INTERVAL_MS));
+    }
+}
+
+/**
+ * @brief LVGL rendering task - must run at high frequency.
+ */
+static void ui_render_task(void *pvParameters)
+{
+    ESP_LOGI(TAG, "UI render task started");
+    
+    while (1) {
+        lvgl_lock();
         lv_timer_handler();
+        lvgl_unlock();
+        
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
@@ -180,48 +337,79 @@ esp_err_t ui_manager_init(const opendash_display_layout_t *layout)
     
     memcpy(&current_layout, layout, sizeof(opendash_display_layout_t));
     
-    ESP_LOGI(TAG, "Creating baseline UI layout for 466×466 AMOLED display");
+    /* Create LVGL mutex */
+    lvgl_mutex = xSemaphoreCreateMutex();
+    if (lvgl_mutex == NULL) {
+        ESP_LOGE(TAG, "Failed to create LVGL mutex");
+        return ESP_FAIL;
+    }
+    
+    ESP_LOGI(TAG, "Creating UI layout for 466×466 AMOLED display");
     
     /* Create main screen */
+    lvgl_lock();
+    
     screen_main = lv_obj_create(NULL);
+    lv_obj_set_size(screen_main, LCD_H_RES, LCD_V_RES);
     lv_obj_set_style_bg_color(screen_main, lv_color_hex(0x000000), 0);
+    lv_obj_set_style_border_width(screen_main, 0, 0);
+    lv_obj_set_style_pad_all(screen_main, 0, 0);
     
     /* Create UI components */
     create_speed_display(screen_main);
-    create_lap_display(screen_main);
-    create_gforce_display(screen_main);
+    create_info_panel(screen_main);
     create_status_bar(screen_main);
     
-    /* Load the screen */
+    /* Load and display the screen */
     lv_scr_load(screen_main);
     
-    ESP_LOGI(TAG, "Baseline UI layout created");
+    lvgl_unlock();
+    
+    ESP_LOGI(TAG, "UI layout created successfully");
     
     return ESP_OK;
 }
 
 esp_err_t ui_manager_start(void)
 {
+    /* Create update task (lower priority, periodic) */
     BaseType_t ret = xTaskCreatePinnedToCore(
-        ui_task,
-        "ui_task",
+        ui_update_task,
+        "ui_update",
+        4096,
+        NULL,
+        4,
+        NULL,
+        0  /* Core 0 for sensor data fetching */
+    );
+    
+    if (ret != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create UI update task");
+        return ESP_FAIL;
+    }
+    
+    /* Create render task (higher priority, frequent) */
+    ret = xTaskCreatePinnedToCore(
+        ui_render_task,
+        "ui_render",
         4096,
         NULL,
         5,
         &ui_task_handle,
-        1
+        1  /* Core 1 for LVGL rendering */
     );
     
     if (ret != pdPASS) {
-        ESP_LOGE(TAG, "Failed to create UI task");
+        ESP_LOGE(TAG, "Failed to create UI render task");
         return ESP_FAIL;
     }
     
-    ESP_LOGI(TAG, "UI task created on core 1");
+    ESP_LOGI(TAG, "UI tasks created and running");
     return ESP_OK;
 }
 
 void ui_manager_update_value(uint16_t data_point_id, float value)
 {
+    /* Called by central system when values change */
     ESP_LOGD(TAG, "Update requested for data point 0x%04X: %.2f", data_point_id, value);
 }
