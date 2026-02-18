@@ -62,31 +62,147 @@ center/
     └── ui_manager.c/h            # LVGL UI management
 ```
 
-## Default UI Layout
+## Display System Architecture
+
+### Single-Screen, Multi-Display-Mode Design
+
+The Center Display uses a **resource-efficient architecture** with one LVGL screen object that cycles through multiple display modes:
+
+- ✅ **Minimal Memory Footprint:** Single screen tree = fewer LVGL objects
+- ✅ **Maximum CPU Efficiency:** No object recreation on mode switch
+- ✅ **Flexible Extensibility:** Add unlimited display modes without memory bloat
+- ✅ **Thread-Safe:** All UI objects created once during init (on UI task)
+
+### Display Modes
+
+Each display mode shows the same physical layout with different data:
+
+| Mode | Center Gauge | Left Column | Right Column |
+|------|--------------|-------------|--------------|
+| **ENGINE** | RPM Arc | Coolant °C, GPS Speed, Boost kPa | Oil Temp °C, Lap Time, AFR |
+| **GPS** | Speed Arc | Altitude m, Sat Count, Heading ° | Latitude, HDOP, Accuracy |
+
+**Operation:**
+- Press **Boot Button (GPIO0)** to cycle between modes
+- Screen shows ~2s per mode by default (customizable)
+- Data updates in real-time regardless of mode
+- All sections display placeholder "---" until data is available
+
+### Default UI Layout
 
 ```
-┌────────────┬─────────────────────┬────────────┐
-│ GPS SPEED  │                     │ LAP TIME   │
-├────────────┤   ARC + RPM         ├────────────┤
-│ COOLANT °C │    (centered)       │ BOOST kPa  │
-├────────────┤                     ├────────────┤
-│ OIL TEMP   │                     │ AFR        │
-├────────────┴─────────────────────┴────────────┤
-│                  Status Bar                   │
-└───────────────────────────────────────────────┘
+┌──────────────┬──────────────────────┬──────────────┐
+│   LABEL 0    │                      │   LABEL 3    │
+│              │   CENTER ARC         │              │
+│   VALUE 0    │  (RPM or Speed)      │   VALUE 3    │
+│   Max: ___   │                      │   Max: ___   │
+├──────────────┼──────────────────────┼──────────────┤
+│   LABEL 1    │                      │   LABEL 4    │
+│   VALUE 1    │                      │   VALUE 4    │
+│   Max: ___   │                      │   Max: ___   │
+├──────────────┼──────────────────────┼──────────────┤
+│   LABEL 2    │                      │   LABEL 5    │
+│   VALUE 2    │                      │   VALUE 5    │
+│   Max: ___   │                      │   Max: ___   │
+├──────────────┴──────────────────────┴──────────────┤
+│              Status Bar (Mode Indicator)           │
+└─────────────────────────────────────────────────────┘
 ```
 
-## Configuration
+## Creating Custom Display Modes
 
-Display configuration is stored in NVS (Non-Volatile Storage) and can be modified:
+### Standard Practice: Data-Only Customization
 
-1. **Via Touch Interface:** Tap and hold a section to reconfigure it
-2. **Via Companion App:** Connect over WiFi/BLE to modify settings
-3. **Via Code:** Modify default layout in `opendash_config_reset_defaults()`
+**Most common use case:** Change which data points appear in each section without modifying layout.
 
-## Data Points
+**Steps:**
 
-Each section can display any data point from the system. See [`../docs/data-points.md`](../docs/data-points.md) for the full list of available data points.
+1. **Edit `main/ui_manager.c`** — Find the `mode_configs` array:
+
+```c
+static const display_mode_config_t mode_configs[DISPLAY_MODE_COUNT] = {
+    [DISPLAY_MODE_ENGINE] = {
+        .section_labels = {"COOLANT °C", "GPS SPEED", "BOOST kPa", "OIL TEMP °C", "LAP TIME", "AFR"},
+        .status_text = "MODE: ENGINE | Press boot button to switch"
+    },
+    [DISPLAY_MODE_GPS] = {
+        .section_labels = {"ALTITUDE m", "SAT COUNT", "HEADING °", "LATITUDE", "HDOP", "ACCURACY"},
+        .status_text = "MODE: GPS | Press boot button to switch"
+    }
+    /* ADD NEW MODES HERE */
+};
+```
+
+2. **Add a new mode to the enum:**
+
+```c
+typedef enum {
+    DISPLAY_MODE_ENGINE = 0,
+    DISPLAY_MODE_GPS = 1,
+    DISPLAY_MODE_CUSTOM = 2,      /* NEW MODE */
+    DISPLAY_MODE_COUNT = 3         /* UPDATE THIS */
+} display_mode_t;
+```
+
+3. **Add configuration for the new mode:**
+
+```c
+[DISPLAY_MODE_CUSTOM] = {
+    .section_labels = {"YOUR LABEL 0", "YOUR LABEL 1", "YOUR LABEL 2", 
+                       "YOUR LABEL 3", "YOUR LABEL 4", "YOUR LABEL 5"},
+    .status_text = "MODE: CUSTOM | Press boot button to switch"
+}
+```
+
+4. **Update `ui_manager.h`** — Change `DISPLAY_MODE_COUNT` if you modified the enum
+
+5. **Rebuild and flash:**
+```bash
+idf.py build
+idf.py -p /dev/ttyUSB0 flash monitor
+```
+
+### Advanced: Custom Layout Design
+
+**For completely different layouts** (different section sizes, positions, gauges, etc.):
+
+This requires **custom LVGL implementation**. The `display_init.c` provides several examples you can extend:
+
+- `create_rpm_arc()` — Speed/RPM gauge pattern
+- `create_data_section()` — Standard data box with label/value/max
+- `create_screen_layout()` — Main layout structure
+
+**Resources for custom LVGL development:**
+
+- 📖 **LVGL 9.x Docs:** https://docs.lvgl.io/master/
+- 💡 **LVGL Examples:** https://docs.lvgl.io/master/examples.html
+- 🔧 **LVGL GitHub:** https://github.com/lvgl/lvgl
+- 📚 **Widget Documentation:** https://docs.lvgl.io/master/widgets/index.html
+
+**General approach:**
+
+1. Create a new function `create_screen_custom_layout()` in `ui_manager.c`
+2. Design your LVGL widgets (arcs, bars, gauges, images, etc.)
+3. Store references in the `screen_layout` struct for later updates
+4. Call from `ui_manager_init()` during boot
+5. Update `ui_manager_update_value()` to route data to your custom widgets
+
+**Thread Safety:** All LVGL object creation must happen on the UI task (core 1) with LVGL mutex locked. See display_init.c for examples of `display_lvgl_lock()` usage.
+
+---
+
+### Future: Standard Layout Switcher (TODO)
+
+Once multiple layout templates are available from the community, implement:
+
+- **Layout Selection Menu:** Boot-time or runtime picker
+- **Layout Registry:** Define available layouts with metadata
+- **Dynamic Loading:** Support multiple layout .c files
+- **Configuration Storage:** Save user's layout choice to NVS
+
+This will allow end-users to **quickly switch between professional templates** without coding.
+
+
 
 ## Troubleshooting
 
