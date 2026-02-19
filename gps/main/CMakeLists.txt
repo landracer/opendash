@@ -9,10 +9,16 @@ idf_component_register(
         "ui_manager.c"
         "gps_handler.c"
         "imu_handler.c"
+        "i2c_node.c"
     INCLUDE_DIRS
         "."
     REQUIRES
         common
         lvgl__lvgl
-        espressif__esp_lvgl_port
+        driver
+        esp_lcd
+        esp_timer
+        esp_driver_gpio
+        esp_driver_spi
+        esp_driver_i2c
 )

@@ -121,6 +121,8 @@ opendash/
 - **Modular sensor support** — Add custom sensors via I2C/SPI/ADC
 - **Programmable alarms** — Threshold-based warnings for any data point
 - **Drag-and-drop assets** — Convert images with LVGL tools, drop into `assets/`
+- **Display Mode System** — Center display supports multiple cycling data views (ENGINE, GPS, custom modes) with zero memory overhead. See [`center/README.md`](center/README.md) for customization guide.
+- **Future: Standard Layout Switcher** — Once multiple community-contributed layouts are available, end-users will be able to select from pre-built dashboard templates without coding. See [DISPLAY_MODE_REFACTORING.md](DISPLAY_MODE_REFACTORING.md) for technical roadmap.
 
 ---
 
@@ -173,13 +175,14 @@ idf.py -p /dev/ttyUSB0 flash monitor
 | [**Quick Start Guide**](QUICKSTART.md) | **5-minute setup guide — start here!** |
 | [**Build Dependencies**](BUILD_DEPENDENCIES.md) | **Complete dependency installation guide** |
 | [**Compile Errors Resolution**](COMPILE_ERRORS_RESOLUTION.md) | **Troubleshooting compilation issues** |
+| [**Display Mode Refactoring**](DISPLAY_MODE_REFACTORING.md) | **Technical deep-dive: Center display architecture redesign** |
 | [`docs/vscode-setup.md`](docs/vscode-setup.md) | Visual Studio Code configuration guide |
 | [`docs/setup-guide.md`](docs/setup-guide.md) | Detailed development environment setup |
 | [`docs/architecture.md`](docs/architecture.md) | System architecture, data flow, and node roles |
 | [`docs/hardware.md`](docs/hardware.md) | Hardware specs, pin mappings, and wiring |
 | [`docs/i2c-protocol.md`](docs/i2c-protocol.md) | I2C communication protocol between nodes |
 | [`docs/data-points.md`](docs/data-points.md) | Full legend of displayable data points |
-| [`center/README.md`](center/README.md) | Center display project guide |
+| [`center/README.md`](center/README.md) | **Center display project guide** — Display mode system, customization |
 | [`left-right/README.md`](left-right/README.md) | Left/Right gauge pods guide |
 | [`gps/README.md`](gps/README.md) | GPS/Telemetry unit guide |
 
@@ -190,6 +193,7 @@ idf.py -p /dev/ttyUSB0 flash monitor
 - **ESP-IDF API Reference** — https://docs.espressif.com/projects/esp-idf/en/release-v5.3/esp32s3/api-reference/index.html
 - **LVGL Documentation** — https://docs.lvgl.io/master/
 - **LVGL Examples** — https://docs.lvgl.io/master/examples.html
+  https://github.com/lvgl/lvgl/tree/master/examples **LVGL E
 - **Waveshare ESP32-S3-Touch-LCD-4.3 Wiki** — https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4.3
 - **Waveshare ESP32-S3-LCD-2.8C Wiki** — https://www.waveshare.com/wiki/ESP32-S3-LCD-2.8C
 - **Waveshare ESP32-S3-Touch-AMOLED-1.75 Wiki** — https://www.waveshare.com/wiki/ESP32-S3-Touch-AMOLED-1.75

@@ -2,7 +2,10 @@
 # OpenDash GPS / Telemetry Unit — SDK Configuration Defaults
 #
 # Hardware: Waveshare ESP32-S3-Touch-AMOLED-1.75
-# Resolution: 466×466 Round AMOLED
+# Display: 466×466 CO5300 QSPI AMOLED
+# Touch: CST9217 (I2C)
+# GPS: LC76G (I2C addr 0x50)
+# IMU: QMI8658 (I2C)
 # ─────────────────────────────────────────────────────────────────────────────
 
 #
@@ -48,8 +51,23 @@ CONFIG_FREERTOS_UNICORE=n
 # LVGL Configuration
 #
 CONFIG_LV_COLOR_DEPTH_16=y
-CONFIG_LV_TICK_CUSTOM=y
 CONFIG_LV_MEM_CUSTOM=y
+
+#
+# Waveshare BSP Configuration
+#
+CONFIG_BSP_I2C_NUM=1
+CONFIG_BSP_I2C_FAST_MODE=y
+
+#
+# Display (QSPI CO5300)
+#
+CONFIG_BSP_LCD_TRANS_QUEUE_DEPTH=10
+
+#
+# SD Card
+#
+CONFIG_BSP_SD_MOUNT_POINT="/sdcard"
 
 #
 # Compiler Options

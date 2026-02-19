@@ -1,5 +1,16 @@
 ## IDF Component Manager Manifest File
 ## Dependencies for OpenDash GPS / Telemetry Unit
+##
+## NOTE: esp_lvgl_port / esp_lvgl_adapter / BSP are NOT used here.
+## They are incompatible with ESP-IDF 6.1-dev (API mismatch on LVGL 9.2).
+## Instead, we use direct LVGL + ESP LCD driver integration (like center display).
+##
+## Individual component dependencies:
+##   - esp_lcd_co5300: CO5300 QSPI AMOLED panel driver
+##   - esp_lcd_touch_cst9217: CST9217 capacitive touch controller
+##   - esp_lcd_panel_io_additions: QSPI panel IO support
 dependencies:
   lvgl/lvgl: "~9.2.0"
-  espressif/esp_lvgl_port: "~2.4.0"
+  espressif/esp_lcd_co5300: "^2.0.3"
+  waveshare/esp_lcd_touch_cst9217: "^1.0.4"
+  espressif/esp_lcd_panel_io_additions: "^1.0.1"
