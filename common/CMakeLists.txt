@@ -1,3 +1,4 @@
+# Licensed under Sovereign Individual License v1.0 — see LICENSE file
 # ─────────────────────────────────────────────────────────────────────────────
 # OpenDash Common Component — CMakeLists.txt
 #
@@ -109,6 +110,24 @@ idf_component_register(
         "src/opendash_data_model.c"
         "src/opendash_checklist.c"
         "src/opendash_display_config.c"
+        "src/opendash_odometer.c"
+        "src/opendash_espnow.c"
+        "src/opendash_logger.c"
+        "src/opendash_uart.c"
+        "src/opendash_rtc.c"
+        "src/opendash_relay.c"
+        "src/opendash_identity.c"
+        "src/opendash_obd_config.c"
+        "src/opendash_audio.c"
+        "src/channel_management.c"
+        "src/node_health.c"
+        "src/opendash_dp_catalog.c"
+        "src/opendash_layout.c"
+        "src/opendash_layout_store.c"
+        "src/opendash_boost.c"
+        "src/opendash_parachute_actuator.c"
+        "src/opendash_parachute.c"
+        "src/opendash_rollover_detector.c"
         ${FONT_SOURCES}
         ${IMAGE_SOURCES}
     INCLUDE_DIRS
@@ -118,6 +137,19 @@ idf_component_register(
     REQUIRES
         nvs_flash
         lvgl__lvgl
+        esp_wifi
+        esp_event
+        esp_netif
+        spiffs
+        esp_driver_i2c
+    PRIV_REQUIRES
+        driver
+        esp_driver_ledc
+        esp_driver_uart
+        esp_driver_gpio
+        esp_driver_i2s
+        esp_timer
+        esp_hal_usb
 )
 
 # ─────────────────────────────────────────────────────────────────────────────

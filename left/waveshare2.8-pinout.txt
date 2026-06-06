@@ -1,0 +1,60 @@
+Waveshare 2.8 GPIO Pin Assignment
+========================================================
+
+GPIO    LCD             SD Card         IMU             RTC             UART            EXIO            I2C             Other
+---------------------------------------------------------------------------------------------------------------
+IO0     -               -               -               -               -               -               -               GPIO00
+IO1     LCD SDA         SD MOSI         -               -               -               -               -               -
+IO2     LCD SCK         SD SCLK         -               -               -               -               -               -
+IO3     R2              -               -               -               -               -               -               BAT ADC
+IO4     B1              -               -               -               -               -               -               BAT ADC
+IO5     BL PWM          -               -               -               -               -               -               -
+IO6     BL PWM          -               IMU SCL         RTC SCL         -               EXIO SCL        SCL             -
+IO7     TP SCL          -               IMU SCL         RTC SCL         -               EXIO SCL        SCL             -
+IO8     R3              -               -               -               -               -               -               -
+IO9     G5              -               -               -               -               -               -               -
+IO10    G4              -               -               -               -               -               -               -
+IO11    G3              -               -               -               -               -               -               -
+IO12    G2              -               -               -               -               -               -               -
+IO13    G1              -               -               -               -               -               -               -
+IO14    G0              -               IMU             -               -               -               -               -
+IO15    TP SDA          -               IMU SDA         RTC SDA         -               EXIO SDA        SDA             -
+IO16    TP INT          -               -               -               -               -               -               -
+IO17    R5              SD MOSI         -               -               UART RXD        -               -               -
+IO18    R4              SD SCLK         -               -               -               -               -               -
+IO19    R2              -               -               -               -               -               -               D N
+IO20    B5              -               -               -               -               -               -               D P
+IO21    B5              -               -               -               -               -               -               -
+IO33    BL PWM          -               -               -               UART TXD        -               -               Internal occupancy
+IO34    TP SCL          -               -               -               UART RXD        -               -               Internal occupancy
+IO35    -               -               -               -               -               -               -               Internal occupancy
+IO36    -               -               -               -               -               -               -               Internal occupancy
+IO37    HSYNC           -               -               -               -               -               -               Internal occupancy
+IO38    HSYNC           -               -               -               -               -               -               -
+IO39    VSYNC           -               -               -               -               -               -               -
+IO40    DE              -               -               -               -               -               -               -
+IO41    PCLK            SD MISO         -               -               -               -               -               -
+IO42    -               SD MISO         -               -               UART TXD        -               -               IO43
+ESP TXD -               -               -               -               UART TXD        -               -               -
+ESP RXD B2              -               -               -               UART RXD        -               -               -
+IO45    B2              -               -               -               -               -               -               -
+IO46    R1              -               -               -               -               -               -               -
+IO47    -               -               -               -               -               -               -               -
+IO48    B4 B3           -               IMU SCL         -               -               -               -               D P / B3
+
+Extended GPIOs (via expander / other):
+---------------------------------------------------------------------------------------------------------------
+Extend IO1      LCD RST
+Extend IO2      TP RST
+Extend IO3      LCD CS
+Extend IO4      -               SD CS           -               -               -               -               -
+Extend IO5      TP INT          -               IMU INT2        -               -               -               -
+Extend IO6      -               -               IMU INT1        RTC INT         -               -               -
+Extend IO7      -               -               -               RTC INT         -               -               -
+Extend IO8      -               -               -               -               -               -               -               Buzz
+
+Notes:
+• Many pins are multiplexed / shared between peripherals
+• "Internal occupancy" usually means used internally by the board design
+• I2C bus appears on multiple pins (shared SDA/SCL)
+• UART pins are labeled as ESP TXD / ESP RXD in some rows

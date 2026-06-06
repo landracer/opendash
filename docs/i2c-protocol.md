@@ -1,10 +1,9 @@
-# OpenDash — I2C Inter-Node Communication Protocol
+<!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
+# OpenDash — Inter-Node Communication Protocol
 
 ## Overview
 
-All OpenDash nodes communicate over a shared I2C bus at **400 kHz** (Fast Mode).
-The **Center** display is always the I2C master. All other nodes (Left, Right,
-GPS, and external BMS) are slaves.
+All OpenDash nodes communicate using ESP-NOW (WiFi peer-to-peer) instead of I2C due to hardware limitations and GPIO conflicts. The **Center** display acts as the ESP-NOW master, with all other nodes (Left, Right, GPS, and external BMS) acting as slaves.
 
 ## Node Addresses
 
@@ -19,7 +18,7 @@ GPS, and external BMS) are slaves.
 
 ## Message Format
 
-Every I2C message uses a fixed-header format for reliability:
+Every message uses a fixed-header format for reliability:
 
 ```
 ┌──────┬──────┬────────┬────────────────┬──────────┐
@@ -48,6 +47,9 @@ Every I2C message uses a fixed-header format for reliability:
 | `0x04` | `SET_BRIGHTNESS` | `[level:1]` | Set display brightness (0–255) |
 | `0x05` | `CHECKLIST_UPDATE` | `[item_id:1][status:1]` | Update checklist item status |
 | `0x06` | `REQUEST_DATA` | `[dp_id:2]` | Request a data point from slave |
+
+### ⚠️ Important Note
+The original design intended to use I2C for inter-node communication, but due to hardware limitations and GPIO conflicts, the system was re-implemented to use ESP-NOW (WiFi peer-to-peer) for communication between nodes. This provides zero-wire communication with no GPIO conflicts and better reliability.
 | `0x07` | `SYSTEM_CMD` | `[subcmd:1][params...]` | System commands (reboot, OTA, etc.) |
 
 ### Slave → Master Responses

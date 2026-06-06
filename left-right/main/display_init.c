@@ -1,3 +1,4 @@
+/* Licensed under Sovereign Individual License v1.0 — see LICENSE file */
 /**
  * @file display_init.c
  * @brief OpenDash Left/Right Gauges — Hardware Initialization

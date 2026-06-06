@@ -7,6 +7,8 @@
  * linearly by ID. This is efficient for the expected data set size
  * (< 128 entries) and avoids dynamic memory allocation.
  *
+ * Licensed under Sovereign Individual License v1.0 — see LICENSE file
+ *
  * @see opendash_data_model.h for the full API documentation.
  * @see docs/data-points.md for the data point legend.
  */

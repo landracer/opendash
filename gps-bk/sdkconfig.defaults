@@ -1,0 +1,88 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# OpenDash GPS / Telemetry Unit — SDK Configuration Defaults
+#
+# Hardware: Waveshare ESP32-S3-Touch-AMOLED-1.75
+# Display: 466×466 CO5300 QSPI AMOLED
+# Touch: CST9217 (I2C)
+# GPS: LC76G (I2C addr 0x50)
+# IMU: QMI8658 (I2C)
+# ─────────────────────────────────────────────────────────────────────────────
+
+#
+# Target Configuration
+#
+CONFIG_IDF_TARGET="esp32s3"
+
+#
+# Flash Configuration
+#
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
+
+#
+# Partition Table
+#
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+
+#
+# ESP32S3-Specific Configuration
+#
+CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240=y
+CONFIG_ESP32S3_DATA_CACHE_64KB=y
+CONFIG_ESP32S3_DATA_CACHE_LINE_64B=y
+
+#
+# Memory Configuration
+#
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_SPEED_80M=y
+
+#
+# FreeRTOS Configuration
+#
+CONFIG_FREERTOS_HZ=1000
+CONFIG_FREERTOS_UNICORE=n
+
+#
+# LVGL Configuration
+#
+CONFIG_LV_COLOR_DEPTH_24=y
+CONFIG_LV_MEM_CUSTOM=y
+
+#
+# Waveshare BSP Configuration
+#
+CONFIG_BSP_I2C_NUM=0
+CONFIG_BSP_I2C_FAST_MODE=y
+
+#
+# Display (QSPI CO5300)
+#
+CONFIG_BSP_LCD_TRANS_QUEUE_DEPTH=10
+
+#
+# SD Card
+#
+CONFIG_BSP_SD_MOUNT_POINT="/sdcard"
+
+#
+# Compiler Options
+#
+CONFIG_COMPILER_OPTIMIZATION_PERF=y
+CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_DISABLE=y
+
+#
+# Logging
+#
+CONFIG_LOG_DEFAULT_LEVEL_INFO=y
+CONFIG_LOG_COLORS=y
+
+#
+# Watchdog — disable CPU0 idle check (WiFi + ESP-NOW + sensor tasks load it)
+#
+CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU0=n
+

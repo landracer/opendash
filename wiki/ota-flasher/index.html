@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpenDash BLE OTA Flasher</title>
+  <style>
+    :root {
+      --bg: #1a1a2e;
+      --surface: #16213e;
+      --border: #0f3460;
+      --accent: #e94560;
+      --text: #eaeaea;
+      --text-dim: #888;
+      --success: #4ecca3;
+      --warn: #f0a500;
+      --error: #e94560;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    h1 {
+      font-size: 1.6rem;
+      margin-bottom: 4px;
+      color: var(--accent);
+    }
+    .subtitle {
+      color: var(--text-dim);
+      font-size: 0.85rem;
+      margin-bottom: 24px;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      width: 100%;
+      max-width: 520px;
+      margin-bottom: 16px;
+    }
+    .card h2 {
+      font-size: 1rem;
+      margin-bottom: 12px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .status-row:last-child { border-bottom: none; }
+    .status-label { color: var(--text-dim); }
+    .status-value { font-weight: 600; }
+    .status-value.connected { color: var(--success); }
+    .status-value.disconnected { color: var(--error); }
+    .status-value.flashing { color: var(--warn); }
+
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 14px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, opacity 0.2s;
+      margin-top: 8px;
+    }
+    .btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+    }
+    .btn-primary:hover:not(:disabled) { background: #d1304a; }
+    .btn-secondary {
+      background: var(--border);
+      color: var(--text);
+    }
+    .btn-secondary:hover:not(:disabled) { background: #1a4a8a; }
+    .btn-danger {
+      background: transparent;
+      color: var(--error);
+      border: 1px solid var(--error);
+    }
+    .btn-danger:hover:not(:disabled) { background: rgba(233, 69, 96, 0.1); }
+
+    .file-input-wrapper {
+      position: relative;
+      overflow: hidden;
+      display: inline-block;
+      width: 100%;
+    }
+    .file-input-wrapper input[type="file"] {
+      position: absolute;
+      left: 0;
+      top: 0;
+      opacity: 0;
+      width: 100%;
+      height: 100%;
+      cursor: pointer;
+    }
+
+    .progress-container {
+      margin-top: 12px;
+    }
+    .progress-bar-bg {
+      height: 24px;
+      background: var(--bg);
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--success));
+      border-radius: 12px;
+      transition: width 0.3s ease;
+      width: 0%;
+    }
+    .progress-text {
+      text-align: center;
+      margin-top: 6px;
+      font-size: 0.85rem;
+      color: var(--text-dim);
+    }
+
+    .log-container {
+      max-height: 200px;
+      overflow-y: auto;
+      background: #0d0d1a;
+      border-radius: 8px;
+      padding: 10px;
+      font-family: 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 0.78rem;
+      line-height: 1.5;
+    }
+    .log-entry { white-space: pre-wrap; word-break: break-all; }
+    .log-info { color: var(--text-dim); }
+    .log-success { color: var(--success); }
+    .log-warn { color: var(--warn); }
+    .log-error { color: var(--error); }
+
+    .unsupported {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--error);
+    }
+    .unsupported a { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <h1>OpenDash BLE OTA Flasher</h1>
+  <p class="subtitle">Web Bluetooth firmware updater for OpenDash ESP32 nodes</p>
+
+  <div id="unsupported" class="card unsupported" style="display:none;">
+    <h2>Browser Not Supported</h2>
+    <p>Web Bluetooth requires <strong>Chrome 56+</strong> or <strong>Edge 79+</strong> on desktop.</p>
+    <p style="margin-top:12px;">
+      <a href="https://developer.mozilla.org/en-US/docs/Web/API/Web_Bluetooth_API#browser_compatibility"
+         target="_blank" rel="noopener">Browser compatibility table</a>
+    </p>
+  </div>
+
+  <div id="app" style="width:100%;max-width:520px;">
+    <!-- Connection Card -->
+    <div class="card">
+      <h2>1. Connect</h2>
+      <div class="status-row">
+        <span class="status-label">Status</span>
+        <span id="connStatus" class="status-value disconnected">Disconnected</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">Device</span>
+        <span id="deviceName" class="status-value">—</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">MTU</span>
+        <span id="mtuValue" class="status-value">—</span>
+      </div>
+      <button id="btnConnect" class="btn btn-primary" onclick="connectDevice()">
+        Scan for OpenDash Node
+      </button>
+      <button id="btnDisconnect" class="btn btn-danger" onclick="disconnectDevice()" disabled>
+        Disconnect
+      </button>
+    </div>
+
+    <!-- Firmware Card -->
+    <div class="card">
+      <h2>2. Select Firmware</h2>
+      <div class="status-row">
+        <span class="status-label">File</span>
+        <span id="fileName" class="status-value">No file selected</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">Size</span>
+        <span id="fileSize" class="status-value">—</span>
+      </div>
+      <div class="file-input-wrapper">
+        <button class="btn btn-secondary">Choose .bin Firmware File</button>
+        <input type="file" id="fileInput" accept=".bin" onchange="handleFileSelect(event)">
+      </div>
+    </div>
+
+    <!-- Flash Card -->
+    <div class="card">
+      <h2>3. Flash</h2>
+      <button id="btnFlash" class="btn btn-primary" onclick="startFlash()" disabled>
+        Start OTA Flash
+      </button>
+      <button id="btnAbort" class="btn btn-danger" onclick="abortFlash()" disabled
+              style="margin-top:8px;">
+        Abort
+      </button>
+      <div class="progress-container">
+        <div class="progress-bar-bg">
+          <div id="progressBar" class="progress-bar-fill"></div>
+        </div>
+        <div id="progressText" class="progress-text">Ready</div>
+      </div>
+    </div>
+
+    <!-- Log Card -->
+    <div class="card">
+      <h2>Log</h2>
+      <div id="logContainer" class="log-container"></div>
+    </div>
+  </div>
+
+  <script>
+    /* ──────────────────────────────────────────────────────────────────────
+     * OpenDash BLE OTA — Web Bluetooth Client
+     *
+     * Matches the GATT service defined in common/include/opendash_bt_ota.h
+     * Service UUID: 0x00FF
+     *   Char 0xFF01: OTA Control (write)
+     *   Char 0xFF02: OTA Data (write-no-response, 512B chunks)
+     *   Char 0xFF03: OTA Status (notify)
+     * ────────────────────────────────────────────────────────────────────── */
+
+    const OTA_SVC_UUID  = 0x00FF;
+    const OTA_CTRL_UUID = 0xFF01;
+    const OTA_DATA_UUID = 0xFF02;
+    const OTA_STAT_UUID = 0xFF03;
+
+    const OTA_CMD_BEGIN   = 0x01;
+    const OTA_CMD_END     = 0x02;
+    const OTA_CMD_ABORT   = 0x03;
+    const OTA_CMD_VERSION = 0x04;
+
+    const OTA_STATE_NAMES = [
+      'IDLE', 'READY', 'CONNECTED', 'RECEIVING', 'VERIFYING', 'COMPLETE', 'ERROR'
+    ];
+
+    const CHUNK_SIZE = 512;
+    const CHUNK_DELAY_MS = 20;  // Small delay between chunks for reliability
+
+    // State
+    let device = null;
+    let server = null;
+    let ctrlChar = null;
+    let dataChar = null;
+    let statChar = null;
+    let firmwareData = null;
+    let flashing = false;
+    let aborted = false;
+
+    // ── Check browser support ──
+    if (!navigator.bluetooth) {
+      document.getElementById('unsupported').style.display = 'block';
+      document.getElementById('app').style.display = 'none';
+    }
+
+    // ── UI Helpers ──
+    function $(id) { return document.getElementById(id); }
+
+    function log(msg, level = 'info') {
+      const el = $('logContainer');
+      const entry = document.createElement('div');
+      entry.className = `log-entry log-${level}`;
+      const ts = new Date().toLocaleTimeString('en-US', { hour12: false });
+      entry.textContent = `[${ts}] ${msg}`;
+      el.appendChild(entry);
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function setProgress(pct, text) {
+      $('progressBar').style.width = `${Math.min(100, pct)}%`;
+      $('progressText').textContent = text || `${Math.round(pct)}%`;
+    }
+
+    function updateUI() {
+      const connected = server && server.connected;
+      $('connStatus').textContent = connected ? 'Connected' : 'Disconnected';
+      $('connStatus').className = `status-value ${connected ? 'connected' : 'disconnected'}`;
+      $('btnConnect').disabled = connected;
+      $('btnDisconnect').disabled = !connected;
+      $('btnFlash').disabled = !connected || !firmwareData || flashing;
+      $('btnAbort').disabled = !flashing;
+    }
+
+    // ── BLE Connection ──
+    async function connectDevice() {
+      try {
+        log('Scanning for OpenDash OTA devices...');
+        device = await navigator.bluetooth.requestDevice({
+          filters: [{ services: [OTA_SVC_UUID] }],
+          optionalServices: [OTA_SVC_UUID]
+        });
+
+        $('deviceName').textContent = device.name || 'Unknown';
+        log(`Selected: ${device.name}`, 'success');
+
+        device.addEventListener('gattserverdisconnected', onDisconnect);
+
+        log('Connecting GATT...');
+        server = await device.gatt.connect();
+        log('GATT connected', 'success');
+
+        log('Getting OTA service...');
+        const service = await server.getPrimaryService(OTA_SVC_UUID);
+
+        ctrlChar = await service.getCharacteristic(OTA_CTRL_UUID);
+        dataChar = await service.getCharacteristic(OTA_DATA_UUID);
+        statChar = await service.getCharacteristic(OTA_STAT_UUID);
+        log('OTA characteristics discovered', 'success');
+
+        // Subscribe to status notifications
+        await statChar.startNotifications();
+        statChar.addEventListener('characteristicvaluechanged', onStatusNotify);
+        log('Status notifications enabled');
+
+        // Read MTU (approximate from characteristic properties)
+        $('mtuValue').textContent = '512 (negotiated)';
+
+        updateUI();
+      } catch (err) {
+        if (err.name === 'NotFoundError') {
+          log('No device selected', 'warn');
+        } else {
+          log(`Connection error: ${err.message}`, 'error');
+        }
+        updateUI();
+      }
+    }
+
+    function onDisconnect() {
+      log('Device disconnected', 'warn');
+      ctrlChar = null;
+      dataChar = null;
+      statChar = null;
+      server = null;
+      flashing = false;
+      updateUI();
+    }
+
+    function disconnectDevice() {
+      if (device && device.gatt.connected) {
+        device.gatt.disconnect();
+      }
+    }
+
+    // ── Status Notification Handler ──
+    function onStatusNotify(event) {
+      const val = event.target.value;
+      const state = val.getUint8(0);
+      const progress = val.getUint8(1);
+      const errCode = val.getUint8(2);
+
+      const stateName = OTA_STATE_NAMES[state] || `UNKNOWN(${state})`;
+      log(`Status: ${stateName}  progress=${progress}%  err=${errCode}`);
+
+      if (state === 5) { // COMPLETE
+        log('OTA COMPLETE — device will reboot!', 'success');
+        setProgress(100, 'Complete — rebooting...');
+        flashing = false;
+        updateUI();
+      } else if (state === 6) { // ERROR
+        log(`OTA ERROR (code ${errCode})`, 'error');
+        setProgress(0, 'Error');
+        flashing = false;
+        updateUI();
+      }
+    }
+
+    // ── File Selection ──
+    function handleFileSelect(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      if (!file.name.endsWith('.bin')) {
+        log('Please select a .bin firmware file', 'error');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        firmwareData = new Uint8Array(e.target.result);
+        $('fileName').textContent = file.name;
+        $('fileSize').textContent = formatSize(firmwareData.length);
+        log(`Firmware loaded: ${file.name} (${formatSize(firmwareData.length)})`, 'success');
+        updateUI();
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    function formatSize(bytes) {
+      if (bytes < 1024) return `${bytes} B`;
+      if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
+      return `${(bytes / 1048576).toFixed(2)} MB`;
+    }
+
+    // ── OTA Flash Process ──
+    async function startFlash() {
+      if (!ctrlChar || !dataChar || !firmwareData) return;
+
+      flashing = true;
+      aborted = false;
+      updateUI();
+      setProgress(0, 'Starting...');
+
+      try {
+        // 1. Send BEGIN command
+        log('Sending OTA BEGIN...', 'info');
+        await ctrlChar.writeValue(new Uint8Array([OTA_CMD_BEGIN]));
+        log('OTA partition erased, ready for data', 'success');
+
+        // Small delay for erase to complete
+        await sleep(500);
+
+        // 2. Send firmware data in chunks
+        const totalChunks = Math.ceil(firmwareData.length / CHUNK_SIZE);
+        log(`Sending ${formatSize(firmwareData.length)} in ${totalChunks} chunks...`);
+
+        for (let i = 0; i < totalChunks; i++) {
+          if (aborted) {
+            log('Flash aborted by user', 'warn');
+            return;
+          }
+
+          const offset = i * CHUNK_SIZE;
+          const end = Math.min(offset + CHUNK_SIZE, firmwareData.length);
+          const chunk = firmwareData.slice(offset, end);
+
+          await dataChar.writeValueWithoutResponse(chunk);
+
+          const pct = ((i + 1) / totalChunks) * 100;
+          setProgress(pct, `${Math.round(pct)}% — ${formatSize(end)} / ${formatSize(firmwareData.length)}`);
+
+          // Log every 10%
+          if (i % Math.max(1, Math.floor(totalChunks / 10)) === 0) {
+            log(`Chunk ${i + 1}/${totalChunks} (${Math.round(pct)}%)`);
+          }
+
+          // Small delay to avoid overwhelming the BLE stack
+          if (i % 4 === 3) {
+            await sleep(CHUNK_DELAY_MS);
+          }
+        }
+
+        log('All data sent — verifying...', 'info');
+        setProgress(100, 'Verifying...');
+
+        // 3. Send END command
+        await ctrlChar.writeValue(new Uint8Array([OTA_CMD_END]));
+        log('OTA END sent — waiting for device verification...', 'info');
+
+        // Device will send COMPLETE or ERROR via status notification
+        // and then reboot
+
+      } catch (err) {
+        log(`Flash error: ${err.message}`, 'error');
+        setProgress(0, 'Error');
+        flashing = false;
+        updateUI();
+      }
+    }
+
+    async function abortFlash() {
+      aborted = true;
+      try {
+        if (ctrlChar) {
+          await ctrlChar.writeValue(new Uint8Array([OTA_CMD_ABORT]));
+          log('Abort sent', 'warn');
+        }
+      } catch (err) {
+        log(`Abort error: ${err.message}`, 'error');
+      }
+      flashing = false;
+      setProgress(0, 'Aborted');
+      updateUI();
+    }
+
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+  </script>
+</body>
+</html>

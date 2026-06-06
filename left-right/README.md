@@ -1,3 +1,4 @@
+<!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # OpenDash — Left/Right Gauges (2.8" Round LCD)
 
 This is the Left and Right Gauge Pods project for OpenDash, running on the Waveshare ESP32-S3-LCD-2.8C hardware.

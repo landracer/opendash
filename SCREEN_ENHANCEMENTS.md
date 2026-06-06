@@ -1,3 +1,4 @@
+<!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # OpenDash Center Display — Screen Enhancements
 
 ## Overview

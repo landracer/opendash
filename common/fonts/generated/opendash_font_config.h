@@ -29,6 +29,8 @@ LV_FONT_DECLARE(kimbalt_32);
 LV_FONT_DECLARE(kimbalt_64);
 LV_FONT_DECLARE(kimbalt_96);
 LV_FONT_DECLARE(kimbalt_128);
+LV_FONT_DECLARE(kimbalt_150);
+LV_FONT_DECLARE(kimbalt_160);
 
 /* Define default font pointers for OpenDash */
 #define OPENDASH_FONT_DEFAULT_SMALL   kimbalt_14
@@ -37,6 +39,8 @@ LV_FONT_DECLARE(kimbalt_128);
 #define OPENDASH_FONT_DEFAULT_XLARGE   kimbalt_64
 #define OPENDASH_FONT_DEFAULT_XXLARGE  kimbalt_96
 #define OPENDASH_FONT_DEFAULT_XXXLARGE kimbalt_128
+#define OPENDASH_FONT_DEFAULT_XXXXLARGE  kimbalt_150
+#define OPENDASH_FONT_DEFAULT_XXXXXLARGE kimbalt_160
 
 #ifdef __cplusplus
 }

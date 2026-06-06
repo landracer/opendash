@@ -1,3 +1,4 @@
+<!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # Quick Start: Using Custom Fonts in OpenDash
 
 ## TL;DR

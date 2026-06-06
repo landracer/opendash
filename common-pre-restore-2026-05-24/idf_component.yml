@@ -1,0 +1,6 @@
+## IDF Component Manager Manifest File
+## Dependencies for OpenDash Common Component
+dependencies:
+  lvgl/lvgl: "~9.2.0"
+  # esp_lvgl_port removed - not compatible with ESP-IDF 6.1-dev
+  # Using direct LVGL + ESP LCD integration instead

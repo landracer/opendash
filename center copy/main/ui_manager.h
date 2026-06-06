@@ -1,0 +1,133 @@
+/* Licensed under Sovereign Individual License v1.0 — see LICENSE file */
+/**
+ * @file ui_manager.h
+ * @brief OpenDash Center Display — UI Manager
+ *
+ * Manages the LVGL user interface, including:
+ * - Multi-screen layouts with swipe/button navigation
+ * - Data point widgets (gauges, numeric displays, bars)
+ * - Warning boxes with red/orange flashing alerts
+ * - Touch event handling and screen transitions
+ */
+
+#ifndef UI_MANAGER_H
+#define UI_MANAGER_H
+
+#include "esp_err.h"
+#include "opendash_display_config.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * @brief Warning severity levels for visual indicators
+ */
+typedef enum {
+    OPENDASH_WARNING_NONE    = 0,   /**< No warning */
+    OPENDASH_WARNING_CAUTION = 1,   /**< Caution (orange flash) */
+    OPENDASH_WARNING_CRITICAL = 2,  /**< Critical (red flash) */
+} opendash_warning_level_t;
+
+/**
+ * @brief Display modes for cycling between different dashboard views
+ */
+typedef enum {
+    DISPLAY_MODE_ENGINE = 0,  /**< Engine metrics with RPM arc */
+    DISPLAY_MODE_GPS = 1,      /**< GPS telemetry with speed info */
+    DISPLAY_MODE_COUNT = 2     /**< Total display modes */
+} display_mode_t;
+
+/**
+ * @brief Initialize the UI manager.
+ *
+ * Creates the baseline UI layout with multi-screen support.
+ *
+ * @param[in] layout  Pointer to the display layout configuration.
+ *
+ * @return ESP_OK on success.
+ */
+esp_err_t ui_manager_init(const opendash_display_layout_t *layout);
+
+/**
+ * @brief Start the UI rendering task.
+ *
+ * Starts a FreeRTOS task that continuously calls lv_task_handler()
+ * to render the UI and handle animations.
+ *
+ * @return ESP_OK on success.
+ */
+esp_err_t ui_manager_start(void);
+
+/**
+ * @brief Update a data point value on the display.
+ *
+ * Updates the displayed value for a given data point ID.
+ *
+ * @param[in] data_point_id  Data point ID to update.
+ * @param[in] value          New value to display.
+ */
+void ui_manager_update_value(uint16_t data_point_id, float value);
+
+/**
+ * @brief Trigger a warning box flash animation.
+ *
+ * Activates the warning box on the left or right side of the screen
+ * with hard red/orange solid color flashing (no transparency bleed).
+ *
+ * @param[in] position  0 = left side, 1 = right side
+ * @param[in] level     OPENDASH_WARNING_CAUTION (orange) or OPENDASH_WARNING_CRITICAL (red)
+ * @param[in] message   Optional warning message (displayed in box)
+ * @param[in] flash_ms  Duration of flash in milliseconds (0 = continuous until cleared)
+ *
+ * @return ESP_OK on success.
+ */
+esp_err_t ui_manager_warning_box_trigger(uint8_t position, 
+                                          opendash_warning_level_t level,
+                                          const char *message,
+                                          uint32_t flash_ms);
+
+/**
+ * @brief Clear a warning box.
+ *
+ * Stops flashing and hides the warning box on the specified side.
+ *
+ * @param[in] position  0 = left side, 1 = right side
+ *
+ * @return ESP_OK on success.
+ */
+esp_err_t ui_manager_warning_box_clear(uint8_t position);
+
+/**
+ * @brief Cycle to the next display mode.
+ *
+ * Cycles through available display modes (ENGINE, GPS, etc).
+ * Updates all section labels and status bar to match the new mode.
+ * Can be called by boot button press or other input handlers.
+ *
+ * @return ESP_OK on success.
+ */
+esp_err_t ui_manager_next_screen(void);
+
+/**
+ * @brief Set display mode directly.
+ *
+ * Switches to a specific display mode and updates all labels.
+ *
+ * @param[in] mode  Display mode (DISPLAY_MODE_ENGINE, DISPLAY_MODE_GPS, etc)
+ * @return ESP_OK on success, ESP_ERR_INVALID_ARG if mode out of range.
+ */
+esp_err_t ui_manager_set_display_mode(display_mode_t mode);
+
+/**
+ * @brief Get current active display mode.
+ *
+ * @return Current display mode index.
+ */
+uint8_t ui_manager_get_current_screen(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* UI_MANAGER_H */

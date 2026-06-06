@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenDash - Hardware Overview</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .header {
+            text-align: center;
+            background: linear-gradient(135deg, #2c3e50, #3498db);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 2em;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 20px;
+        }
+        .main-content {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .sidebar {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            height: fit-content;
+        }
+        h2 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        h3 {
+            color: #3498db;
+        }
+        .toc {
+            list-style-type: none;
+            padding: 0;
+        }
+        .toc li {
+            margin: 8px 0;
+            padding: 5px;
+            border-left: 3px solid #3498db;
+            background-color: #f8f9fa;
+        }
+        .toc li a {
+            text-decoration: none;
+            color: #2c3e50;
+            font-weight: 500;
+        }
+        .toc li a:hover {
+            color: #3498db;
+        }
+        .card {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .code-block {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #3498db;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        .highlight {
+            background-color: #fff9c4;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding: 20px;
+            color: #7f8c8d;
+            font-size: 0.9em;
+        }
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+            .header h1 {
+                font-size: 1.8em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>OpenDash - Hardware Overview</h1>
+        <p>Comprehensive hardware specifications and component details</p>
+    </div>
+
+    <div class="container">
+        <div class="main-content">
+            <h2>System Components</h2>
+            <p>OpenDash is a modular racecar dashboard system with four ESP32-S3 display nodes communicating over a shared I2C bus.</p>
+            
+            <div class="card">
+                <h3>Hardware Inventory</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Node</th>
+                            <th>Board</th>
+                            <th>Display</th>
+                            <th>Resolution</th>
+                            <th>Controller</th>
+                            <th>MCU</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Center</td>
+                            <td>Waveshare ESP32-S3-Touch-LCD-4.3</td>
+                            <td>4.3" IPS</td>
+                            <td>800×480</td>
+                            <td>ST7262 RGB</td>
+                            <td>ESP32-S3</td>
+                        </tr>
+                        <tr>
+                            <td>Left</td>
+                            <td>Waveshare ESP32-S3-Touch-LCD-2.8C</td>
+                            <td>2.8" Round IPS</td>
+                            <td>480×480</td>
+                            <td>ST7701S + TCA9554</td>
+                            <td>ESP32-S3</td>
+                        </tr>
+                        <tr>
+                            <td>Right</td>
+                            <td>Waveshare ESP32-S3-Touch-LCD-2.8C</td>
+                            <td>2.8" Round IPS</td>
+                            <td>480×480</td>
+                            <td>ST7701S + TCA9554</td>
+                            <td>ESP32-S3</td>
+                        </tr>
+                        <tr>
+                            <td>GPS</td>
+                            <td>Waveshare ESP32-S3-Touch-AMOLED-1.75</td>
+                            <td>1.75" Round AMOLED</td>
+                            <td>466×466</td>
+                            <td>CO5300</td>
+                            <td>ESP32-S3</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h2>ESP32-S3 Specifications</h2>
+            <div class="card">
+                <h3>Core Hardware</h3>
+                <ul>
+                    <li><span class="highlight">Architecture</span>: 32-bit RISC-V</li>
+                    <li><span class="highlight">Clock Speed</span>: Up to 240 MHz</li>
+                    <li><span class="highlight">Flash</span>: 16 MB external flash memory</li>
+                    <li><span class="highlight">PSRAM</span>: 8 MB external PSRAM (Octal)</li>
+                    <li><span class="highlight">Connectivity</span>: WiFi 802.11 b/g/n, Bluetooth 5.0</li>
+                    <li><span class="highlight">Peripherals</span>: I2C, SPI, UART, ADC, DAC, PWM, GPIO</li>
+                </ul>
+            </div>
+
+            <h2>Display Controllers</h2>
+            
+            <div class="card">
+                <h3>Center Display (ST7262 RGB)</h3>
+                <ul>
+                    <li><span class="highlight">Controller</span>: ST7262 RGB</li>
+                    <li><span class="highlight">Interface</span>: Parallel RGB interface</li>
+                    <li><span class="highlight">Resolution</span>: 800×480</li>
+                    <li><span class="highlight">Color Depth</span>: 16-bit color (RGB565)</li>
+                    <li><span class="highlight">Touch</span>: GT911 capacitive touch controller</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h3>Left/Right Gauges (ST7701S)</h3>
+                <ul>
+                    <li><span class="highlight">Controller</span>: ST7701S LCD controller</li>
+                    <li><span class="highlight">Interface</span>: 3-wire SPI + RGB parallel</li>
+                    <li><span class="highlight">Resolution</span>: 480×480</li>
+                    <li><span class="highlight">Color Depth</span>: 16-bit color (RGB565)</li>
+                    <li><span class="highlight">Touch</span>: GT911 capacitive touch controller</li>
+                    <li><span class="highlight">IO Expander</span>: TCA9554 I2C IO expander</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h3>GPS Unit (CO5300)</h3>
+                <ul>
+                    <li><span class="highlight">Controller</span>: CO5300 AMOLED controller</li>
+                    <li><span class="highlight">Interface</span>: SPI</li>
+                    <li><span class="highlight">Resolution</span>: 466×466</li>
+                    <li><span class="highlight">Color Depth</span>: 16-bit color (RGB565)</li>
+                    <li><span class="highlight">Touch</span>: GT911 capacitive touch controller</li>
+                </ul>
+            </div>
+
+            <h2>Communication Interfaces</h2>
+            <div class="card">
+                <h3>I2C Bus Configuration</h3>
+                <ul>
+                    <li><span class="highlight">Bus Speed</span>: 400 kHz (Fast Mode)</li>
+                    <li><span class="highlight">Master</span>: Center display</li>
+                    <li><span class="highlight">Slaves</span>: Left gauge (0x10), Right gauge (0x11), GPS unit (0x12), BMS (0x20)</li>
+                    <li><span class="highlight">Ports</span>: 
+                        <ul>
+                            <li>Port 0 (Master): SDA=15, SCL=7 — internal bus for TCA9554 IO expander + GT911 touch</li>
+                            <li>Port 1 (Slave): SDA=4, SCL=16 — external bus to Center unit</li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h3>Pin Mappings</h3>
+                <p>Each node uses a specific pin configuration:</p>
+                <div class="code-block">
+                    // Center Display (ST7262 RGB) - I2C Port 0<br>
+                    // SDA = GPIO 19, SCL = GPIO 20 (I2C Master)<br>
+                    // Touch: GT911 on I2C Port 0<br>
+                    // SPI for display: MOSI=GPIO 18, MISO=GPIO 17, SCK=GPIO 16, CS=GPIO 15<br>
+                    
+                    // Left/Right Gauges (ST7701S) - I2C Port 1<br>
+                    // SDA = GPIO 4, SCL = GPIO 16 (I2C Slave)<br>
+                    // SPI for display: MOSI=GPIO 18, MISO=GPIO 17, SCK=GPIO 16, CS=GPIO 15<br>
+                    // IO Expander: TCA9554 on I2C Port 0<br>
+                    // Touch: GT911 on I2C Port 0<br>
+                    
+                    // GPS Unit (CO5300) - I2C Port 1<br>
+                    // SDA = GPIO 4, SCL = GPIO 16 (I2C Slave)<br>
+                    // SPI for display: MOSI=GPIO 18, MISO=GPIO 17, SCK=GPIO 16, CS=GPIO 15<br>
+                    // Touch: GT911 on I2C Port 0<br>
+                </div>
+            </div>
+
+            <h2>Peripheral Components</h2>
+            <div class="card">
+                <h3>GPS Module (LC76G)</h3>
+                <ul>
+                    <li><span class="highlight">Protocol</span>: Multi-constellation (GPS, GLONASS, BeiDou, Galileo)</li>
+                    <li><span class="highlight">Accuracy</span>: Centimeter-level positioning</li>
+                    <li><span class="highlight">Update Rate</span>: 10 Hz</li>
+                    <li><span class="highlight">Features</span>: 
+                        <ul>
+                            <li>Position, velocity, time (PVT) data</li>
+                            <li>Real-time delta vs. best lap</li>
+                            <li>Sector-based predictions</li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h3>IMU (QMI8658)</h3>
+                <ul>
+                    <li><span class="highlight">Type</span>: 6-axis IMU (3-axis accelerometer + 3-axis gyroscope)</li>
+                    <li><span class="highlight">Accuracy</span>: 
+                        <ul>
+                            <li>Accelerometer: ±2g to ±16g range</li>
+                            <li>Gyroscope: ±125°/s to ±2000°/s range</li>
+                        </ul>
+                    </li>
+                    <li><span class="highlight">Features</span>: 
+                        <ul>
+                            <li>3-axis g-force measurement</li>
+                            <li>Orientation tracking</li>
+                            <li>Parachute deployment system</li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+
+            <h2>Power and Connectivity</h2>
+            <div class="card">
+                <h3>Power Requirements</h3>
+                <ul>
+                    <li><span class="highlight">Supply Voltage</span>: 5V (USB-C or battery)</li>
+                    <li><span class="highlight">Current Draw</span>: 
+                        <ul>
+                            <li>Center Display: ~150mA</li>
+                            <li>Left/Right Gauges: ~100mA each</li>
+                            <li>GPS Unit: ~120mA</li>
+                        </ul>
+                    </li>
+                    <li><span class="highlight">Power Management</span>: 
+                        <ul>
+                            <li>Built-in voltage regulation</li>
+                            <li>Power saving modes</li>
+                            <li>Overcurrent protection</li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h3>Connectivity Options</h3>
+                <ul>
+                    <li><span class="highlight">WiFi</span>: ESP32 built-in 802.11 b/g/n</li>
+                    <li><span class="highlight">Bluetooth</span>: ESP32 built-in 5.0</li>
+                    <li><span class="highlight">USB</span>: USB-C for programming and data transfer</li>
+                    <li><span class="highlight">CAN Bus</span>: Center unit supports onboard CAN for ECU communication</li>
+                    <li><span class="highlight">I2C</span>: Shared bus for inter-node communication</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="sidebar">
+            <h2>Navigation</h2>
+            <ul class="toc">
+                <li><a href="index.html">Home</a></li>
+                <li><a href="#components">System Components</a></li>
+                <li><a href="#esp32">ESP32-S3 Specs</a></li>
+                <li><a href="#controllers">Display Controllers</a></li>
+                <li><a href="#communication">Communication</a></li>
+                <li><a href="#peripherals">Peripheral Components</a></li>
+                <li><a href="#power">Power & Connectivity</a></li>
+            </ul>
+
+            <div class="card">
+                <h3>Quick Links</h3>
+                <ul>
+                    <li><a href="../readme.md">Main README</a></li>
+                    <li><a href="../PROJECT_INDEX.md">Project Index</a></li>
+                    <li><a href="../docs/hardware.md">Original Hardware Doc</a></li>
+                    <li><a href="protocol.html">I2C Protocol</a></li>
+                    <li><a href="https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4.3">Waveshare 4.3" Display</a></li>
+                    <li><a href="https://www.waveshare.com/wiki/ESP32-S3-LCD-2.8C">Waveshare 2.8" Display</a></li>
+                    <li><a href="https://www.waveshare.com/wiki/ESP32-S3-Touch-AMOLED-1.75">Waveshare 1.75" Display</a></li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h3>Related Pages</h3>
+                <ul>
+                    <li><a href="index.html">Home</a></li>
+                    <li><a href="features.html">Key Features</a></li>
+                    <li><a href="architecture.html">System Architecture</a></li>
+                    <li><a href="data-points.html">Data Points</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>OpenDash — Universal Racecar Dashboard | Built for racers, by racers</p>
+        <p>Copyright © 2024–2026 uknowmelast & Axiom (AI Co-Architect)</p>
+    </div>
+</body>
+</html>

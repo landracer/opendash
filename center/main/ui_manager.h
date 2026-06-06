@@ -1,3 +1,4 @@
+/* Licensed under Sovereign Individual License v1.0 — see LICENSE file */
 /**
  * @file ui_manager.h
  * @brief OpenDash Center Display — UI Manager
@@ -14,6 +15,8 @@
 
 #include "esp_err.h"
 #include "opendash_display_config.h"
+#include "opendash_layout.h"
+#include "espnow_master.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -33,8 +36,13 @@ typedef enum {
  */
 typedef enum {
     DISPLAY_MODE_ENGINE = 0,  /**< Engine metrics with RPM arc */
-    DISPLAY_MODE_GPS = 1,      /**< GPS telemetry with speed info */
-    DISPLAY_MODE_COUNT = 2     /**< Total display modes */
+    DISPLAY_MODE_GPS    = 1,  /**< GPS telemetry with speed info */
+    DISPLAY_MODE_MD     = 2,  /**< Multidisplay: EGT1-4, O2, MAS, RPM arc */
+    DISPLAY_MODE_RELAY  = 3,  /**< Relay control: 7×4 grid of toggle boxes */
+    DISPLAY_MODE_BMS    = 4,  /**< BMS data: 5×3 grid of battery/VESC data */
+    DISPLAY_MODE_OBD    = 5,  /**< OBD2 data: 5×3 grid of engine PIDs */
+    DISPLAY_MODE_CONFIG = 6,  /**< System config: OTA flasher, node status, settings */
+    DISPLAY_MODE_COUNT  = 7   /**< Total display modes */
 } display_mode_t;
 
 /**
@@ -124,6 +132,92 @@ esp_err_t ui_manager_set_display_mode(display_mode_t mode);
  * @return Current display mode index.
  */
 uint8_t ui_manager_get_current_screen(void);
+
+/**
+ * @brief Update node online/offline status on the CONFIG screen.
+ *
+ * Call from the ESP-NOW master task after updating node status.
+ * Only processes when CONFIG mode is active.
+ *
+ * @param[in] status  Pointer to current node status.
+ */
+void ui_manager_update_config_node_status(const espnow_master_node_status_t *status);
+
+/**
+ * @brief Refresh the BLE-OTA badge in the status bar.
+ *
+ * Polls the node_health module for any slave currently advertising
+ * OPENDASH_STATUS_FLAG_BLE_OTA. When one is found, a blinking
+ * "BT-OTA: <node>" badge appears on the right side of the status bar
+ * (visible on every screen). Cleared automatically when no node holds
+ * the flag any more. Must be called with LVGL lock held.
+ */
+void ui_manager_refresh_ota_banner(void);
+
+/**
+ * @brief Update relay box visuals from a RELAY_STATUS report.
+ *
+ * Called from espnow_master when a relay node sends its channel states.
+ * Must be called with LVGL lock held.
+ *
+ * @param[in] node    The relay node that sent the status.
+ * @param[in] states  Array of channel states (0=OFF, 1=ON).
+ * @param[in] num_ch  Number of channels in the states array.
+ */
+void ui_manager_update_relay_status(opendash_node_t node, const uint8_t *states, uint8_t num_ch);
+
+/**
+ * @brief Update MIL (Check Engine Light) indicator visibility.
+ *
+ * Call periodically from main loop. When mil_on is true and MIL indicator
+ * is enabled in OBD config, shows a blinking "CHECK ENG" badge on all screens.
+ *
+ * @param[in] mil_on  true if MIL lamp is active (from obd2_flags or MIL frame)
+ */
+void ui_manager_mil_indicator_update(bool mil_on);
+
+/**
+ * @brief Show a power fault notification on the status bar.
+ *
+ * Called when a relay/MOS node reboots with all channels off but center
+ * had a non-zero cached state. Flashes status bar red and shows alert.
+ * Auto-clears after 5 seconds. Must be called with LVGL lock held.
+ *
+ * @param[in] node_name  Human-readable name of the faulted node.
+ */
+void ui_manager_show_power_fault(const char *node_name);
+
+/**
+ * @brief Update the DTC code list on the OBD config screen (if open).
+ *
+ * @param[in] codes  Array of 6-char DTC code strings (5 chars + null).
+ * @param[in] count  Number of DTC codes.
+ */
+void ui_manager_update_dtc_list(const char codes[][6], uint8_t count);
+
+/**
+ * @brief Check if OBD page is enabled in user config.
+ * @return true if OBD is enabled in the normal swipe cycle
+ */
+bool ui_manager_is_obd_enabled(void);
+
+/**
+ * @brief Apply a screen layout for the given display mode (persists to NVS).
+ *
+ * @param[in] mode    Display mode index (DISPLAY_MODE_*).
+ * @param[in] layout  Layout to apply.
+ * @return ESP_OK on success.
+ */
+esp_err_t ui_manager_apply_layout(uint8_t mode, const screen_layout_v1_t *layout);
+
+/**
+ * @brief Read the active screen layout for the given display mode.
+ *
+ * @param[in]  mode  Display mode index (DISPLAY_MODE_*).
+ * @param[out] out   Populated with the current layout on success.
+ * @return ESP_OK on success.
+ */
+esp_err_t ui_manager_get_layout(uint8_t mode, screen_layout_v1_t *out);
 
 #ifdef __cplusplus
 }

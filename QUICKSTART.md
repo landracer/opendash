@@ -1,3 +1,4 @@
+<!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # OpenDash — Quick Start Guide
 
 Get up and running with OpenDash in 5 minutes!

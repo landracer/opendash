@@ -1,8 +1,9 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# OpenDash Left/Right Gauges — SDK Configuration Defaults
+# OpenDash Left Gauge — SDK Configuration Defaults
 #
-# Hardware: Waveshare ESP32-S3-LCD-2.8C
-# Resolution: 480×480 Round IPS LCD
+# Hardware: Waveshare ESP32-S3-Touch-LCD-2.8C
+# Display: 480x480 Round IPS LCD (ST7701S controller, RGB565 interface)
+# Touch: GT911 capacitive touch over I2C
 # ─────────────────────────────────────────────────────────────────────────────
 
 #
@@ -11,27 +12,28 @@
 CONFIG_IDF_TARGET="esp32s3"
 
 #
-# Flash Configuration
+# Flash Configuration (16MB onboard)
 #
 CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
 CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
 CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
 
 #
-# Partition Table
+# Partition Table (custom — 2MB app partitions for image data)
 #
-CONFIG_PARTITION_TABLE_CUSTOM=n
-CONFIG_PARTITION_TABLE_TWO_OTA=y
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+CONFIG_PARTITION_TABLE_FILENAME="partitions.csv"
 
 #
-# ESP32S3-Specific Configuration
+# ESP32-S3 CPU & Cache
 #
 CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240=y
 CONFIG_ESP32S3_DATA_CACHE_64KB=y
 CONFIG_ESP32S3_DATA_CACHE_LINE_64B=y
 
 #
-# Memory Configuration
+# PSRAM (8MB Octal SPI — required for LVGL frame buffer)
 #
 CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
 CONFIG_SPIRAM=y
@@ -39,10 +41,15 @@ CONFIG_SPIRAM_MODE_OCT=y
 CONFIG_SPIRAM_SPEED_80M=y
 
 #
-# FreeRTOS Configuration
+# FreeRTOS
 #
 CONFIG_FREERTOS_HZ=1000
 CONFIG_FREERTOS_UNICORE=n
+
+#
+# Task Watchdog — disable IDLE0 check (CPU0 loaded by WiFi/ESP-NOW)
+#
+CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU0=n
 
 #
 # LVGL Configuration
@@ -52,7 +59,7 @@ CONFIG_LV_TICK_CUSTOM=y
 CONFIG_LV_MEM_CUSTOM=y
 
 #
-# Compiler Options
+# Compiler
 #
 CONFIG_COMPILER_OPTIMIZATION_PERF=y
 CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_DISABLE=y
@@ -62,3 +69,29 @@ CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_DISABLE=y
 #
 CONFIG_LOG_DEFAULT_LEVEL_INFO=y
 CONFIG_LOG_COLORS=y
+
+# ─── BLE OTA (centralised, see opendash_bt_ota_enter) ────────────────────────
+CONFIG_BT_ENABLED=y
+CONFIG_BT_NIMBLE_ENABLED=y
+CONFIG_BT_NIMBLE_MAX_CONNECTIONS=1
+CONFIG_BT_NIMBLE_ROLE_PERIPHERAL=y
+CONFIG_BT_NIMBLE_ROLE_CENTRAL=n
+CONFIG_BT_NIMBLE_ROLE_OBSERVER=n
+CONFIG_BT_NIMBLE_ROLE_BROADCASTER=y
+# Peripheral Preferred Connection Parameters — BlueZ central reads these on
+# connect when no explicit CPR was negotiated. Forces 32 s supervision so the
+# link survives flash-write stalls and mouse/HOGP scheduler contention.
+CONFIG_BT_NIMBLE_SVC_GAP_PPCP_MIN_CONN_INTERVAL=6
+CONFIG_BT_NIMBLE_SVC_GAP_PPCP_MAX_CONN_INTERVAL=12
+CONFIG_BT_NIMBLE_SVC_GAP_PPCP_SLAVE_LATENCY=0
+CONFIG_BT_NIMBLE_SVC_GAP_PPCP_SUPERVISION_TMO=3200
+CONFIG_BT_NIMBLE_LL_CFG_FEAT_LE_2M_PHY=y
+CONFIG_BT_NIMBLE_ACL_BUF_COUNT=32
+CONFIG_BT_NIMBLE_ACL_BUF_SIZE=517
+CONFIG_BT_NIMBLE_MSYS1_BLOCK_COUNT=24
+# Pin BT controller + NimBLE host to CPU1 so they don't fight the RGB DMA
+# bounce-buffer task on CPU0. Without this, OTA links die at ~2-10s with HCI
+# reason 0x08 because controller link-layer ISRs are starved.
+CONFIG_BT_CTRL_PINNED_TO_CORE_1=y
+CONFIG_BT_NIMBLE_PINNED_TO_CORE_1=y
+CONFIG_LV_FONT_FMT_TXT_LARGE=y

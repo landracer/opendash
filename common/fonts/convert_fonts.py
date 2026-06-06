@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Licensed under Sovereign Individual License v1.0 — see LICENSE file
 """
 OpenDash Font Converter
 Automatically converts TrueType fonts to LVGL C format using lv_font_conv.
@@ -315,6 +316,16 @@ LV_FONT_DECLARE({name}_{size_128});
 #define OPENDASH_FONT_DEFAULT_XXLARGE  {name}_{size_96}
 #define OPENDASH_FONT_DEFAULT_XXXLARGE {name}_{size_128}
 """
+
+    # Check for extra-large sizes (150, 160) - used by pod displays
+    extra_declares = ""
+    extra_defines = ""
+    if 150 in sizes:
+        extra_declares += f"LV_FONT_DECLARE({name}_150);\n"
+        extra_defines += f"#define OPENDASH_FONT_DEFAULT_XXXXLARGE  {name}_150\n"
+    if 160 in sizes:
+        extra_declares += f"LV_FONT_DECLARE({name}_160);\n"
+        extra_defines += f"#define OPENDASH_FONT_DEFAULT_XXXXXLARGE {name}_160\n"
     
     # Generate header content
     header_content = f"""/**
@@ -345,12 +356,12 @@ extern "C" {{
 LV_FONT_DECLARE({name}_{size_14});
 LV_FONT_DECLARE({name}_{size_18});
 LV_FONT_DECLARE({name}_{size_32});
-{extended_declares}
+{extended_declares}{extra_declares}
 /* Define default font pointers for OpenDash */
 #define OPENDASH_FONT_DEFAULT_SMALL   {name}_{size_14}
 #define OPENDASH_FONT_DEFAULT_MEDIUM  {name}_{size_18}
 #define OPENDASH_FONT_DEFAULT_LARGE   {name}_{size_32}
-{extended_defines}
+{extended_defines}{extra_defines}
 #ifdef __cplusplus
 }}
 #endif
@@ -368,6 +379,8 @@ LV_FONT_DECLARE({name}_{size_32});
         print_info(f"  Sizes: SMALL={size_14}px, MEDIUM={size_18}px, LARGE={size_32}px")
         if has_extended:
             print_info(f"  Extended: XLARGE={size_64}px, XXLARGE={size_96}px, XXXLARGE={size_128}px")
+        if extra_declares:
+            print_info(f"  Extra: {[s for s in [150, 160] if s in sizes]}px")
         return True
     except Exception as e:
         print_error(f"Failed to write header file: {e}")

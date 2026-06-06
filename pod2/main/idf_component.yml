@@ -1,0 +1,10 @@
+## IDF Component Manager Manifest File
+## Dependencies for OpenDash Pod 2 Display Unit
+##
+## Same hardware as GPS unit (Waveshare ESP32-S3-Touch-AMOLED-1.75)
+## but without GPS/IMU modules — display-only pod.
+dependencies:
+  lvgl/lvgl: "~9.2.0"
+  espressif/esp_lcd_co5300: "^2.0.3"
+  waveshare/esp_lcd_touch_cst9217: "^1.0.4"
+  espressif/esp_lcd_panel_io_additions: "^1.0.1"

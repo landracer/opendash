@@ -1,3 +1,4 @@
+<!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # OpenDash — System Architecture
 
 ## Overview
@@ -34,18 +35,20 @@ having a unique address.
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-## I2C Bus Architecture
+## Communication Architecture
 
-All four devices connect to a shared I2C bus. The **Center** display acts as the
-I2C master, with all other nodes acting as slaves.
+All four devices communicate using ESP-NOW (WiFi peer-to-peer) instead of I2C due to hardware limitations and GPIO conflicts. The **Center** display acts as the ESP-NOW master, with all other nodes acting as slaves.
 
-| Node | I2C Address | Role | Description |
+| Node | Address | Role | Description |
 |---|---|---|---|
-| Center | Master | I2C Master | Polls slaves, aggregates data, primary display |
-| Left | `0x10` | I2C Slave | Receives display data from master |
-| Right | `0x11` | I2C Slave | Receives display data from master |
-| GPS | `0x12` | I2C Slave | Provides GPS/IMU data, receives display commands |
-| BMS (ext.) | `0x20` | I2C Slave | External BMS node (rAtTrax integration) |
+| Center | Master | ESP-NOW Master | Broadcasts data to slaves, aggregates data, primary display |
+| Left | `0x10` | ESP-NOW Slave | Receives display data from master |
+| Right | `0x11` | ESP-NOW Slave | Receives display data from master |
+| GPS | `0x12` | ESP-NOW Slave | Provides GPS/IMU data, receives display commands |
+| BMS (ext.) | `0x20` | ESP-NOW Slave | External BMS node (rAtTrax integration) |
+
+### ⚠️ Important Note
+The original design intended to use I2C for inter-node communication, but due to hardware limitations and GPIO conflicts, the system was re-implemented to use ESP-NOW (WiFi peer-to-peer) for communication between nodes. This provides zero-wire communication with no GPIO conflicts and better reliability.
 
 ## Data Flow
 
@@ -56,17 +59,17 @@ I2C master, with all other nodes acting as slaves.
                     └──────┬───────┘
                            │ CAN / UART
                            ▼
-┌──────────┐    I2C    ┌──────────┐    I2C    ┌──────────┐
-│   LEFT   │◄─────────►│  CENTER  │◄─────────►│  RIGHT   │
-│  Gauge   │           │  (Master)│           │  Gauge   │
-└──────────┘           └────┬─────┘           └──────────┘
-                            │ I2C
-                            ▼
+┌──────────┐    ESP-NOW    ┌──────────┐    ESP-NOW    ┌──────────┐
+│   LEFT   │◄─────────────►│  CENTER  │◄─────────────►│  RIGHT   │
+│  Gauge   │               │  (Master)│               │  Gauge   │
+└──────────┘               └────┬─────┘               └──────────┘
+                                │ ESP-NOW
+                                ▼
                     ┌──────────────┐
                     │  GPS / IMU   │
                     │  (Slave)     │
                     └──────┬───────┘
-                           │ I2C
+                           │ ESP-NOW
                            ▼
                     ┌──────────────┐
                     │  BMS Node    │
@@ -76,7 +79,7 @@ I2C master, with all other nodes acting as slaves.
 
 ### Data Flow Steps
 
-1. **Center** unit acts as the I2C master and system coordinator
+1. **Center** unit acts as the ESP-NOW master and system coordinator
 2. **GPS unit** continuously reads GNSS and IMU data, stores latest readings
 3. **Center** polls GPS unit for position, speed, g-force data
 4. **Center** reads OBD2/CAN data directly (onboard CAN transceiver)
@@ -84,6 +87,9 @@ I2C master, with all other nodes acting as slaves.
 6. **Left/Right** render their configured data points
 7. **BMS node** provides battery data when polled
 8. **SD card logging** happens on the Center unit (primary) and GPS unit (backup)
+
+### ⚠️ Important Note
+The original design intended to use I2C for inter-node communication, but due to hardware limitations and GPIO conflicts, the system was re-implemented to use ESP-NOW (WiFi peer-to-peer) for communication between nodes. This provides zero-wire communication with no GPIO conflicts and better reliability.
 
 ## Software Architecture (Per Node)
 

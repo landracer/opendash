@@ -1,3 +1,4 @@
+<!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # OpenDash — Hardware Specifications
 
 ## Device Summary
@@ -125,8 +126,9 @@
 | Touch SDA | GPIO1 | CST9217 I2C data |
 | Touch SCL | GPIO2 | CST9217 I2C clock |
 | Touch INT | GPIO3 | Touch interrupt |
-| GPS TX | GPIO17 | LC76G UART TX |
-| GPS RX | GPIO18 | LC76G UART RX |
+| ~~GPS TX~~ | ~~GPIO17~~ | ~~LC76G UART TX~~ — **NOT USED: GPS is I2C** |
+| ~~GPS RX~~ | ~~GPIO18~~ | ~~LC76G UART RX~~ — **NOT USED: GPS is I2C** |
+| **GPS I2C** | **GPIO15/14** | LC76G via **CASIC I2C** (0x50/0x54/0x58, 100 kHz, shared bus) |
 | IMU SDA | GPIO5 | QMI8658 I2C data |
 | IMU SCL | GPIO6 | QMI8658 I2C clock |
 | I2C SDA (ext) | GPIO15 | External I2C bus (inter-node) |

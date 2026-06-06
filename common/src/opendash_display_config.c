@@ -5,6 +5,8 @@
  * Implements the display configuration API for loading, saving, and
  * managing display layouts using ESP-IDF's NVS storage.
  *
+ * Licensed under Sovereign Individual License v1.0 — see LICENSE file
+ *
  * @see opendash_display_config.h for API documentation.
  */
 
@@ -38,6 +40,8 @@ static void get_center_defaults(opendash_display_layout_t *layout)
     layout->use_metric = false;
     layout->temp_unit = OPENDASH_TEMP_FAHRENHEIT;  /* Default to Fahrenheit */
     layout->speed_unit = OPENDASH_SPEED_MPH;       /* Default to MPH */
+    layout->pressure_unit = OPENDASH_PRESSURE_PSI; /* Default to PSI */
+    layout->distance_unit = OPENDASH_DISTANCE_MI;  /* Default to miles */
 
     /* Section 0: RPM (large arc gauge in center) */
     layout->sections[0].data_point_id = OPENDASH_DP_RPM;
@@ -74,6 +78,8 @@ static void get_gauge_defaults(opendash_display_layout_t *layout, opendash_node_
     layout->use_metric = false;
     layout->temp_unit = OPENDASH_TEMP_FAHRENHEIT;
     layout->speed_unit = OPENDASH_SPEED_MPH;
+    layout->pressure_unit = OPENDASH_PRESSURE_PSI;
+    layout->distance_unit = OPENDASH_DISTANCE_MI;
 
     if (node == OPENDASH_NODE_LEFT) {
         /* Left pod: Oil pressure primary */
@@ -110,6 +116,8 @@ static void get_gps_defaults(opendash_display_layout_t *layout)
     layout->use_metric = false;
     layout->temp_unit = OPENDASH_TEMP_FAHRENHEIT;
     layout->speed_unit = OPENDASH_SPEED_MPH;
+    layout->pressure_unit = OPENDASH_PRESSURE_PSI;
+    layout->distance_unit = OPENDASH_DISTANCE_MI;
 
     /* Section 0: Current lap time */
     layout->sections[0].data_point_id = OPENDASH_DP_LAP_TIME;
@@ -207,6 +215,14 @@ opendash_err_t opendash_config_reset_defaults(opendash_node_t node,
             break;
         case OPENDASH_NODE_LEFT:
         case OPENDASH_NODE_RIGHT:
+        case OPENDASH_NODE_POD1:
+        case OPENDASH_NODE_POD2:
+        case OPENDASH_NODE_POD3:
+        case OPENDASH_NODE_POD4:
+        case OPENDASH_NODE_POD5:
+        case OPENDASH_NODE_POD6:
+        case OPENDASH_NODE_POD7:
+        case OPENDASH_NODE_POD8:
             get_gauge_defaults(layout, node);
             break;
         case OPENDASH_NODE_GPS:

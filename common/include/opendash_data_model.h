@@ -8,6 +8,8 @@
  * Data points are identified by 16-bit IDs (see docs/data-points.md).
  * Values are stored as 32-bit floats for uniformity.
  *
+ * Licensed under Sovereign Individual License v1.0 — see LICENSE file
+ *
  * @see docs/data-points.md for the full data point legend.
  * @see ESP-IDF NVS:
  *      https://docs.espressif.com/projects/esp-idf/en/release-v5.3/esp32s3/api-reference/storage/nvs_flash.html
@@ -41,12 +43,32 @@ extern "C" {
 #define OPENDASH_DP_FUEL_PRESSURE    0x0109  /**< Fuel system pressure (kPa) */
 #define OPENDASH_DP_AFR              0x010A  /**< Air-fuel ratio */
 #define OPENDASH_DP_LAMBDA           0x010B  /**< Lambda value */
-#define OPENDASH_DP_EGT              0x010C  /**< Exhaust gas temperature (°C) */
+#define OPENDASH_DP_EGT              0x010C  /**< Exhaust gas temperature — max of all (°C) */
 #define OPENDASH_DP_BATTERY_VOLTAGE  0x010D  /**< System battery voltage (V) */
 #define OPENDASH_DP_TIMING_ADVANCE   0x010E  /**< Ignition timing advance (°) */
-#define OPENDASH_DP_MAF_RATE         0x010F  /**< Mass air flow rate (g/s) */
+#define OPENDASH_DP_MAF_RATE         0x010F  /**< Mass air flow rate / LMM (g/s) */
 #define OPENDASH_DP_FUEL_LEVEL       0x0110  /**< Fuel tank level (%) */
 #define OPENDASH_DP_TRANS_TEMP       0x0111  /**< Transmission fluid temp (°C) */
+#define OPENDASH_DP_EGT1             0x0112  /**< EGT cylinder 1 (°C) */
+#define OPENDASH_DP_EGT2             0x0113  /**< EGT cylinder 2 (°C) */
+#define OPENDASH_DP_EGT3             0x0114  /**< EGT cylinder 3 (°C) */
+#define OPENDASH_DP_EGT4             0x0115  /**< EGT cylinder 4 (°C) */
+#define OPENDASH_DP_EGT5             0x0118  /**< EGT channel 5 (°C) */
+#define OPENDASH_DP_EGT6             0x0119  /**< EGT channel 6 (°C) */
+#define OPENDASH_DP_EGT7             0x011A  /**< EGT channel 7 (°C) */
+#define OPENDASH_DP_EGT8             0x011B  /**< EGT channel 8 (°C) */
+#define OPENDASH_DP_O2_LAMBDA        0x0116  /**< O2 / Lambda sensor (ratio) */
+#define OPENDASH_DP_MD_RPM           0x0117  /**< RPM from multidisplay source */
+#define OPENDASH_DP_OBD2_FLAGS       0x011C  /**< OBD2 status flags (bit0=ready, bit1=DTCs, bit2=MIL) */
+#define OPENDASH_DP_MIL_ON           0x011D  /**< MIL lamp on (1.0=on, 0.0=off) */
+#define OPENDASH_DP_DTC_COUNT        0x011E  /**< Number of stored DTCs */
+
+/* ── RPM source preference ────────────────────────────────────────────────
+ * Which RPM source to display on center arc when both OBD/demo and
+ * multidisplay provide RPM. 0 = prefer OBD/demo, 1 = prefer multidisplay */
+#ifndef OPENDASH_RPM_SOURCE_MD
+#define OPENDASH_RPM_SOURCE_MD  0
+#endif
 
 /* GPS / Navigation data points: 0x0200 – 0x02FF */
 #define OPENDASH_DP_GPS_SPEED        0x0200  /**< Speed from GNSS (km/h) */
@@ -62,6 +84,7 @@ extern "C" {
 #define OPENDASH_DP_LAP_DELTA        0x020A  /**< Delta vs. best lap (ms, +/-) */
 #define OPENDASH_DP_SECTOR_TIME      0x020B  /**< Current sector time (ms) */
 #define OPENDASH_DP_PREDICTIVE_LAP   0x020C  /**< Predicted current lap time (ms) */
+#define OPENDASH_DP_GPS_FIX          0x020D  /**< GPS fix status (0=no fix, 1=valid fix) */
 
 /* IMU / Motion data points: 0x0300 – 0x03FF */
 #define OPENDASH_DP_GFORCE_LAT       0x0300  /**< Lateral g-force */
@@ -85,6 +108,13 @@ extern "C" {
 #define OPENDASH_DP_ENERGY_USED      0x0408  /**< Energy used this session (Wh) */
 #define OPENDASH_DP_CELL_V_BASE      0x0410  /**< Cell 1 voltage (0x0410–0x041F) */
 
+/* Battery / BMS extended: 0x0409 – 0x040F */
+#define OPENDASH_DP_SOH              0x0409  /**< State of health (%) */
+#define OPENDASH_DP_BMS_TEMP_IC      0x040A  /**< BMS IC temperature (°C) */
+#define OPENDASH_DP_BMS_BALANCE      0x040B  /**< Balancing active (0/1) */
+#define OPENDASH_DP_BMS_CHARGING     0x040C  /**< Charging active (0/1) */
+#define OPENDASH_DP_ENERGY_CHARGED   0x040D  /**< Energy charged this session (Wh) */
+
 /* System data points: 0x0500 – 0x05FF */
 #define OPENDASH_DP_CPU_TEMP         0x0500  /**< ESP32 die temperature (°C) */
 #define OPENDASH_DP_FREE_HEAP        0x0501  /**< Free heap memory (KB) */
@@ -93,12 +123,100 @@ extern "C" {
 #define OPENDASH_DP_SD_FREE          0x0504  /**< SD card free space (MB) */
 #define OPENDASH_DP_LOG_SESSION      0x0505  /**< Logging session number */
 
+/* VESC motor controller data points: 0x0600 – 0x06FF
+ * Mapped from VESC CAN STATUS messages 1-6
+ * See: https://github.com/vedderb/bldc — datatypes.h CAN_PACKET_STATUS */
+
+/* CAN_PACKET_STATUS (ID=9) — 20 Hz broadcast */
+#define OPENDASH_DP_VESC_ERPM        0x0600  /**< Electrical RPM (raw eRPM) */
+#define OPENDASH_DP_VESC_CURRENT     0x0601  /**< Motor phase current (A) */
+#define OPENDASH_DP_VESC_DUTY        0x0602  /**< Duty cycle (0.0–1.0) */
+
+/* CAN_PACKET_STATUS_2 (ID=14) */
+#define OPENDASH_DP_VESC_AH          0x0603  /**< Amp-hours consumed (Ah) */
+#define OPENDASH_DP_VESC_AH_CHARGED  0x0604  /**< Amp-hours charged (Ah) */
+
+/* CAN_PACKET_STATUS_3 (ID=15) */
+#define OPENDASH_DP_VESC_WH          0x0605  /**< Watt-hours consumed (Wh) */
+#define OPENDASH_DP_VESC_WH_CHARGED  0x0606  /**< Watt-hours charged (Wh) */
+
+/* CAN_PACKET_STATUS_4 (ID=16) */
+#define OPENDASH_DP_VESC_TEMP_FET    0x0607  /**< MOSFET temperature (°C) */
+#define OPENDASH_DP_VESC_TEMP_MOTOR  0x0608  /**< Motor temperature (°C) */
+#define OPENDASH_DP_VESC_CURRENT_IN  0x0609  /**< Total input current (A) */
+#define OPENDASH_DP_VESC_PID_POS     0x060A  /**< PID position (°) */
+
+/* CAN_PACKET_STATUS_5 (ID=27) */
+#define OPENDASH_DP_VESC_TACHO       0x060B  /**< Tachometer value (ERPM ticks) */
+#define OPENDASH_DP_VESC_V_IN        0x060C  /**< Input voltage (V) */
+
+/* CAN_PACKET_STATUS_6 (ID=58) */
+#define OPENDASH_DP_VESC_ADC1        0x060D  /**< ADC channel 1 (V) */
+#define OPENDASH_DP_VESC_ADC2        0x060E  /**< ADC channel 2 (V) */
+#define OPENDASH_DP_VESC_ADC3        0x060F  /**< ADC channel 3 (V) */
+#define OPENDASH_DP_VESC_PPM         0x0610  /**< PPM input (0.0–1.0) */
+
+/* VESC derived / computed */
+#define OPENDASH_DP_VESC_RPM         0x0611  /**< Motor RPM (eRPM / pole_pairs) */
+#define OPENDASH_DP_VESC_POWER_IN    0x0612  /**< Input power (V_in × I_in) (W) */
+#define OPENDASH_DP_VESC_POWER_MOTOR 0x0613  /**< Motor power (I_motor × V_in × duty) (W) */
+#define OPENDASH_DP_VESC_FAULT       0x0614  /**< Fault code (mc_fault_code enum) */
+
+/* VESC wheel speed (4 wheels via separate VESC IDs or hall sensors) */
+#define OPENDASH_DP_WHEEL_RPM_FL     0x0620  /**< Front-left wheel RPM */
+#define OPENDASH_DP_WHEEL_RPM_FR     0x0621  /**< Front-right wheel RPM */
+#define OPENDASH_DP_WHEEL_RPM_RL     0x0622  /**< Rear-left wheel RPM */
+#define OPENDASH_DP_WHEEL_RPM_RR     0x0623  /**< Rear-right wheel RPM */
+#define OPENDASH_DP_WHEEL_SPEED_AVG  0x0624  /**< Average wheel speed (km/h) */
+
+/* ─── Relay / MOS controller data points: 0x0700 – 0x07FF ───────────────
+ * State: 0.0 = OFF, 1.0 = ON.  PWM duty: 0.0–100.0% (MOS modules only).
+ * ──────────────────────────────────────────────────────────────────────── */
+
+/* 4-channel HD relay (high-amp: fans, pumps, etc.) */
+#define OPENDASH_DP_RELAY4_CH1       0x0700  /**< HD relay ch1 state (0/1) */
+#define OPENDASH_DP_RELAY4_CH2       0x0701  /**< HD relay ch2 state (0/1) */
+#define OPENDASH_DP_RELAY4_CH3       0x0702  /**< HD relay ch3 state (0/1) */
+#define OPENDASH_DP_RELAY4_CH4       0x0703  /**< HD relay ch4 state (0/1) */
+
+/* 8-channel relay module A (low-amp devices) */
+#define OPENDASH_DP_RELAY8A_CH1      0x0710  /**< Relay 8A ch1 state (0/1) */
+#define OPENDASH_DP_RELAY8A_CH2      0x0711  /**< Relay 8A ch2 state (0/1) */
+#define OPENDASH_DP_RELAY8A_CH3      0x0712  /**< Relay 8A ch3 state (0/1) */
+#define OPENDASH_DP_RELAY8A_CH4      0x0713  /**< Relay 8A ch4 state (0/1) */
+#define OPENDASH_DP_RELAY8A_CH5      0x0714  /**< Relay 8A ch5 state (0/1) */
+#define OPENDASH_DP_RELAY8A_CH6      0x0715  /**< Relay 8A ch6 state (0/1) */
+#define OPENDASH_DP_RELAY8A_CH7      0x0716  /**< Relay 8A ch7 state (0/1) */
+#define OPENDASH_DP_RELAY8A_CH8      0x0717  /**< Relay 8A ch8 state (0/1) */
+
+/* 8-channel relay module B (low-amp devices) */
+#define OPENDASH_DP_RELAY8B_CH1      0x0720  /**< Relay 8B ch1 state (0/1) */
+#define OPENDASH_DP_RELAY8B_CH2      0x0721  /**< Relay 8B ch2 state (0/1) */
+#define OPENDASH_DP_RELAY8B_CH3      0x0722  /**< Relay 8B ch3 state (0/1) */
+#define OPENDASH_DP_RELAY8B_CH4      0x0723  /**< Relay 8B ch4 state (0/1) */
+#define OPENDASH_DP_RELAY8B_CH5      0x0724  /**< Relay 8B ch5 state (0/1) */
+#define OPENDASH_DP_RELAY8B_CH6      0x0725  /**< Relay 8B ch6 state (0/1) */
+#define OPENDASH_DP_RELAY8B_CH7      0x0726  /**< Relay 8B ch7 state (0/1) */
+#define OPENDASH_DP_RELAY8B_CH8      0x0727  /**< Relay 8B ch8 state (0/1) */
+
+/* 4-channel MOS module A (PWM or on-off) */
+#define OPENDASH_DP_MOS4A_CH1        0x0730  /**< MOS 4A ch1 state (0/1 or PWM 0-100%) */
+#define OPENDASH_DP_MOS4A_CH2        0x0731  /**< MOS 4A ch2 state */
+#define OPENDASH_DP_MOS4A_CH3        0x0732  /**< MOS 4A ch3 state */
+#define OPENDASH_DP_MOS4A_CH4        0x0733  /**< MOS 4A ch4 state */
+
+/* 4-channel MOS module B (PWM or on-off) */
+#define OPENDASH_DP_MOS4B_CH1        0x0740  /**< MOS 4B ch1 state (0/1 or PWM 0-100%) */
+#define OPENDASH_DP_MOS4B_CH2        0x0741  /**< MOS 4B ch2 state */
+#define OPENDASH_DP_MOS4B_CH3        0x0742  /**< MOS 4B ch3 state */
+#define OPENDASH_DP_MOS4B_CH4        0x0743  /**< MOS 4B ch4 state */
+
 /* ────────────────────────────────────────────────────────────────────────────
  * Data Point Entry
  * ──────────────────────────────────────────────────────────────────────────── */
 
 /** @brief Maximum number of data points tracked simultaneously. */
-#define OPENDASH_MAX_DATA_POINTS    128
+#define OPENDASH_MAX_DATA_POINTS    192
 
 /**
  * @brief Single data point entry in the data store.

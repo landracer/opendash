@@ -35,3 +35,8 @@ package-lock.json
 # Temporary files
 /tmp/
 *.tmp
+tearing-logs/
+
+# Local-only — never push
+archive/
+docs/archived/

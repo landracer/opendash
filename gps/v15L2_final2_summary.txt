@@ -1,0 +1,60 @@
+[  13.6s] [0;32mI (15754) opendash_gps:   GPS: acquiring satellites (LC76G I2C)[0m
+[  23.6s] [0;32mI (25808) opendash_gps: Uptime: 10s | GPS: NO FIX | Sats: 0 | Center: searching | Mode: 0[0m
+[  33.4s] [0;31mE (35554) gps_handler: === FULL RECOVERY: 50+ failures — PMIC power cycle ===[0m
+[  33.6s] [0;32mI (35808) opendash_gps: Uptime: 20s | GPS: NO FIX | Sats: 0 | Center: searching | Mode: 0[0m
+[  43.6s] [0;32mI (45808) opendash_gps: Uptime: 30s | GPS: NO FIX | Sats: 0 | Center: searching | Mode: 0[0m
+[  49.3s] [0;31mE (51514) gps_handler: === FULL RECOVERY COMPLETE (power_cycles=1) ===[0m
+[  49.9s] [0;32mI (52115) gps_handler: === FIRST GPS DATA! (4095 bytes, c=100) ===[0m
+[  50.5s] [0;32mI (52687) gps_handler: GPS: fix=no sats=0/0 speed=0.0 hdop=0.0 total=4095B 141s c=100[0m
+[  53.6s] [0;32mI (55808) opendash_gps: Uptime: 40s | GPS: NO FIX | Sats: 0 | Center: searching | Mode: 0[0m
+[  63.6s] [0;32mI (65808) opendash_gps: Uptime: 50s | GPS: NO FIX | Sats: 0 | Center: searching | Mode: 0[0m
+[  73.6s] [0;32mI (75808) opendash_gps: Uptime: 60s | GPS: NO FIX | Sats: 0 | Center: searching | Mode: 0[0m
+[  74.7s] [0;31mE (76839) gps_handler: === FULL RECOVERY: 50+ failures — PMIC power cycle ===[0m
+[  83.6s] [0;32mI (85808) opendash_gps: Uptime: 70s | GPS: NO FIX | Sats: 0 | Center: searching | Mode: 0[0m
+[  90.6s] [0;31mE (92799) gps_handler: === FULL RECOVERY COMPLETE (power_cycles=2) ===[0m
+[  93.6s] [0;32mI (95808) opendash_gps: Uptime: 80s | GPS: NO FIX | Sats: 0 | Center: searching | Mode: 0[0m
+[  94.4s] [0;32mI (96584) gps_handler: GPS: fix=no sats=0/12 speed=0.0 hdop=0.0 total=19915B 648s c=250[0m
+[ 103.6s] [0;32mI (105808) opendash_gps: Uptime: 90s | GPS: NO FIX | Sats: 0 | Center: searching | Mode: 0[0m
+[ 106.7s] [0;32mI (108893) gps_handler: GPS: fix=no sats=0/0 speed=0.0 hdop=0.0 total=23476B 772s c=310[0m
+[ 112.6s] [0;32mI (114810) gps_handler: GPS: fix=no sats=0/0 speed=0.0 hdop=0.0 total=25546B 844s c=335[0m
+[ 113.6s] [0;32mI (115808) opendash_gps: Uptime: 100s | GPS: NO FIX | Sats: 0 | Center: searching | Mode: 1[0m
+[ 116.0s] [0;32mI (118178) gps_handler: GPS: fix=no sats=0/0 speed=0.0 hdop=0.0 total=26581B 880s c=350[0m
+[ 122.8s] [0;32mI (125010) gps_handler: GPS: fix=no sats=0/0 speed=0.0 hdop=0.0 total=28996B 964s c=380[0m
+[ 123.6s] [0;32mI (125808) opendash_gps: Uptime: 110s | GPS: NO FIX | Sats: 0 | Center: searching | Mode: 3[0m
+[ 125.8s] [0;32mI (127946) gps_handler: GPS: fix=no sats=0/0 speed=0.0 hdop=0.0 total=30031B 1000s c=390[0m
+[ 133.6s] [0;32mI (135808) opendash_gps: Uptime: 120s | GPS: NO FIX | Sats: 0 | Center: searching | Mode: 3[0m
+[ 136.8s] [0;32mI (139006) gps_handler: GPS: fix=no sats=0/0 speed=0.0 hdop=0.0 total=33826B 1132s c=440[0m
+[ 140.8s] [0;32mI (142938) gps_handler: GPS: fix=no sats=0/0 speed=0.0 hdop=0.0 total=35206B 1180s c=455[0m
+[ 143.6s] [0;32mI (145808) opendash_gps: Uptime: 130s | GPS: NO FIX | Sats: 0 | Center: searching | Mode: 3[0m
+[ 145.6s] [0;32mI (147785) gps_handler: GPS: fix=no sats=0/0 speed=0.0 hdop=0.0 total=36931B 1240s c=475[0m
+[ 148.0s] [0;32mI (150157) gps_handler: GPS: fix=no sats=0/1 speed=0.0 hdop=0.0 total=37629B 1264s c=485[0m
+[ 153.0s] [0;32mI (155177) gps_handler: GPS: fix=no sats=0/1 speed=0.0 hdop=0.0 total=39394B 1324s c=505[0m
+[ 153.6s] [0;32mI (155808) opendash_gps: Uptime: 140s | GPS: NO FIX | Sats: 0 | Center: searching | Mode: 3[0m
+[ 158.0s] [0;32mI (160156) gps_handler: GPS: fix=no sats=0/12 speed=0.0 hdop=0.0 total=41803B 1402s c=525[0m
+[ 162.4s] [0;32mI (164574) gps_handler: GPS: fix=no sats=0/22 speed=0.0 hdop=0.0 total=44096B 1460s c=545[0m
+[ 163.6s] [0;32mI (165808) opendash_gps: Uptime: 150s | GPS: NO FIX | Sats: 0 | Center: searching | Mode: 3[0m
+[ 170.9s] [0;32mI (173073) gps_handler: GPS: fix=no sats=0/0 speed=0.0 hdop=0.0 total=46277B 1536s c=585[0m
+[ 173.6s] [0;32mI (175808) opendash_gps: Uptime: 160s | GPS: NO FIX | Sats: 0 | Center: searching | Mode: 3[0m
+[ 177.7s] [0;32mI (179886) gps_handler: GPS: fix=no sats=0/0 speed=0.0 hdop=0.0 total=48692B 1620s c=615[0m
+[ 182.9s] [0;32mI (185132) gps_handler: GPS: fix=no sats=0/1 speed=0.0 hdop=0.0 total=50449B 1680s c=640[0m
+[ 183.6s] [0;32mI (185808) opendash_gps: Uptime: 170s | GPS: NO FIX | Sats: 0 | Center: searching | Mode: 3[0m
+[ 190.6s] [0;32mI (192795) gps_handler: GPS: fix=no sats=0/1 speed=0.0 hdop=0.0 total=53273B 1776s c=675[0m
+[ 193.6s] [0;32mI (195808) opendash_gps: Uptime: 180s | GPS: NO FIX | Sats: 0 | Center: searching | Mode: 3[0m
+[ 199.1s] [0;32mI (201250) gps_handler: GPS: fix=no sats=0/1 speed=0.0 hdop=0.0 total=55486B 1852s c=715[0m
+[ 203.6s] [0;32mI (205808) opendash_gps: Uptime: 190s | GPS: NO FIX | Sats: 0 | Center: searching | Mode: 3[0m
+[ 213.6s] [0;32mI (215808) opendash_gps: Uptime: 200s | GPS: NO FIX | Sats: 0 | Center: searching | Mode: 3[0m
+[ 217.9s] [0;31mE (220059) gps_handler: === FULL RECOVERY: 50+ failures — PMIC power cycle ===[0m
+[ 223.6s] [0;32mI (225808) opendash_gps: Uptime: 210s | GPS: NO FIX | Sats: 0 | Center: searching | Mode: 3[0m
+[ 233.6s] [0;32mI (235808) opendash_gps: Uptime: 220s | GPS: NO FIX | Sats: 0 | Center: searching | Mode: 3[0m
+[ 233.8s] [0;31mE (236021) gps_handler: === FULL RECOVERY COMPLETE (power_cycles=3) ===[0m
+[ 236.1s] [0;32mI (238237) gps_handler: GPS: fix=YES sats=9/12 speed=0.4 hdop=1.1 total=62489B 2031s c=840[0m
+[ 236.1s] [0;32mI (238237) gps_handler:   Pos: 39.664193, -105.010385  Alt: 1621.5m  Hdg: 0.0[0m
+[ 243.6s] [0;32mI (245808) opendash_gps: Uptime: 230s | GPS: 3D FIX | Sats: 9 | Center: searching | Mode: 3[0m
+[ 253.6s] [0;32mI (255808) opendash_gps: Uptime: 240s | GPS: 3D FIX | Sats: 9 | Center: searching | Mode: 3[0m
+[ 263.6s] [0;32mI (265808) opendash_gps: Uptime: 250s | GPS: 3D FIX | Sats: 9 | Center: searching | Mode: 3[0m
+[ 273.6s] [0;32mI (275808) opendash_gps: Uptime: 260s | GPS: 3D FIX | Sats: 9 | Center: searching | Mode: 3[0m
+[ 283.6s] [0;32mI (285808) opendash_gps: Uptime: 270s | GPS: 3D FIX | Sats: 9 | Center: searching | Mode: 3[0m
+[ 293.6s] [0;32mI (295808) opendash_gps: Uptime: 280s | GPS: 3D FIX | Sats: 9 | Center: searching | Mode: 3[0m
+[ 298.8s] [0;31mE (300998) gps_handler: === FULL RECOVERY: 50+ failures — PMIC power cycle ===[0m
+
+=== Monitor ended at 300.8s ===

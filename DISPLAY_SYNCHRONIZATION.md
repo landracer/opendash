@@ -1,3 +1,4 @@
+<!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # Display Codebase Synchronization
 
 This document explains how the three display projects (center, left-right, gps) stay synchronized and share common code.

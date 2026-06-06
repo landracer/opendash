@@ -1,3 +1,4 @@
+/* Licensed under Sovereign Individual License v1.0 — see LICENSE file */
 /**
  * @file ui_manager.c
  * @brief OpenDash Left/Right Gauges — UI Manager Implementation

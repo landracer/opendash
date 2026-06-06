@@ -1,0 +1,61 @@
+{
+  "fonts": [
+    {
+      "name": "kimbalt",
+      "source": "kimbalt_.ttf",
+      "comment": "Kimbalt font - bold style, system default",
+      "sizes": [14, 18, 32, 64, 96, 128],
+      "bpp": 4,
+      "range": "0x20-0x7F,0xB0",
+      "default": true
+    },
+    {
+      "name": "engebold",
+      "source": "engebold.ttf",
+      "comment": "Engebold font - bold alternative",
+      "sizes": [14, 18, 32, 64, 96, 128],
+      "bpp": 4,
+      "range": "0x20-0x7F,0xB0",
+      "default": false
+    },
+    {
+      "name": "montserrat",
+      "source": "Montserrat-Regular.ttf",
+      "comment": "Montserrat font - alternative font",
+      "sizes": [14, 18, 32, 64, 96, 128],
+      "bpp": 4,
+      "range": "0x20-0x7F,0xB0",
+      "default": false
+    },
+    {
+      "name": "zektonit",
+      "source": "zektonit.ttf",
+      "comment": "Zekton IT font - italic style",
+      "sizes": [14, 18, 32, 64, 96, 128],
+      "bpp": 4,
+      "range": "0x20-0x7F,0xB0",
+      "default": false
+    },
+    {
+      "name": "unsi",
+      "source": "unsi.ttf",
+      "comment": "Unsi font - test new font converter",
+      "sizes": [14, 18, 32, 64, 96, 128],
+      "bpp": 4,
+      "range": "0x20-0x7F,0xB0",
+      "default": false
+    },
+    {
+      "name": "unispace",
+      "source": "unispace.ttf",
+      "comment": "Unispace font",
+      "sizes": [14, 18, 32, 64, 96, 128],
+      "bpp": 4,
+      "range": "0x20-0x7F,0xB0",
+      "default": false
+    }
+  ],
+  "default_bpp": 4,
+  "default_range": "0x20-0x7F,0xB0",
+  "comment": "The font marked with 'default: true' will be used as the system default. Range includes ASCII + degree symbol (°) for temperature display. Sizes: 14=small, 18=medium, 32=large, 64=xlarge, 96=xxlarge, 128=xxxlarge"
+}

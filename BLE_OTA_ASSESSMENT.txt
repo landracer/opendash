@@ -1,0 +1,306 @@
+# OpenDash BLE OTA — Deep Assessment for External Review
+
+**Date:** 2026-05-28
+**Author:** automated session log, audited for accuracy
+**Audience:** internal + 3rd-party BLE / ESP-IDF reviewers
+**Status:** **NOT WORKING IN THE 5-MINUTE WINDOW.** Mechanism is correct; throughput collapses below what the OTA window permits.
+
+---
+
+## 1. Problem statement
+
+`ble_ota.py` (Bleak / Linux BlueZ host) must push the LEFT and RIGHT firmware
+binary (`opendash_leftright.bin`, **2,456,384 bytes**) to an ESP32-S3 OpenDash
+node over BLE GATT. The OTA window on the peripheral is **300 s** (5 min) by
+design — anything longer is unacceptable for field use.
+
+Symptoms:
+
+- BLE sessions die intermittently. Lifetimes observed: **1.2 s, 1.6 s, 2.5 s,
+  6 s, 22 s, 33 s, and in one anomalous case > 3 min.**
+- Disconnect reason on the peripheral is uniformly **HCI 0x08 / NimBLE
+  reason = 520** (`HCI_ERR_CONN_TIMEOUT` — link supervision timeout).
+- The peripheral correctly re-advertises after each disconnect and accepts a
+  RESUME, so OTA committed bytes are preserved. The transfer eventually
+  *would* finish given enough time (we observed one session reach 2.04 MB /
+  83 % in a single connection), but cumulative resume storms blow past the
+  300 s window before completion.
+
+---
+
+## 2. Architecture summary (so reviewers can orient themselves)
+
+### 2.1 Peripheral (ESP32-S3, NimBLE)
+
+File: `common/src/opendash_bt_ota.c`
+
+GATT service `0xFFB0` with four characteristics:
+
+| UUID    | Properties             | Purpose                                 |
+| ------- | ---------------------- | --------------------------------------- |
+| 0xFF01  | WRITE                  | Control (`BEGIN/RESUME/END/ABORT`)      |
+| 0xFF02  | WRITE \| WRITE_NO_RSP  | Firmware data chunks                    |
+| 0xFF03  | READ \| NOTIFY         | Status (`state, %, err`) — 4 KB tick    |
+| 0xFF04  | READ                   | Server-committed offset (LE u32)        |
+
+On connect the peripheral:
+
+1. Sets preferred MTU 517 (the central drives the exchange).
+2. Requests `ble_gap_update_params{itvl_min=24, itvl_max=48, latency=0,
+   supervision_timeout=3200}` → 30–60 ms interval, **32 s supervision**.
+3. Performs `esp_ota_begin(OTA_WITH_SEQUENTIAL_WRITES)` lazily on first
+   `BEGIN`.
+
+On disconnect: keeps `s_ota_handle` and `s_bytes_received` live so the next
+session can RESUME. Re-advertises with the same `own_addr_type` chosen at
+sync time (ESP32-S3 has no factory public address; `BLE_OWN_ADDR_RANDOM`).
+
+Pre-OTA sequencing (all in `opendash_bt_ota_enter`):
+
+- Best-effort `STATUS_REPORT(BLE_OTA flag)` to center.
+- `opendash_espnow_deinit()` → WiFi released.
+- `esp_task_wdt_deinit()` (other tasks blocked forever after WiFi teardown).
+- Slave's `main.c` first calls `ui_manager_suspend()` + `display_pause_for_ota()`
+  to stop the 18 MHz RGB DMA + LVGL CPU work, and (on LEFT only) calls
+  `opendash_uart_suspend()` to deletion-park the MDv2 UART RX task.
+- BLE TX power forced to `ESP_PWR_LVL_P9` on DEFAULT / ADV / CONN_HDL0.
+
+### 2.2 Center (master)
+
+In `center/main/espnow_master.c`, the ENTER_BT_OTA path calls
+`channel_mgr_pause_node_traffic(node, 360000)` **for every slave**, not just
+the target. This freezes center's ESP-NOW TX on ch1 so it doesn't beat the
+target during the OTA window. Confirmed in the field: center `tx` counter
+freezes; only `err` continues to climb (queued retries).
+
+### 2.3 Client (`ble_ota.py`)
+
+Bleak / Linux BlueZ. Default `--chunk-size 384`, `--chunk-delay-ms 1.2`. Now
+supports `--no-response` (write-without-response) and includes
+**server-paced flow control**: every 16 chunks, the client reads OFFSET and
+pauses until `sent - srv ≤ 16 KB`, with an 8 s ceiling that resyncs `sent` to
+`srv` if the server stalls (e.g. mid-disconnect).
+
+---
+
+## 3. What we’ve already eliminated as the cause
+
+Each bullet was verified empirically; the test conditions are reproducible.
+
+| # | Hypothesis                                                       | Action taken                                                          | Outcome                                                                                |
+| - | ---------------------------------------------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| 1 | Center fan-out RF jamming                                        | `channel_mgr_pause_node_traffic` over all slaves                      | Center TX visibly freezes; **no improvement** in disconnect rate                       |
+| 2 | RGB DMA + LVGL starving NimBLE host task                         | `ui_manager_suspend()`, `display_pause_for_ota()` before BLE init     | Helped a little; sessions occasionally last 30 s+ now; **disconnects persist**         |
+| 3 | No resume path                                                   | Added RESUME (CTRL 0x05) + OFFSET char (0xFF04)                       | Works; committed bytes survive disconnects; **doesn’t fix root cause**                 |
+| 4 | 6 s supervision_timeout too tight                                | Bumped to **32 s** in `ble_gap_update_params`                         | Confirmed live in NimBLE log; sessions **still die at 1.5 s**                          |
+| 5 | UART RX task contending for CPU                                  | Added `opendash_uart_suspend()` (vTaskSuspend + uart_driver_delete)   | Confirmed live; **no change** in disconnect rate                                       |
+| 6 | Low BLE TX power                                                 | Forced `ESP_PWR_LVL_P9` (max +9 dBm) on DEFAULT/ADV/CONN_HDL0         | **No measurable change**                                                                |
+| 7 | Other host BT devices (MX Ergo BT mouse) stealing radio time     | Disconnected mouse, repeated test                                     | **Worse** — 2 connections in 5 min vs ~10 with mouse paired (debunked, not the cause)  |
+| 8 | Other ESP-NOW slaves jamming ch1                                 | Physically unplugged POD1, POD2, GPS                                  | Center observed `dp/s=0` from slaves; **OTA still dies on identical schedule**         |
+| 9 | Client overrunning controller with `--no-response`                | Added 16 KB / 16-chunk server-paced flow control (reads OFFSET char)  | Fixed the "client sent 2.4 MB but server got 50 KB" anomaly; **disconnect rate unchanged** |
+
+The supervision_timeout fix proves the disconnect is **not** a NimBLE host
+timer firing — the peripheral configures 32 s, but disconnects routinely
+occur 1–2 s after connection. That means **the controller, the central, or
+something below the NimBLE host is dropping the link**, and `reason=520` is
+just the controller's downstream report.
+
+---
+
+## 4. Hard data from the most recent runs
+
+### 4.1 Run A — peripheral pristine RF (pods/gps unplugged), `--no-response` + flow control, `--chunk-size 384`
+
+```
+session 5  RESUME 25,344 → drop after  2.6 s (committed +0 B before drop)
+session 6  RESUME 25,344 → drop after 23.0 s (committed +38 KB) — ONE good run
+session 7  RESUME 63,744 → never recovers, OTA window expires
+```
+
+That single good session (run 6) implies a **best-case sustained rate of
+~1.7 KB/s** of *committed* throughput when sessions die at this cadence. The
+firmware is 2.45 MB. Required throughput to complete in 5 min: **8.2 KB/s
+sustained**. We are roughly **5× below the floor** even in clean RF.
+
+### 4.2 Run B — "lucky session" anomaly (one of ~15 attempts)
+
+A single connection survived ~3 minutes and pushed **~2.04 MB / 83 %**
+before the OTA window closed. Throughput in that session: **~11 KB/s
+committed** — i.e. *if* every session looked like this one, OTA would finish
+in **3:40**, comfortably under 5 min.
+
+The conditions under which this anomaly occurred could not be reproduced.
+It happened **once**, on a session that included normal Linux activity
+(mouse paired, USB monitors running, IDE editing) — i.e. no special
+preparation. Subsequent attempts in identical environment regressed to
+1–25 s sessions.
+
+### 4.3 Throughput within a single session (no-response)
+
+While sessions last, the *server-committed* rate is in the **10–60 KB/s**
+range. The headline 100 % bar in the client is misleading without flow
+control: writes accepted by Bleak get queued in the OS HCI layer; on a
+spontaneous disconnect, anything past the controller's TX queue is silently
+discarded. Flow control patch (Section 5.3) now keeps the client honest.
+
+---
+
+## 5. Code-level audit findings
+
+### 5.1 Peripheral GATT write handler is synchronous-blocking
+
+In `ota_data_access` we call `esp_ota_write(s_ota_handle, buf, len)` inline.
+`OTA_WITH_SEQUENTIAL_WRITES` lets us avoid pre-erasing, but each write may
+still **block** on a flash sector erase (~30–60 ms on 4 KB boundaries) plus
+program time. While blocking, the NimBLE host task does not service incoming
+HCI events. ATT writes from the central pile up in the controller's RX
+queue; if it overflows, the controller drops the connection. This is
+consistent with disconnects clustering near 4 KB boundaries in the log
+(every progress notify is the line **after** the boundary; the disconnect
+often comes within 2 s of crossing it).
+
+**Recommended:** move flash writes off the NimBLE host task — queue chunks
+to a worker task with a small ring buffer (e.g. 8 × 480 B) and let the host
+task return immediately. NimBLE host task priority and stack should also be
+reviewed against `CONFIG_BT_NIMBLE_HOST_TASK_STACK_SIZE` /
+`CONFIG_BT_NIMBLE_HOST_TASK_PRIO`.
+
+### 5.2 Notify on every 4 KB during writes
+
+`notify_status()` is called inside the data write path every 4 KB. Each
+notify is an outbound ATT PDU contending with the inbound write stream on
+the same conn interval. This compounds 5.1. Reduce to every 64 KB or
+piggyback inside a heartbeat instead.
+
+### 5.3 Client previously had no flow control with `WRITE_NO_RSP`
+
+Already patched. See `ble_ota.py` "Server-paced flow control" block.
+
+### 5.4 Connection parameter update may be silently ignored
+
+`ble_gap_update_params(...)` is a request sent over L2CAP after connection.
+BlueZ as the central may take seconds to honour it (or reject it outright).
+We never log the resulting accepted parameters. The 32 s supervision the
+peripheral asked for is **not necessarily** what the link runs at.
+
+**Recommended:** subscribe to `BLE_GAP_EVENT_CONN_UPDATE` and log
+`event->conn_update.status` + `ble_gap_conn_find()` to confirm.
+
+### 5.5 ESP-NOW deinit doesn’t guarantee a clean WiFi state
+
+`opendash_espnow_deinit()` calls `esp_wifi_stop` + `esp_wifi_deinit`, but
+the controller’s phy / mac state on ESP32-S3 may need an explicit
+`esp_phy_disable()` before BLE can run cleanly. Worth instrumenting with
+`esp_phy_*` calls and verifying via `esp_wifi_get_*` that everything is
+truly released before NimBLE initialises.
+
+### 5.6 No DLE negotiation
+
+We accept MTU 517 but never explicitly request data length extension. On
+the central side BlueZ usually negotiates DLE automatically, but on the
+peripheral controller we should call `ble_hs_hci_util_set_data_len` (or rely
+on `CONFIG_BT_NIMBLE_LL_CFG_FEAT_LE_DATA_LEN_EXT=y`, which should be
+verified in sdkconfig).
+
+### 5.7 sdkconfig audit not done
+
+We have not yet inspected the LEFT/RIGHT sdkconfig for:
+
+- `CONFIG_BT_NIMBLE_HOST_TASK_STACK_SIZE`
+- `CONFIG_BT_NIMBLE_HOST_TASK_PRIO`
+- `CONFIG_BT_NIMBLE_MAX_BONDS / MAX_CCCDS`
+- `CONFIG_BT_CTRL_TX_BUF_NB` (HCI TX buffers)
+- `CONFIG_BT_NIMBLE_LL_CFG_FEAT_LE_DATA_LEN_EXT`
+- `CONFIG_BT_NIMBLE_NVS_PERSIST`
+- `CONFIG_BT_NIMBLE_TRANSPORT_*`
+- `CONFIG_BT_BLE_CCA_MODE` (coexistence with WiFi remnants)
+- `CONFIG_BT_CTRL_BLE_MAX_ACT` and `CONFIG_BT_CTRL_BLE_MAX_ACT_EFF`
+
+These are strong candidates for explaining why the controller would drop
+the link under sustained inbound write pressure.
+
+### 5.8 No instrumentation of the disconnect cause path
+
+`reason=520` is the only signal. We have no way to distinguish:
+
+- central-initiated disconnect (BlueZ → DISCONN command)
+- peripheral controller-initiated disconnect (RX queue overflow, etc.)
+- LL link supervision timeout actually firing
+- HCI link-layer encryption failure (we don’t pair / bond)
+
+**Recommended:** add an HCI tracer on the Linux host
+(`btmon -w /tmp/btmon.log`) and capture one full failing OTA. That single
+artifact will conclusively identify which side hung up.
+
+---
+
+## 6. Hypothesis on the real root cause
+
+Combining the evidence in 4.1 + 4.2 + 5.1 + 5.2 + 5.4:
+
+> The NimBLE host task spends too long inside `esp_ota_write` (worst case
+> at every 4 KB flash-erase boundary). Inbound ATT writes accumulate in the
+> ESP32-S3 BLE controller's RX queue. When the queue saturates, the
+> controller drops the link with an internal LL timeout, which is reported
+> upstream as HCI 0x08. Because the bursts coincide with the 4 KB erase
+> cadence, sessions die at semi-random short intervals depending on where
+> the next erase falls relative to the inbound chunk schedule.
+>
+> The one anomalous 3-minute session likely coincided with a flash region
+> that happened to be already-erased (`OTA_WITH_SEQUENTIAL_WRITES` can skip
+> the erase for sectors that were not part of a prior boot image), so the
+> blocking time per write was minimal and the queue never overflowed.
+
+If this is correct, the fix is **5.1** — move `esp_ota_write` off the
+NimBLE host task. Everything else we’ve done (TX power, supervision_timeout,
+RF clearing, UART suspend, flow control) is helpful but does not address
+the core race.
+
+---
+
+## 7. Open questions for external reviewers
+
+1. Has anyone seen `reason=520` correlate with ESP32-S3 controller RX-queue
+   overflow specifically? Is there a documented HCI VS event that fires
+   first?
+2. Best-practice pattern for "GATT write → flash" on NimBLE under
+   `OTA_WITH_SEQUENTIAL_WRITES`? Async producer/consumer or a
+   `xQueue`-backed worker?
+3. What is the typical achievable throughput for NimBLE-as-peripheral OTA
+   on ESP32-S3 with Bleak as the central? Public benchmarks?
+4. Should we be using `BLE_HS_FOREVER` for the advertise duration in
+   re-advertise after disconnect, or a finite cap (we currently use
+   `BLE_HS_FOREVER` and rely on the 300 s outer timer in `opendash_bt_ota_start`)?
+5. Is BlueZ's default L2CAP CONN_PARAM_UPDATE behaviour going to honour a
+   peripheral-side request for 32 s supervision, or silently cap it?
+
+---
+
+## 8. Concrete next steps (in priority order)
+
+1. **Capture `btmon` trace** of a single failing OTA session — single source
+   of truth for who is hanging up.
+2. **Move `esp_ota_write` to a worker task** with a queue. Smallest change
+   that addresses the leading hypothesis.
+3. **Cut notify rate** in `ota_data_access` from every 4 KB to every 64 KB.
+4. **Confirm `LE_DATA_LEN_EXT`** is enabled in sdkconfig and DLE is
+   negotiated; if not, request it explicitly.
+5. **Log `BLE_GAP_EVENT_CONN_UPDATE`** to verify our requested supervision
+   timeout was actually accepted.
+6. **sdkconfig audit** per 5.7.
+7. Re-run end-to-end OTA test in the same RF environment to compare against
+   the data in §4.
+
+---
+
+## 9. Files touched during investigation
+
+- `common/include/opendash_uart.h` — added `opendash_uart_suspend()` decl.
+- `common/src/opendash_uart.c` — task handle + suspend impl.
+- `common/src/opendash_bt_ota.c` — supervision_timeout 600→3200,
+  ESP_PWR_LVL_P9 TX boost, RESUME (0x05) + OFFSET char (0xFF04).
+- `left/main/main.c`, `right/main/main.c` — ui_manager_suspend +
+  display_pause_for_ota + (LEFT) opendash_uart_suspend before OTA.
+- `center/main/espnow_master.c` — ENTER_BT_OTA fans out
+  `channel_mgr_pause_node_traffic` to all slaves.
+- `ble_ota.py` — server-paced flow control window for `--no-response`.

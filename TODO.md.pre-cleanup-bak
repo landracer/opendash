@@ -1,0 +1,515 @@
+# OpenDash — Project TODO
+
+> Comprehensive tracking of planned features, known issues, and future direction.
+> Organized by priority and subsystem.
+>
+> Last updated: July 2026
+>
+> **Project Status: BETA** — Sensor data flowing end-to-end from MultiDisplay
+> through HC-05/HC-06 Bluetooth to ESP32-S3 displays via ESP-NOW.
+
+---
+
+## Legend
+
+| Symbol | Meaning |
+|---|---|
+| `[x]` | Done |
+| `[ ]` | Not started |
+| `[~]` | In progress / partial |
+| `[!]` | Blocked / needs investigation |
+
+---
+
+## 1. Critical Bugs & Stability
+
+### 1.1 WDT Crash on Screen Switch (Left/Right)
+
+- [x] Root cause: `update_outlined_text()` writes 10 labels without yielding,
+      starving IDLE0 on CPU0 → WDT fires ~5 seconds after switching to ODO
+- [x] Guard: only update ODO labels when ODO screen is active
+- [x] Rate-limit ODO updates to 1/second (20 ticks × 50ms)
+- [x] Add `taskYIELD()` between the two `update_outlined_text()` calls
+- [x] Skip `lv_label_set_text()` if text hasn't changed (avoids invalidation storm)
+- [x] UI task now wraps `lv_timer_handler()` in LVGL mutex lock/unlock
+- [ ] Stress test: rapid button pressing for 60+ seconds (verify no WDT)
+- [ ] Consider replacing 4-shadow outlined text with 1 shadow for lighter rendering
+
+### 1.2 GT911 Touch Not Detected (All Projects)
+
+- [x] Added GT911 hardware reset via TCA9554 EXIO2 before I2C probe
+- [x] Probe both GT911 addresses: 0x5D and 0x14
+- [!] **INT pin conflict:** GT911 INT may be on GPIO16 — same as I2C slave SCL.
+      Need to verify against board schematic and resolve conflict.
+- [ ] Register GT911 as LVGL input device (full touch support)
+- [ ] Add `esp_lcd_touch_gt911` managed component to `idf_component.yml`
+- [ ] Test touch across all board revisions
+- [ ] Apply GT911 fix to center/ and gps/ (different hardware, different touch init)
+
+### 1.3 Left Display Flicker During UART Debug Logging
+
+- [x] Root cause identified: 100Hz `ESP_LOGI` per parsed frame saturates UART0
+      console and starves LCD refresh task
+- [x] Fixed: `OPENDASH_UART_DEBUG` set to 0 (compile flag in `opendash_uart.h`)
+- [x] "STX+TAG detected" log downgraded to `ESP_LOGD`
+- [x] 5-second heartbeat retained at `ESP_LOGI` for passive health monitoring
+
+### 1.4 Bad ETX Frame Loss (~15-20%)
+
+- [~] False `STX+TAG` (0x02 0x5F) in 35-byte VR6 zero-padding triggers
+      false frame starts → misaligned reads → ETX mismatch
+- [ ] Implement frame timing validation (expect frames every ~10ms)
+- [ ] Track consecutive good frames to increase sync confidence
+- [ ] Consider checksum/CRC validation of parsed fields (plausibility check)
+
+---
+
+## 2. Display Features (Left/Right Gauge Pods)
+
+### 2.1 Multi-Page Gauge System
+
+- [x] `gauge_page_t` struct with configurable primary/secondary data points
+- [x] Up to `GAUGE_PAGE_MAX` (8) pages, currently using 3 gauge + 1 odo
+- [x] Single LVGL widget set shared by all gauge pages (no create/destroy)
+- [x] Labels, units, and arc range swapped on page switch
+- [x] Page cycling via boot button: Gauge[0] → Gauge[1] → … → ODO → loop
+- [ ] Make pages configurable via NVS (persist user's page order/selection)
+- [ ] I2C command from Center to change page remotely
+- [ ] Page indicator (dots or number at bottom showing current/total)
+
+### 2.2 Arc Outline (Symmetric)
+
+- [x] Fixed asymmetric outline (was all outside, now symmetric 5px each side)
+- [x] Both arcs share same `ARC_SIZE` bounding box, outline has wider stroke
+- [x] Halved outline thickness from 10px to 5px per side
+
+### 2.3 Secondary Box
+
+- [x] Made taller: 85px → 100px (less cramped)
+- [ ] Auto-size box height based on font metrics
+- [ ] Optional progress bar for secondary value
+- [ ] Border color changes based on value thresholds (green/yellow/red)
+
+### 2.4 Min/Max Tracking
+
+- [x] Per-page session min/max of primary arc value
+- [x] Displayed as `MIN:xx  MAX:yy` text below primary reading
+- [ ] Min/max markers on the arc itself (small triangles at angle positions)
+- [ ] Optional persistence to NVS (per-session auto-clear or manual reset)
+- [ ] Min/max for secondary value too
+
+### 2.5 Shift-Light Blink
+
+- [x] Arc color toggles red/blue when arc > 90% on `shift_light=true` pages
+- [x] 150ms blink interval, auto-revert below threshold
+- [ ] Configurable threshold percentage (currently hardcoded 90%)
+- [ ] Configurable RPM shift point (absolute value, not percentage)
+- [ ] Full-screen flash mode (border or background flash, not just arc)
+- [ ] RGB LED output trigger (external shift light hardware)
+
+### 2.6 Background Images
+
+- [x] Conditional include (`__has_include`) for background images
+- [x] Fallback to plain black if images not present
+- [ ] Multiple background image themes (carbon fiber, brushed aluminum, etc.)
+- [ ] Per-page background selection
+
+---
+
+## 3. Center Display (4.3" Main Dash)
+
+- [x] Basic multi-screen UI (ENGINE, GPS, custom modes)
+- [x] Drag race demo data generator (realistic 12s cycle with keyframe interpolation)
+- [x] Demo data auto-halts for GPS when GPS node comes online
+- [~] Demo data auto-halt for engine data when real MD sensor data arrives
+- [ ] Fix GT911 touch initialization (different hardware from left/right)
+- [ ] Implement touch-based screen switching (swipe or tap zones)
+- [ ] Settings screen (unit preferences, brightness, page assign)
+- [~] Data logging to SD card or flash storage
+  - Center sd_logger.c is a no-op stub — needs real SPI-via-CH422G implementation
+  - Center CMakeLists already links fatfs + sdmmc components
+  - CH422G IO expander (I2C 0x24/0x38) controls SD card CS pin
+  - `display_get_i2c_bus()` documented for SD CS access
+- [ ] Lap timer integration (see §10.5 BonoGPS-Inspired Lap Tracking)
+
+---
+
+## 4. GPS Display (1.75" AMOLED)
+
+- [x] **GPS I2C driver complete** — v15L2, production-verified (March 2025)
+- [x] LC76G CASIC I2C protocol: 0x50/0x54/0x58 at 100 kHz
+- [x] PMIC power cycle + WAKE + primer + per-read WAKE + drain mechanisms
+- [x] NMEA parsing: GGA, RMC, GSV, GSA, GLL, VTG, TXT, PQTM
+- [x] Automatic recovery from shared bus degradation (100-125s windows)
+- [x] 3D Fix: 9-16 sats, HDOP 0.7-1.1, 62-95K bytes/5min
+- [x] Full documentation: wiki guide v2.0.0, 10Hz spec breakout, cross-refs
+- [ ] Fix touch initialization (CST9217 via I2C 0x5A, not CST816S)
+- [ ] GPS data display UI (speed, heading, coordinates, sat count)
+- [ ] 10 Hz update rate activation (via `$PAIR050,100` after first fix)
+- [ ] IMU integration (QMI8658 at 0x6B — G-force meter, tilt display)
+- [ ] Parachute deployment system integration
+- [ ] Lap timer with sector times (see §10.5)
+- [x] SD card data logging wired in (sd_logger.c → CMakeLists → main.c)
+  - SDMMC 1-line mode: CLK=GPIO2, CMD=GPIO1, D0=GPIO3
+  - Logs at 5 Hz: GPS snapshot + IMU g-forces + engine data points
+  - Session counter on SD card, auto-incrementing CSV filenames
+  - Queue 128 entries, flush every 16, background task on CPU 1
+- [ ] Track map overlay (if display resolution allows)
+
+---
+
+## 5. Communication & Protocol
+
+### 5.1 ESP-NOW Wireless Bus
+
+- [x] Basic data point broadcast (center → left/right gauge pods)
+- [x] Warning command support
+- [x] Odometer sub-commands (reset trip, etc.)
+- [x] Left→Center relay of multidisplay sensor data via DATA_RESPONSE
+- [x] Center→Left/Right forwarding of received data points
+- [ ] Bidirectional communication (slaves report status to center)
+- [ ] Health/heartbeat between nodes (detect disconnected display)
+- [ ] Dynamic data point subscription (slave requests specific DPs)
+- [ ] Protocol version handshake on startup
+- [ ] Retry/error recovery for ESP-NOW communication failures
+
+### 5.2 Multidisplay UART (HC-05 Bluetooth)
+
+> **MD Output Rate:** SERIALFREQ=10 (10ms) = **100 Hz** default.
+> OpenDash UART RX keeps up at 100 Hz but the main loop only consumes at
+> **5 Hz** (every 200ms). 95% of frames are discarded (latest value kept).
+> Consider lowering SERIALFREQ to 50 (20 Hz) or 100 (10 Hz) on the MD side
+> to save ATmega2560 CPU cycles with zero data loss. Changeable at runtime
+> via MD serial command 11, persisted to EEPROM addr 101.
+>
+> **Bad ETX (~15-20%) is NOT timing-related** — it's electrical noise/byte
+> corruption on the BT UART link. The parser handles it gracefully by
+> re-scanning for STX.
+
+- [x] Binary frame parser: STX(0x02) TAG(0x5F) payload[93] ETX(0x03)
+- [x] Little-endian AVR field extraction (rd_u16, rd_s16, rd_u32)
+- [x] GPIO20 (USB D+) reclaimed via USB PHY pad disable for UART1 RX
+- [x] All 8 EGT channels parsed and forwarded
+- [x] RPM, boost, throttle, lambda, LMM, battery voltage, VDO sensors
+- [x] Speed, gear, N75 duty cycle, requested boost, EFR speed, knock
+- [x] Connection state machine: WAITING → RECEIVING → TIMEOUT
+- [x] 5-second UART diagnostic heartbeat
+- [x] Toggleable per-frame debug logging (`OPENDASH_UART_DEBUG`)
+- [x] Comprehensive protocol documentation (UART_CONNECTION.md, SERIAL_PROTOCOL.md)
+- [ ] Frame timing validation to reduce false-start frame loss
+- [ ] HC-05 AT-command auto-connect (currently relies on pre-paired modules)
+
+### 5.3 CAN Bus / OBD2
+
+- [ ] CAN transceiver integration on center node
+- [ ] OBD2 PID request/response parsing
+- [ ] Custom CAN protocol for aftermarket ECUs (Haltech, MegaSquirt, etc.)
+- [ ] Configurable CAN baud rate and filter masks
+- [ ] CAN data logging (raw frames to flash/SD)
+- [ ] **OBDII/ELM327 via MultiDisplay** — Future MD firmware will add ELM327
+      support; OpenDash parser will need to handle additional data fields when
+      the MD protocol payload expands (see §10.6)
+
+### 5.4 VESC & rAtTrax-BMS Integration
+
+- [x] **VESC data model complete** — full 0x0600 range in opendash_data_model.h:
+  - STATUS 1: eRPM, current, duty cycle
+  - STATUS 2: Ah consumed/charged
+  - STATUS 3: Wh consumed/charged
+  - STATUS 4: FET temp, motor temp, current_in, PID position
+  - STATUS 5: tacho value, input voltage
+  - STATUS 6: ADC1-3, PPM
+  - Derived: power_in, power_motor, fault code, wheel RPMs (FL/FR/RL/RR), avg wheel speed
+- [x] **BMS data model extended** — SOH, BMS_TEMP_IC, BMS_BALANCE, BMS_CHARGING, ENERGY_CHARGED
+- [ ] VESC CAN bus driver (parse STATUS 1-6 frames, 500kbps, 29-bit EID)
+- [x] ESP-NOW node for rAtTrax BMS data — BMS Logger sends properly framed DATA_RESPONSE messages, center auto-discovers BMS node and forwards to gauge pods
+- [x] Center `espnow_master.c` updated — MAX_NODES=4, BMS slot in s_nodes[], bms_online tracked
+- [ ] BMS alarm forwarding to OpenDash warning system
+- [ ] Pack voltage/current display on center and gauge pods
+- [ ] Shared lap tracking data between rAtTrax-BMS and OpenDash (see §10.5)
+
+---
+
+## 6. System Features
+
+### 6.1 OTA (Over-The-Air) Updates
+
+- [x] Flash partitions support OTA (factory + ota_0 + ota_1)
+- [x] **BLE OTA working end-to-end on POD1, POD2, GPS, LEFT, RIGHT** (May 2026)
+  - LEFT first OTA: 11m40s @ ~3.5 KB/s (1M PHY, BlueZ-default 60 ms interval)
+  - RIGHT first OTA: **4m31s** @ ~9.1 KB/s (2M PHY enabled, correct PPCP) ✅
+  - LEFT rebuilt with RIGHT's improved config — expected ~5 min next run
+- [x] Per-node OTA (update LEFT/RIGHT/GPS independently via `ota <node>`)
+- [x] Auto-RESUME from server offset after mid-OTA disconnect
+- [x] Centralised entry path in `common/src/opendash_bt_ota.c` —
+      one timeout, one advertising state machine, one GATT service
+- [x] CENTER console command sends `ENTER_BT_OTA` x3 to target node
+- [x] OTA partition state validates new image and rolls back on failure
+- [ ] **Android OTA client** — see [`wiki/ota-android-plan.md`](./wiki/ota-android-plan.md)
+- [ ] Sub-5-min target on LEFT (post-rebuild verification pending)
+- [ ] HTTP OTA over WiFi SoftAP (alternative path, much higher throughput)
+- [ ] Version checking before flash + per-node version reporting on advert
+- [ ] OTA progress mirrored to LCD UI (currently only on console)
+- [ ] Firmware image compression (LZ4 stream) to halve transfer time
+- [ ] Bluetooth pairing/passkey to prevent unauthorised OTA in the wild
+
+### 6.2 NVS Configuration Persistence
+
+- [x] Unit preferences saved/loaded
+- [x] Odometer persistence with wear-level protection
+- [ ] Per-page gauge configuration persistence
+- [ ] Calibration data storage (sensor offsets, scaling)
+- [ ] Factory reset command (revert all NVS to defaults)
+- [ ] NVS usage monitoring (percent full)
+
+### 6.3 Real-Time Clock (PCF85063)
+
+- [x] **PCF85063 driver complete** — `opendash_rtc.c/h` in common/
+  - Supports both legacy I2C (`opendash_rtc_init()`, left/right) and
+    new master API (`opendash_rtc_init_master()`, GPS)
+  - BCD encode/decode, OS bit validation, 24h mode
+  - System clock sync via `settimeofday()` at boot (before GPS fix)
+  - GPS time → RTC set for battery-backed persistence
+- [x] Left pod: RTC init wired into main.c (I2C_MASTER_PORT)
+- [x] Right pod: RTC init wired into main.c (I2C_MASTER_PORT)
+- [x] GPS: RTC init via `opendash_rtc_init_master(display_get_i2c_handle())`
+- [ ] Center: no PCF85063 on 4.3" Waveshare board (uses ESP-NOW time sync from GPS)
+- [ ] GPS → RTC sync: write GPS time to RTC on valid fix (gps_handler.c)
+- [ ] Show clock on center dashboard (HH:MM from system clock)
+
+### 6.3 Power Management
+
+- [ ] Graceful shutdown on power loss (save odometer)
+- [ ] Ignition switch detection (auto power on/off)
+- [ ] Display sleep mode (reduce brightness after timeout)
+- [ ] Deep sleep with wake-on-CAN or wake-on-button
+
+### 6.4 Diagnostics
+
+- [x] UART diagnostic heartbeat (5-sec interval: byte count, STX count, status)
+- [x] GPIO activity probe on UART RX pin at startup
+- [ ] Built-in self-test on startup (check all I2C devices, RAM, flash)
+- [ ] Sensor plausibility checks (value range validation)
+- [ ] Error counters (I2C NACK, CAN errors, watchdog resets)
+- [ ] Serial console debug commands (`help`, `status`, `reset`)
+- [ ] On-screen diagnostic mode (raw sensor values, frame stats)
+
+---
+
+## 7. Hardware & Wiring
+
+### 7.1 Current Pin Assignments — Verified
+
+- [x] **GPIO20 (J9 DP / USB D+):** UART1 RX for HC-05 Bluetooth data (left pod).
+      USB-Serial/JTAG PHY released via `usb_serial_jtag_ll_phy_enable_pad(false)`.
+      ROM bootloader re-enables for flashing — no conflict.
+- [x] **GPIO43/44 (J10):** UART0 console output. CH343P bridge chip holds GPIO44
+      permanently — cannot be used for external UART input.
+- [!] **GPIO16:** Used for I2C slave SCL — may conflict with GT911 INT on 2.8C boards.
+      Need to verify against Waveshare schematic. If shared, must relocate
+      I2C slave to different GPIO pair.
+- [ ] Audit all GPIO assignments across all 4 boards for conflicts
+- [ ] Document verified GPIO assignments for each board revision
+
+### 7.2 Wiring Harness
+
+- [ ] Design standardized wiring harness (connector pinout, wire gauge)
+- [ ] I2C termination resistor placement (4.7K pullups on center only)
+- [ ] EMI shielding for CAN and I2C lines in race car environment
+- [ ] Vibration-resistant connector selection (Deutsch, Molex MX)
+
+### 7.3 Enclosures
+
+- [ ] 3D printed enclosure for center (4.3" display + ESP32-S3 board)
+- [ ] Pod mounts for left/right (2.8" round displays in gauge pods)
+- [ ] GPS display mount (1.75" AMOLED, ideally near windshield)
+- [ ] Ventilation / thermal design (ESP32-S3 gets warm under load)
+
+---
+
+## 8. Testing
+
+- [ ] Build verification: automated CI/CD build for all 4 projects
+- [ ] Unit tests for common library functions (conversion, protocol parsing)
+- [ ] Integration test: simulated I2C traffic with logic analyzer verification
+- [ ] Endurance test: 4-hour continuous operation across all displays
+- [ ] Temperature test: operate in 0°C to 60°C range (typical car cabin)
+- [ ] Vibration test: simulate race car conditions
+
+---
+
+## 9. Documentation
+
+- [x] `PROJECT_INDEX.md` — Central project reference
+- [x] `left/README.md` — Detailed left gauge pod docs
+- [x] `right/README.md` — Right gauge pod docs (synced from left)
+- [x] Code annotations in all source files (multi-line function headers)
+- [x] ASCII art layout diagrams in ui_manager.c
+- [x] `UART_CONNECTION.md` — Full MD serial protocol reference for OpenDash
+- [x] `SERIAL_PROTOCOL.md` — Canonical multidisplay binary protocol spec (in MD repo)
+- [x] `BLUETOOTH_PAIRING.md` — HC-05/HC-06 end-user pairing guide
+- [x] `FEATURES_AND_SENSORS.md` — Complete sensor capability matrix
+- [ ] `center/README.md` — Needs update for current implementation
+- [x] `gps/README.md` — Complete rewrite (I2C, correct addresses, v15L2)
+- [x] `wiki/LC76G-I2C-GPS-Driver-Guide.md` v2.0.0 — Authoritative GPS reference
+- [x] `wiki/LC76G-10Hz-Spec-Breakout.md` — 10 Hz capability analysis
+- [x] ARCHIVE headers on 11 historical/deprecated files
+- [x] Cross-reference annotations (gps_handler.c → wiki §§)
+- [x] INTENSIVE_TODO.md I2C address corrections (0x28/0x2A → 0x50/0x54/0x58)
+- [x] hardware.md GPS pins corrected (UART → I2C CASIC)
+- [x] CHANGELOG.md — GPS v15L2 entry added
+- [x] CHANGELOG.md — Beta release changelog with full MD integration history
+- [ ] API reference generated from Doxygen comments
+- [ ] Wiring diagram (Fritzing or KiCad)
+- [ ] User manual (non-developer audience)
+- [ ] Video: installation walkthrough
+
+---
+
+## 10. Future Vision
+
+### 10.1 Companion Mobile App
+
+- [ ] React Native or Flutter app for phone/tablet
+- [ ] BLE connection to center ESP32-S3
+- [ ] Live data streaming to phone
+- [ ] Drag race timing (reaction time, 60ft, 1/8mi, 1/4mi)
+- [ ] Data review and analysis (graphs, lap overlays)
+- [ ] Configuration sync (change gauge pages from phone)
+
+### 10.2 Data Logging
+
+- [x] High-frequency logging to SD card (GPS node)
+  - GPS 10 Hz verified feasible (see `wiki/LC76G-10Hz-Spec-Breakout.md`)
+  - sd_logger.c compiled, wired into GPS main loop at 5 Hz  
+  - SDMMC 1-line: CLK=GPIO2, CMD=GPIO1, D0=GPIO3
+  - Mixed CSV: SNAP rows (GPS+IMU) + DP rows (engine data points)
+  - Session counter on SD card, queue 128, flush every 16
+- [~] Center SD logging (stub — needs CH422G SPI CS implementation)
+- [x] SPIFFS logger in common (opendash_logger.c) — functional fallback
+- [ ] Log file format standardization (consider VESC Express CSV format alignment)
+- [ ] PC review software (or web-based viewer)
+- [ ] GPS track overlay with data correlation
+
+### 10.3 Sensor Support via MultiDisplay Integration
+
+> **Status: DONE** — MultiDisplay IS the external sensor package. Any sensor
+> that can be wired to MD's analog/digital inputs flows automatically into
+> OpenDash. The list below reflects what MD currently provides and OpenDash
+> now receives.
+
+- [x] RPM measurement (engine tach signal)
+- [x] Boost / MAP pressure (kPa, ×100 scaling)
+- [x] Throttle position (0-100%)
+- [x] Lambda / O2 (narrow-band or wideband signal)
+- [x] Mass air flow / LMM (g/s, ×100 scaling)
+- [x] Battery voltage (×100 scaling)
+- [x] 8× EGT channels (Type K thermocouple, raw °C)
+- [x] 3× VDO temperature sensors (oil/coolant/trans, ×10 scaling)
+- [x] 3× VDO pressure sensors (oil/fuel/brake, ×10 scaling)
+- [x] Vehicle speed (from ECU or GPS via MD)
+- [x] Gear position (computed from RPM + speed)
+- [x] N75 boost duty cycle (0-100%)
+- [x] Requested boost target (kPa)
+- [x] BorgWarner EFR turbo speed (RPM)
+- [x] Knock sensor reading
+- [x] Case temperature (internal MD board temp)
+
+> **See:** `FEATURES_AND_SENSORS.md` for the full capability matrix.
+> **See:** `UART_CONNECTION.md` for protocol details and byte offsets.
+
+### 10.4 Advanced Display Features
+
+- [ ] Animated arc transitions (smooth sweep on value change)
+- [ ] Configurable color themes / dark mode variants
+- [ ] Night mode (reduced brightness, red tint)
+- [ ] Predictive warnings (trending analysis)
+- [ ] G-force display with historical trace
+- [ ] Digital tachometer with programmable shift points
+
+### 10.5 Lap Tracking (BonoGPS-Inspired)
+
+> **Approach:** Implement our own lap detection, sector timing, and predictive
+> lap logic on the ESP32-S3. Inspired by BonoGPS's u-blox configuration patterns
+> but with all timing/detection computed on-device rather than relying on a
+> mobile app. See `docs/LAP_TRACKING_PLAN.md` for full design.
+
+- [ ] u-blox GPS configuration via UBX binary commands (rate, GNSS, messages)
+- [ ] Start/finish line definition (lat/lon pair stored in NVS)
+- [ ] Line-crossing detection (perpendicular distance algorithm)
+- [ ] Lap time calculation with millisecond precision
+- [ ] Best lap tracking (session + all-time via NVS)
+- [ ] Real-time delta vs. best lap (position-based interpolation)
+- [ ] Sector boundary definitions (up to 8 sectors per track)
+- [ ] Sector split times with best-sector tracking
+- [ ] Predictive lap time display (current pace vs. reference lap)
+- [ ] Track database stored on SD card (JSON format, named tracks)
+- [ ] GPS module auto-configuration at boot (10-25 Hz, automotive dynamic model)
+- [ ] Integration with rAtTrax-BMS Logger for shared lap data
+- [ ] Lap data logging to SD card (timestamped position + all sensor channels)
+
+### 10.6 OBDII/ELM327 via MultiDisplay
+
+> **Status:** Planned. MultiDisplay firmware roadmap includes ELM327/OBDII
+> support. When implemented, MD will bridge OBD2 PIDs into its serial stream.
+> OpenDash must be ready to parse expanded MD frames.
+
+- [ ] Monitor MD firmware for OBDII payload additions
+- [ ] Extend `parse_binary_frame()` for new fields when available
+- [ ] Map OBD2 PIDs to existing OpenDash data point IDs
+- [ ] Direct CAN/OBD2 on center as alternative path (no MD dependency)
+
+---
+
+## Completed Milestones
+
+- [x] Hardware init for all display types (ST7701S, ST7262, CO5300)
+- [x] LVGL 9.2 integration with PSRAM draw buffers
+- [x] ESP-NOW communication framework (replaced I2C due to GPIO conflicts)
+- [x] Unit conversion system (temp, pressure, speed, distance)
+- [x] Odometer with NVS persistence
+- [x] Odometer reset via 5-second boot button long press (left + right)
+  - Buzzer 3-beep feedback, NVS save, immediate UI update
+- [x] Warning system with flash overlay
+- [x] Boot button screen cycling + long press detection (left, right)
+- [x] Custom partition tables (2MB app + OTA)
+- [x] Multi-page gauge system (3 pages + odo, expandable to 8)
+- [x] Session min/max tracking per gauge page
+- [x] Shift-light blink (RPM > 90% threshold)
+- [x] Arc outline symmetry fix (5px each side)
+- [x] Secondary box height increase (85 → 100px)
+- [x] GT911 hardware reset via TCA9554 before probe
+- [x] WDT crash fix (yield + text-change guard + LVGL mutex in ui_task)
+- [x] Comprehensive documentation (PROJECT_INDEX.md, per-node READMEs)
+- [x] GPS I2C driver v15L2 — production-verified, 3D fix, 62-95K bytes/5min
+- [x] GPS documentation ecosystem (wiki guide v2.0.0 + 10Hz spec + cross-refs)
+- [x] LCD/touch corrections across all docs (CST816S → CST9217, UART → I2C)
+
+### July 2026 Updates
+
+- [x] **PCF85063 RTC driver** — dual-API (legacy + new master), wired into left/right/GPS
+- [x] **VESC data model** — full STATUS 1-6 mapping (25 data points + wheel speed)
+- [x] **BMS data model extended** — SOH, IC temp, balance status, charging, energy
+- [x] **GPS SD card logging wired in** — sd_logger.c built, init'd, logging 5 Hz snapshots
+- [x] **Boot button long press** — 5s hold = odometer reset with buzzer (left + right)
+- [x] **vesc_express CAN protocol research** — STATUS 1-6, BMS, GNSS, IO Board frames documented
+- [x] **MD Hz verified** — 100 Hz output (SERIALFREQ=10), 5 Hz consumed, 95% discarded
+
+### Beta Release — March 2026
+
+- [x] **MultiDisplay integration — LIVE DATA end-to-end**
+  - HC-05 Bluetooth master → HC-06 "mdv2" slave at 115200 baud
+  - Binary frame parser (95-byte SERIALOUT_BINARY format)
+  - GPIO20 (USB D+) reclaimed for UART1 RX via USB PHY pad disable
+  - All 8 EGT channels + RPM + boost + lambda + LMM + battery + VDO sensors
+  - Left gauge receives via UART, relays to Center via ESP-NOW
+  - Center displays RPM sweep and all forwarded data points
+- [x] `opendash_uart.c/h` — Full UART driver with connection state machine
+- [x] `opendash_data_model.h` — EGT1-EGT8 data point IDs (0x0112-0x011B)
+- [x] Toggleable debug logging (`OPENDASH_UART_DEBUG` compile flag)
+- [x] UART_CONNECTION.md — Complete protocol reference for OpenDash
+- [x] SERIAL_PROTOCOL.md — Canonical MD binary protocol spec (in MD repo)
+
+---
+
+*OpenDash — Built for racers, by racers.*

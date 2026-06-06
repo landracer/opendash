@@ -1,0 +1,342 @@
+/* Licensed under Sovereign Individual License v1.0 — see LICENSE file */
+/**
+ * @file boost_config_ui.c
+ * @brief LVGL System Config screen (Boost editor lives here).
+ *
+ * Layout (single full-screen page, scrollable):
+ *
+ *   ┌────────────────────────────────────────────────────────────────┐
+ *   │  System Config              [Close]                             │
+ *   │  Boost target node:  [MOS_4CH_A ▾]                              │
+ *   │ ─────────────────────────────────────────────────────────────── │
+ *   │  Boost                                                           │
+ *   │  Mode: ( ) OFF  ( ) LOW  (•) MED  ( ) HIGH                       │
+ *   │  Setpoint: 1.40 BAR   Actual: 1.38 BAR   Duty: 178/255           │
+ *   │  Safety: [OK] [EGT-warn] [overboost] [stale] [throttle] [fuel]   │
+ *   │ ─────────────────────────────────────────────────────────────── │
+ *   │  Map Editor                                                      │
+ *   │   Slot:  [LOW][MED][HIGH]   Gear: [1][2][3][4][5][6]              │
+ *   │   Duty row    : [+][-]  v0 v1 v2 … v15                            │
+ *   │   Setpoint row: [+][-]  s0 s1 s2 … s15  (in cBar)                 │
+ *   │ ─────────────────────────────────────────────────────────────── │
+ *   │  Safety (sliders) — overboost / EGT warn / EGT crit / AFR / fuel │
+ *   │  PID gains — aKp aKi aKd / cKp cKi cKd                            │
+ *   │ ─────────────────────────────────────────────────────────────── │
+ *   │  [Push Defaults]  [Pull from slave]  [Enter BLE OTA]              │
+ *   └────────────────────────────────────────────────────────────────┘
+ *
+ * The map editor uses tap-to-bump cells (±1 step) plus the row-level [+]/[-]
+ * buttons that nudge every cell at once. This is deliberately keyboard-free
+ * since the dash is touch-only.
+ */
+
+#include "boost_config_ui.h"
+#include "boost_client.h"
+#include "system_config.h"
+#include "opendash_boost.h"
+#include "opendash_common.h"
+
+#include <stdio.h>
+#include <string.h>
+#include "esp_log.h"
+
+static const char *TAG = "boost_ui";
+
+/* ============================================================================
+ *  Editor state
+ * ==========================================================================*/
+
+static lv_obj_t *s_root = NULL;
+static lv_obj_t *s_lbl_actual = NULL;
+static lv_obj_t *s_lbl_setp   = NULL;
+static lv_obj_t *s_lbl_duty   = NULL;
+static lv_obj_t *s_lbl_flags  = NULL;
+static lv_obj_t *s_lbl_target = NULL;
+
+/* Per-cell labels for the live grid (duty + setpoint). */
+static lv_obj_t *s_cell_duty[OPENDASH_BOOST_MAP_POINTS];
+static lv_obj_t *s_cell_setp[OPENDASH_BOOST_MAP_POINTS];
+
+static uint8_t s_edit_slot = OPENDASH_BOOST_SLOT_MED;
+static uint8_t s_edit_gear = 0;
+
+/* Working buffers (mirror what we'll push to the slave). */
+static uint8_t  s_buf_duty[OPENDASH_BOOST_MAP_POINTS];
+static uint16_t s_buf_setp[OPENDASH_BOOST_MAP_POINTS];
+
+/* ============================================================================
+ *  Helpers
+ * ==========================================================================*/
+
+static const char *node_label(opendash_node_t n)
+{
+    switch (n) {
+        case OPENDASH_NODE_MOS_4CH_A: return "MOS_4CH_A";
+        case OPENDASH_NODE_MOS_4CH_B: return "MOS_4CH_B";
+        case OPENDASH_NODE_INVALID:   return "(disabled)";
+        default:                       return "?";
+    }
+}
+
+static void load_buffers_from_client(void)
+{
+    if (!boost_client_peek_duty_row(s_edit_slot, s_edit_gear, s_buf_duty)) {
+        memset(s_buf_duty, 0, sizeof(s_buf_duty));
+    }
+    if (!boost_client_peek_setpoint_row(s_edit_slot, s_edit_gear, s_buf_setp)) {
+        memset(s_buf_setp, 0, sizeof(s_buf_setp));
+    }
+}
+
+static void refresh_cells(void)
+{
+    char tmp[8];
+    for (int i = 0; i < OPENDASH_BOOST_MAP_POINTS; ++i) {
+        if (s_cell_duty[i]) {
+            snprintf(tmp, sizeof(tmp), "%u", s_buf_duty[i]);
+            lv_label_set_text(s_cell_duty[i], tmp);
+        }
+        if (s_cell_setp[i]) {
+            snprintf(tmp, sizeof(tmp), "%u", s_buf_setp[i]);
+            lv_label_set_text(s_cell_setp[i], tmp);
+        }
+    }
+}
+
+/* ============================================================================
+ *  Event handlers
+ * ==========================================================================*/
+
+static void on_close_click(lv_event_t *e)
+{
+    (void)e;
+    if (s_root) {
+        lv_obj_add_flag(s_root, LV_OBJ_FLAG_HIDDEN);
+    }
+}
+
+static void on_mode_click(lv_event_t *e)
+{
+    uintptr_t mode = (uintptr_t)lv_event_get_user_data(e);
+    boost_client_set_mode((opendash_boost_mode_t)mode);
+    ESP_LOGI(TAG, "Mode → %u", (unsigned)mode);
+}
+
+static void on_slot_click(lv_event_t *e)
+{
+    s_edit_slot = (uint8_t)(uintptr_t)lv_event_get_user_data(e);
+    load_buffers_from_client();
+    refresh_cells();
+}
+
+static void on_gear_click(lv_event_t *e)
+{
+    s_edit_gear = (uint8_t)(uintptr_t)lv_event_get_user_data(e);
+    load_buffers_from_client();
+    refresh_cells();
+}
+
+static void on_duty_cell_click(lv_event_t *e)
+{
+    /* Single tap = +5 duty counts. Long press = -5. */
+    uintptr_t idx = (uintptr_t)lv_event_get_user_data(e);
+    lv_event_code_t code = lv_event_get_code(e);
+    int delta = (code == LV_EVENT_LONG_PRESSED) ? -5 : +5;
+    int v = (int)s_buf_duty[idx] + delta;
+    if (v < 0)   v = 0;
+    if (v > 255) v = 255;
+    s_buf_duty[idx] = (uint8_t)v;
+    refresh_cells();
+    /* Push immediately — small payload, lets the user feel the dyno change. */
+    boost_client_set_duty_row(s_edit_slot, s_edit_gear, s_buf_duty);
+}
+
+static void on_setp_cell_click(lv_event_t *e)
+{
+    uintptr_t idx = (uintptr_t)lv_event_get_user_data(e);
+    lv_event_code_t code = lv_event_get_code(e);
+    int delta = (code == LV_EVENT_LONG_PRESSED) ? -5 : +5;  /* 5 cBar = 0.05 BAR */
+    int v = (int)s_buf_setp[idx] + delta;
+    if (v < 0)   v = 0;
+    if (v > 300) v = 300;
+    s_buf_setp[idx] = (uint16_t)v;
+    refresh_cells();
+    boost_client_set_setpoint_row(s_edit_slot, s_edit_gear, s_buf_setp);
+}
+
+static void on_pull_click(lv_event_t *e)
+{
+    (void)e;
+    boost_client_request_pull_all();
+}
+
+static void on_target_click(lv_event_t *e)
+{
+    (void)e;
+    /* Toggle between the two available MOS hosts. */
+    g_boost_target_node = (g_boost_target_node == OPENDASH_NODE_MOS_4CH_A)
+                         ? OPENDASH_NODE_MOS_4CH_B : OPENDASH_NODE_MOS_4CH_A;
+    system_config_save_boost_target();
+    if (s_lbl_target) lv_label_set_text_fmt(s_lbl_target, "Target: %s", node_label(g_boost_target_node));
+    boost_client_request_pull_all();
+}
+
+/* ============================================================================
+ *  UI assembly
+ * ==========================================================================*/
+
+static lv_obj_t *make_row(lv_obj_t *parent, const char *title)
+{
+    lv_obj_t *row = lv_obj_create(parent);
+    lv_obj_set_width(row, lv_pct(100));
+    lv_obj_set_height(row, LV_SIZE_CONTENT);
+    lv_obj_set_layout(row, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_all(row, 4, 0);
+    lv_obj_set_style_pad_column(row, 4, 0);
+    if (title && *title) {
+        lv_obj_t *lbl = lv_label_create(row);
+        lv_label_set_text(lbl, title);
+        lv_obj_set_width(lbl, 110);
+    }
+    return row;
+}
+
+static void add_button(lv_obj_t *parent, const char *txt, lv_event_cb_t cb, void *ud)
+{
+    lv_obj_t *btn = lv_button_create(parent);
+    lv_obj_add_event_cb(btn, cb, LV_EVENT_CLICKED, ud);
+    lv_obj_t *lbl = lv_label_create(btn);
+    lv_label_set_text(lbl, txt);
+    lv_obj_center(lbl);
+}
+
+lv_obj_t *boost_config_ui_create(lv_obj_t *parent)
+{
+    if (!parent) parent = lv_scr_act();
+    if (s_root) {
+        lv_obj_del(s_root);
+        s_root = NULL;
+    }
+
+    s_root = lv_obj_create(parent);
+    lv_obj_set_size(s_root, lv_pct(100), lv_pct(100));
+    lv_obj_set_layout(s_root, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(s_root, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_all(s_root, 6, 0);
+    lv_obj_set_style_pad_row(s_root, 4, 0);
+    lv_obj_set_scroll_dir(s_root, LV_DIR_VER);
+
+    /* Title + close */
+    {
+        lv_obj_t *row = make_row(s_root, NULL);
+        lv_obj_t *lbl = lv_label_create(row);
+        lv_label_set_text(lbl, "System Config");
+        lv_obj_set_flex_grow(lbl, 1);
+        add_button(row, "Close", on_close_click, NULL);
+    }
+
+    /* Target node */
+    {
+        lv_obj_t *row = make_row(s_root, "Boost target:");
+        s_lbl_target = lv_label_create(row);
+        lv_label_set_text_fmt(s_lbl_target, "Target: %s", node_label(g_boost_target_node));
+        lv_obj_set_flex_grow(s_lbl_target, 1);
+        add_button(row, "Switch", on_target_click, NULL);
+        add_button(row, "Re-pull", on_pull_click, NULL);
+    }
+
+    /* Mode radio (radio look via plain buttons; LVGL has no native radio group) */
+    {
+        lv_obj_t *row = make_row(s_root, "Mode:");
+        add_button(row, "OFF",  on_mode_click, (void *)(uintptr_t)OPENDASH_BOOST_MODE_OFF);
+        add_button(row, "LOW",  on_mode_click, (void *)(uintptr_t)OPENDASH_BOOST_MODE_LOW);
+        add_button(row, "MED",  on_mode_click, (void *)(uintptr_t)OPENDASH_BOOST_MODE_MED);
+        add_button(row, "HIGH", on_mode_click, (void *)(uintptr_t)OPENDASH_BOOST_MODE_HIGH);
+    }
+
+    /* Live readout */
+    {
+        lv_obj_t *row = make_row(s_root, "Live:");
+        s_lbl_setp   = lv_label_create(row); lv_label_set_text(s_lbl_setp,   "set --");
+        s_lbl_actual = lv_label_create(row); lv_label_set_text(s_lbl_actual, "act --");
+        s_lbl_duty   = lv_label_create(row); lv_label_set_text(s_lbl_duty,   "duty --");
+        s_lbl_flags  = lv_label_create(row); lv_label_set_text(s_lbl_flags,  "flags --");
+    }
+
+    /* Map editor — slot picker */
+    {
+        lv_obj_t *row = make_row(s_root, "Slot:");
+        add_button(row, "LOW",  on_slot_click, (void *)(uintptr_t)OPENDASH_BOOST_SLOT_LOW);
+        add_button(row, "MED",  on_slot_click, (void *)(uintptr_t)OPENDASH_BOOST_SLOT_MED);
+        add_button(row, "HIGH", on_slot_click, (void *)(uintptr_t)OPENDASH_BOOST_SLOT_HIGH);
+    }
+
+    /* Gear picker */
+    {
+        lv_obj_t *row = make_row(s_root, "Gear:");
+        for (int g = 0; g < OPENDASH_BOOST_GEARS; ++g) {
+            char txt[4]; snprintf(txt, sizeof(txt), "%d", g + 1);
+            add_button(row, txt, on_gear_click, (void *)(uintptr_t)g);
+        }
+    }
+
+    /* Duty cells */
+    {
+        lv_obj_t *row = make_row(s_root, "Duty (+/-5):");
+        for (int i = 0; i < OPENDASH_BOOST_MAP_POINTS; ++i) {
+            lv_obj_t *btn = lv_button_create(row);
+            lv_obj_set_size(btn, 38, 32);
+            lv_obj_add_event_cb(btn, on_duty_cell_click, LV_EVENT_CLICKED,      (void *)(uintptr_t)i);
+            lv_obj_add_event_cb(btn, on_duty_cell_click, LV_EVENT_LONG_PRESSED, (void *)(uintptr_t)i);
+            s_cell_duty[i] = lv_label_create(btn);
+            lv_label_set_text(s_cell_duty[i], "0");
+            lv_obj_center(s_cell_duty[i]);
+        }
+    }
+
+    /* Setpoint cells */
+    {
+        lv_obj_t *row = make_row(s_root, "Setp cBar:");
+        for (int i = 0; i < OPENDASH_BOOST_MAP_POINTS; ++i) {
+            lv_obj_t *btn = lv_button_create(row);
+            lv_obj_set_size(btn, 38, 32);
+            lv_obj_add_event_cb(btn, on_setp_cell_click, LV_EVENT_CLICKED,      (void *)(uintptr_t)i);
+            lv_obj_add_event_cb(btn, on_setp_cell_click, LV_EVENT_LONG_PRESSED, (void *)(uintptr_t)i);
+            s_cell_setp[i] = lv_label_create(btn);
+            lv_label_set_text(s_cell_setp[i], "0");
+            lv_obj_center(s_cell_setp[i]);
+        }
+    }
+
+    /* Footer */
+    {
+        lv_obj_t *row = make_row(s_root, NULL);
+        add_button(row, "Pull from slave", on_pull_click, NULL);
+    }
+
+    load_buffers_from_client();
+    refresh_cells();
+
+    return s_root;
+}
+
+void boost_config_ui_show(void)
+{
+    if (!s_root) boost_config_ui_create(NULL);
+    if (s_root) lv_obj_clear_flag(s_root, LV_OBJ_FLAG_HIDDEN);
+    /* Pull fresh state when the user opens the panel. */
+    boost_client_request_pull_all();
+}
+
+void boost_config_ui_tick(void)
+{
+    if (!s_root || lv_obj_has_flag(s_root, LV_OBJ_FLAG_HIDDEN)) return;
+    opendash_boost_telemetry_t t;
+    boost_client_get_telemetry(&t);
+    if (s_lbl_setp)   lv_label_set_text_fmt(s_lbl_setp,   "set %.2f BAR",   t.setpoint_cbar / 100.0f);
+    if (s_lbl_actual) lv_label_set_text_fmt(s_lbl_actual, "act %.2f BAR",   t.boost_cbar    / 100.0f);
+    if (s_lbl_duty)   lv_label_set_text_fmt(s_lbl_duty,   "duty %u/255",     t.duty);
+    if (s_lbl_flags)  lv_label_set_text_fmt(s_lbl_flags,  "flags 0x%02X",    t.safety_flags);
+}

@@ -1,0 +1,158 @@
+[  13.5s] [0;32mI (15686) gps_handler:   Warm-up: standard WAKE activation...[0m
+[  13.6s] [0;32mI (15754) opendash_gps:   GPS: acquiring satellites (LC76G I2C)[0m
+[  15.4s] [0;32mI (17554) gps_handler:   Init[0]: tx=ESP_OK rx=ESP_ERR_INVALID_RESPONSE avail=4294967295 [FFFFFFFF][0m
+[  15.9s] [0;32mI (18115) gps_handler:   Init[1]: tx=ESP_OK rx=ESP_ERR_INVALID_RESPONSE avail=4294967295 [FFFFFFFF][0m
+[  16.5s] [0;32mI (18675) gps_handler:   Init[2]: tx=ESP_OK rx=ESP_ERR_INVALID_RESPONSE avail=4294967295 [FFFFFFFF][0m
+[  17.1s] [0;32mI (19235) gps_handler:   Init[3]: tx=ESP_OK rx=ESP_ERR_INVALID_RESPONSE avail=4294967295 [FFFFFFFF][0m
+[  17.6s] [0;32mI (19795) gps_handler:   Init[4]: tx=ESP_OK rx=ESP_ERR_INVALID_RESPONSE avail=4294967295 [FFFFFFFF][0m
+[  23.6s] [0;32mI (25808) opendash_gps: Uptime: 10s | GPS: NO FIX | Sats: 0 | Center: searching | Mode: 0[0m
+[  30.4s] [0;31mE (32580) gps_handler: === FULL RECOVERY: 50+ failures — PMIC power cycle ===[0m
+[  33.6s] [0;32mI (35808) opendash_gps: Uptime: 20s | GPS: NO FIX | Sats: 0 | Center: searching | Mode: 0[0m
+[  43.6s] [0;32mI (45808) opendash_gps: Uptime: 30s | GPS: NO FIX | Sats: 0 | Center: searching | Mode: 0[0m
+[  44.1s] [0;32mI (46329) gps_handler:   Post-recovery[0]: tx=ESP_ERR_INVALID_RESPONSE rx=ESP_OK avail=1414615076[0m
+[  46.4s] [0;32mI (48541) gps_handler:   Post-recovery[1]: tx=ESP_OK rx=ESP_OK avail=9200[0m
+[  46.4s] [0;31mE (48544) gps_handler: === FULL RECOVERY COMPLETE (power_cycles=1) ===[0m
+[  46.5s] [0;32mI (48682) gps_handler: avail=9200 (c=100)[0m
+[  46.9s] [0;32mI (49114) gps_handler: === FIRST GPS DATA! (4095 bytes, c=100) ===[0m
+[  47.6s] [0;32mI (49755) gps_handler: GPS: fix=no sats=0/9 speed=0.0 hdop=0.0 total=4095B 111s c=100[0m
+[  48.1s] [0;33mW (50307) gps_handler:   TxRx activation: ESP_OK [0D0D0D0D][0m
+[  48.4s] [0;32mI (50572) gps_handler: avail=4849 (c=106)[0m
+[  49.6s] [0;33mW (51770) gps_handler:   TxRx activation: ESP_OK [47474747][0m
+[  49.8s] [0;32mI (52034) gps_handler: avail=498 (c=112)[0m
+[  50.7s] [0;33mW (52905) gps_handler:   TxRx activation: ESP_OK [0A0A0A0A][0m
+[  51.5s] [0;33mW (53669) gps_handler:   TxRx activation: ESP_OK [0A0A0A0A][0m
+[  52.2s] [0;33mW (54431) gps_handler:   TxRx activation: ESP_OK [0A0A0A0A][0m
+[  53.0s] [0;33mW (55173) gps_handler:   TxRx activation: ESP_OK [00000000][0m
+[  53.6s] [0;32mI (55808) opendash_gps: Uptime: 40s | GPS: NO FIX | Sats: 0 | Center: searching | Mode: 0[0m
+[  53.7s] [0;33mW (55937) gps_handler:   TxRx activation: ESP_OK [00000000][0m
+[  54.5s] [0;33mW (56700) gps_handler:   TxRx activation: ESP_OK [00000000][0m
+[  55.2s] [0;33mW (57422) gps_handler:   TxRx activation: ESP_OK [00000000][0m
+[  56.0s] [0;33mW (58185) gps_handler:   TxRx activation: ESP_OK [00000000][0m
+[  56.8s] [0;33mW (58949) gps_handler:   TxRx activation: ESP_OK [00000000][0m
+[  57.5s] [0;33mW (59671) gps_handler:   TxRx activation: ESP_OK [00000000][0m
+[  58.2s] [0;33mW (60434) gps_handler:   TxRx activation: ESP_OK [00000000][0m
+[  59.0s] [0;33mW (61196) gps_handler:   TxRx activation: ESP_OK [00000000][0m
+[  59.8s] [0;33mW (61950) gps_handler:   TxRx activation: ESP_OK [00000000][0m
+[  60.5s] [0;33mW (62713) gps_handler:   TxRx activation: ESP_OK [00000000][0m
+[  61.3s] [0;33mW (63477) gps_handler:   TxRx activation: ESP_OK [00000000][0m
+[  62.0s] [0;33mW (64199) gps_handler:   TxRx activation: ESP_OK [00000000][0m
+[  62.8s] [0;33mW (64963) gps_handler:   TxRx activation: ESP_OK [00000000][0m
+[  63.5s] [0;33mW (65726) gps_handler:   TxRx activation: ESP_OK [00000000][0m
+[  63.6s] [0;32mI (65808) opendash_gps: Uptime: 50s | GPS: NO FIX | Sats: 0 | Center: searching | Mode: 0[0m
+[  64.3s] [0;33mW (66449) gps_handler:   TxRx activation: ESP_OK [00000000][0m
+[  65.0s] [0;31mE (67139) gps_handler: === FULL RECOVERY: 50+ failures — PMIC power cycle ===[0m
+[  73.6s] [0;32mI (75819) opendash_gps: Uptime: 60s | GPS: NO FIX | Sats: 0 | Center: searching | Mode: 0[0m
+[  78.7s] [0;32mI (80886) gps_handler:   Post-recovery[0]: tx=ESP_ERR_INVALID_RESPONSE rx=ESP_OK avail=0[0m
+[  80.9s] [0;32mI (83096) gps_handler:   Post-recovery[1]: tx=ESP_OK rx=ESP_OK avail=9196[0m
+[  80.9s] [0;31mE (83099) gps_handler: === FULL RECOVERY COMPLETE (power_cycles=2) ===[0m
+[  81.0s] [0;32mI (83236) gps_handler: avail=9196 (c=213)[0m
+[  82.3s] [0;33mW (84475) gps_handler:   TxRx activation: ESP_OK [32323232][0m
+[  82.6s] [0;32mI (84741) gps_handler: avail=4865 (c=219)[0m
+[  83.6s] [0;32mI (85819) opendash_gps: Uptime: 70s | GPS: NO FIX | Sats: 0 | Center: searching | Mode: 0[0m
+[  83.7s] [0;33mW (85893) gps_handler:   TxRx activation: ESP_OK [38383838][0m
+[  84.0s] [0;32mI (86159) gps_handler: avail=514 (c=225)[0m
+[  84.2s] [0;32mI (86428) gps_handler: GPS: fix=YES sats=9/11 speed=0.0 hdop=1.2 total=18416B 450s c=225[0m
+[  84.8s] [0;33mW (86985) gps_handler:   TxRx activation: ESP_OK [39393939][0m
+[  85.1s] [0;32mI (87248) gps_handler: avail=3494 (c=231)[0m
+[  86.2s] [0;33mW (88391) gps_handler:   TxRx activation: ESP_OK [0A0A0A0A][0m
+[  86.5s] [0;32mI (88654) gps_handler: avail=763 (c=237)[0m
+[  87.4s] [0;33mW (89549) gps_handler:   TxRx activation: ESP_OK [0A0A0A0A][0m
+[  87.6s] [0;32mI (89814) gps_handler: avail=628 (c=243)[0m
+[  88.5s] [0;33mW (90697) gps_handler:   TxRx activation: ESP_OK [0A0A0A0A][0m
+[  88.8s] [0;32mI (90962) gps_handler: avail=624 (c=249)[0m
+[  89.1s] [0;32mI (91322) gps_handler: avail=886 (c=250)[0m
+[  89.4s] [0;32mI (91626) gps_handler: GPS: fix=YES sats=12/24 speed=1.1 hdop=0.8 total=25835B 577s c=250[0m
+[  90.1s] [0;33mW (92265) gps_handler:   TxRx activation: ESP_OK [0A0A0A0A][0m
+[  90.3s] [0;32mI (92530) gps_handler: avail=782 (c=256)[0m
+[  91.2s] [0;33mW (93376) gps_handler:   TxRx activation: ESP_OK [0A0A0A0A][0m
+[  91.4s] [0;32mI (93639) gps_handler: avail=503 (c=262)[0m
+[  92.3s] [0;33mW (94508) gps_handler:   TxRx activation: ESP_OK [2C2C2C2C][0m
+[  92.6s] [0;32mI (94772) gps_handler: avail=1075 (c=268)[0m
+[  93.5s] [0;33mW (95696) gps_handler:   TxRx activation: ESP_OK [0A0A0A0A][0m
+[  93.6s] [0;32mI (95819) opendash_gps: Uptime: 80s | GPS: 3D FIX | Sats: 15 | Center: searching | Mode: 0[0m
+[  93.8s] [0;32mI (95961) gps_handler: avail=781 (c=274)[0m
+[  94.1s] [0;32mI (96334) gps_handler: avail=1041 (c=275)[0m
+[  94.5s] [0;32mI (96655) gps_handler: GPS: fix=YES sats=16/33 speed=1.0 hdop=0.7 total=31041B 662s c=275[0m
+[  95.0s] [0;33mW (97213) gps_handler:   TxRx activation: ESP_OK [0A0A0A0A][0m
+[  95.3s] [0;32mI (97476) gps_handler: avail=783 (c=281)[0m
+[  96.2s] [0;33mW (98373) gps_handler:   TxRx activation: ESP_OK [0A0A0A0A][0m
+[  96.4s] [0;32mI (98636) gps_handler: avail=686 (c=287)[0m
+[  97.3s] [0;33mW (99524) gps_handler:   TxRx activation: ESP_OK [0A0A0A0A][0m
+[  97.6s] [0;32mI (99788) gps_handler: avail=671 (c=293)[0m
+[  98.5s] [0;33mW (100675) gps_handler:   TxRx activation: ESP_OK [0A0A0A0A][0m
+[  98.8s] [0;32mI (100941) gps_handler: avail=636 (c=299)[0m
+[  99.1s] [0;32mI (101251) gps_handler: avail=1044 (c=300)[0m
+[  99.4s] [0;32mI (101619) gps_handler: GPS: fix=YES sats=14/34 speed=1.8 hdop=0.8 total=35885B 743s c=300[0m
+[ 100.0s] [0;33mW (102176) gps_handler:   TxRx activation: ESP_OK [0A0A0A0A][0m
+[ 100.2s] [0;32mI (102439) gps_handler: avail=707 (c=306)[0m
+[ 101.1s] [0;33mW (103330) gps_handler:   TxRx activation: ESP_OK [30303030][0m
+[ 101.4s] [0;32mI (103593) gps_handler: avail=869 (c=312)[0m
+[ 102.4s] [0;33mW (104579) gps_handler:   TxRx activation: ESP_OK [0A0A0A0A][0m
+[ 102.7s] [0;32mI (104843) gps_handler: avail=781 (c=318)[0m
+[ 103.6s] [0;33mW (105740) gps_handler:   TxRx activation: ESP_OK [0A0A0A0A][0m
+[ 103.6s] [0;32mI (105819) opendash_gps: Uptime: 90s | GPS: 3D FIX | Sats: 15 | Center: searching | Mode: 0[0m
+[ 103.8s] [0;32mI (106004) gps_handler: avail=701 (c=324)[0m
+[ 104.7s] [0;33mW (106893) gps_handler:   TxRx activation: ESP_OK [0A0A0A0A][0m
+[ 105.0s] [0;32mI (107157) gps_handler: avail=1617 (c=330)[0m
+[ 105.3s] [0;32mI (107530) gps_handler: GPS: fix=YES sats=16/25 speed=0.8 hdop=0.8 total=41840B 842s c=330[0m
+[ 106.0s] [0;33mW (108170) gps_handler:   TxRx activation: ESP_OK [0A0A0A0A][0m
+[ 106.2s] [0;32mI (108433) gps_handler: avail=783 (c=336)[0m
+[ 107.1s] [0;33mW (109331) gps_handler:   TxRx activation: ESP_OK [0A0A0A0A][0m
+[ 107.4s] [0;32mI (109595) gps_handler: avail=794 (c=342)[0m
+[ 108.3s] [0;33mW (110494) gps_handler:   TxRx activation: ESP_OK [0A0A0A0A][0m
+[ 108.6s] [0;32mI (110759) gps_handler: avail=794 (c=348)[0m
+[ 109.4s] [0;33mW (111606) gps_handler:   TxRx activation: ESP_OK [0A0A0A0A][0m
+[ 109.7s] [0;32mI (111869) gps_handler: avail=761 (c=354)[0m
+[ 110.1s] [0;32mI (112241) gps_handler: avail=68 (c=355)[0m
+[ 110.3s] [0;32mI (112519) gps_handler: GPS: fix=YES sats=16/31 speed=0.6 hdop=0.8 total=46064B 910s c=355[0m
+[ 110.9s] [0;33mW (113078) gps_handler:   TxRx activation: ESP_OK [2C2C2C2C][0m
+[ 111.2s] [0;32mI (113344) gps_handler: avail=1538 (c=361)[0m
+[ 112.1s] [0;33mW (114262) gps_handler:   TxRx activation: ESP_OK [0A0A0A0A][0m
+[ 112.3s] [0;32mI (114527) gps_handler: avail=772 (c=367)[0m
+[ 113.2s] [0;33mW (115374) gps_handler:   TxRx activation: ESP_OK [0A0A0A0A][0m
+[ 113.4s] [0;32mI (115637) gps_handler: avail=633 (c=373)[0m
+[ 113.6s] [0;32mI (115819) opendash_gps: Uptime: 100s | GPS: 3D FIX | Sats: 16 | Center: searching | Mode: 0[0m
+[ 114.3s] [0;33mW (116521) gps_handler:   TxRx activation: ESP_OK [0A0A0A0A][0m
+[ 114.6s] [0;32mI (116785) gps_handler: avail=633 (c=379)[0m
+[ 115.4s] [0;33mW (117620) gps_handler:   TxRx activation: ESP_OK [0A0A0A0A][0m
+[ 115.7s] [0;32mI (117883) gps_handler: avail=728 (c=385)[0m
+[ 116.0s] [0;32mI (118221) gps_handler: GPS: fix=YES sats=16/28 speed=0.3 hdop=0.8 total=51648B 1006s c=385[0m
+[ 116.6s] [0;33mW (118779) gps_handler:   TxRx activation: ESP_OK [0A0A0A0A][0m
+[ 116.9s] [0;32mI (119042) gps_handler: avail=783 (c=391)[0m
+[ 117.8s] [0;33mW (119940) gps_handler:   TxRx activation: ESP_OK [0A0A0A0A][0m
+[ 118.0s] [0;32mI (120203) gps_handler: avail=1844 (c=397)[0m
+[ 119.0s] [0;33mW (121196) gps_handler:   TxRx activation: ESP_OK [0A0A0A0A][0m
+[ 119.3s] [0;32mI (121459) gps_handler: avail=237 (c=403)[0m
+[ 120.1s] [0;33mW (122305) gps_handler:   TxRx activation: ESP_OK [47474747][0m
+[ 120.4s] [0;32mI (122570) gps_handler: avail=1135 (c=409)[0m
+[ 121.3s] [0;33mW (123499) gps_handler:   TxRx activation: ESP_OK [0A0A0A0A][0m
+[ 121.6s] [0;32mI (123765) gps_handler: avail=783 (c=415)[0m
+[ 121.9s] [0;32mI (124108) gps_handler: GPS: fix=YES sats=16/33 speed=1.0 hdop=0.8 total=57710B 1106s c=415[0m
+[ 122.5s] [0;33mW (124667) gps_handler:   TxRx activation: ESP_OK [0A0A0A0A][0m
+[ 122.7s] [0;32mI (124932) gps_handler: avail=635 (c=421)[0m
+[ 123.1s] [0;32mI (125242) gps_handler: avail=891 (c=422)[0m
+[ 123.6s] [0;32mI (125819) opendash_gps: Uptime: 110s | GPS: 3D FIX | Sats: 16 | Center: searching | Mode: 0[0m
+[ 124.0s] [0;33mW (126150) gps_handler:   TxRx activation: ESP_OK [0A0A0A0A][0m
+[ 124.7s] [0;33mW (126938) gps_handler:   TxRx activation: ESP_OK [2C2C2C2C][0m
+[ 125.0s] [0;32mI (127202) gps_handler: avail=1420 (c=433)[0m
+[ 126.0s] [0;33mW (128157) gps_handler:   TxRx activation: ESP_OK [0A0A0A0A][0m
+[ 133.6s] [0;32mI (135819) opendash_gps: Uptime: 120s | GPS: 3D FIX | Sats: 16 | Center: searching | Mode: 0[0m
+[ 143.6s] [0;32mI (145819) opendash_gps: Uptime: 130s | GPS: 3D FIX | Sats: 16 | Center: searching | Mode: 0[0m
+[ 153.6s] [0;32mI (155819) opendash_gps: Uptime: 140s | GPS: 3D FIX | Sats: 16 | Center: searching | Mode: 0[0m
+[ 163.6s] [0;32mI (165819) opendash_gps: Uptime: 150s | GPS: 3D FIX | Sats: 16 | Center: searching | Mode: 0[0m
+[ 173.6s] [0;32mI (175819) opendash_gps: Uptime: 160s | GPS: 3D FIX | Sats: 16 | Center: searching | Mode: 0[0m
+[ 183.6s] [0;32mI (185819) opendash_gps: Uptime: 170s | GPS: 3D FIX | Sats: 16 | Center: searching | Mode: 0[0m
+[ 193.6s] [0;32mI (195819) opendash_gps: Uptime: 180s | GPS: 3D FIX | Sats: 16 | Center: searching | Mode: 0[0m
+[ 203.6s] [0;32mI (205819) opendash_gps: Uptime: 190s | GPS: 3D FIX | Sats: 16 | Center: searching | Mode: 0[0m
+[ 213.6s] [0;32mI (215819) opendash_gps: Uptime: 200s | GPS: 3D FIX | Sats: 16 | Center: searching | Mode: 0[0m
+[ 223.6s] [0;32mI (225819) opendash_gps: Uptime: 210s | GPS: 3D FIX | Sats: 16 | Center: searching | Mode: 0[0m
+[ 228.5s] [0;31mE (230731) gps_handler: === FULL RECOVERY: 50+ failures — PMIC power cycle ===[0m
+[ 233.6s] [0;32mI (235819) opendash_gps: Uptime: 220s | GPS: 3D FIX | Sats: 16 | Center: searching | Mode: 0[0m
+[ 243.6s] [0;32mI (245819) opendash_gps: Uptime: 230s | GPS: 3D FIX | Sats: 16 | Center: searching | Mode: 0[0m
+[ 253.6s] [0;32mI (255819) opendash_gps: Uptime: 240s | GPS: 3D FIX | Sats: 16 | Center: searching | Mode: 0[0m
+[ 263.6s] [0;32mI (265819) opendash_gps: Uptime: 250s | GPS: 3D FIX | Sats: 16 | Center: searching | Mode: 0[0m
+[ 273.6s] [0;32mI (275819) opendash_gps: Uptime: 260s | GPS: 3D FIX | Sats: 16 | Center: searching | Mode: 0[0m
+[ 283.6s] [0;32mI (285819) opendash_gps: Uptime: 270s | GPS: 3D FIX | Sats: 16 | Center: searching | Mode: 0[0m
+[ 293.6s] [0;32mI (295819) opendash_gps: Uptime: 280s | GPS: 3D FIX | Sats: 16 | Center: searching | Mode: 0[0m
+
+=== Monitor ended at 300.6s ===

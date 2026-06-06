@@ -1,0 +1,763 @@
+/**
+ * @file boost_config_ui.c
+ * @brief LVGL System Config screen — Boost editor.
+ *
+ *  ┌──────────────────────────────────────────────────────────────────────┐
+ *  │ BOOST CONFIG                                  [Close]                │
+ *  │ Units: [kPa][BAR][PSI]  Target: MOS_4CH_A [Switch][Re-pull]          │
+ *  │ Mode:  [OFF][NORMAL][RACE]                                            │
+ *  │ ─── UNSTABLE LINK / LIMP MODE ───   (red banner, only when stale)    │
+ *  │ Live: setpoint 0.45 BAR   actual 0.32 BAR   duty 168/255             │
+ *  │ Edit slot: [NORMAL][RACE]   Gear: [1][2][3][4][5][6]                 │
+ *  │ ┌─────┬────┬────┬────┬────┬────┬────┬────┬────┬────┬────┬────┬────┬─┐│
+ *  │ │ RPM │ ...│    │    │    │    │    │    │    │    │    │    │    │ ││
+ *  │ │ DUTY│ btn│ btn│ btn│ btn│ btn│ btn│ btn│ btn│ btn│ btn│ btn│ btn│ ││
+ *  │ │ SETP│ btn│ btn│ btn│ btn│ btn│ btn│ btn│ btn│ btn│ btn│ btn│ btn│ ││
+ *  │ └─────┴────┴────┴────┴────┴────┴────┴────┴────┴────┴────┴────┴────┴─┘│
+ *  └──────────────────────────────────────────────────────────────────────┘
+ *
+ * Cell tap → numeric keypad popup (same lv_keyboard pattern used by the
+ * layout editor) pre-loaded with the cell's current value. OK commits and
+ * pushes the row to the slave. Cancel discards.
+ *
+ * Pressure-related cells (setpoint, live readout) honour the user's unit
+ * preference (kPa / BAR / PSI). Internally everything is still centi-bar
+ * on the wire (1 cBar ≡ 1 kPa).
+ */
+
+#include "boost_config_ui.h"
+#include "boost_client.h"
+#include "system_config.h"
+#include "opendash_boost.h"
+#include "opendash_common.h"
+#include "opendash_ui_styles.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "esp_log.h"
+#include "esp_system.h"
+#include "esp_heap_caps.h"
+#include "esp_task_wdt.h"
+
+static const char *TAG = "boost_ui";
+
+/* ============================================================================
+ *  Editor state
+ * ==========================================================================*/
+
+static lv_obj_t *s_root        = NULL;
+static lv_obj_t *s_lbl_actual  = NULL;
+static lv_obj_t *s_lbl_setp    = NULL;
+static lv_obj_t *s_lbl_duty    = NULL;
+static lv_obj_t *s_lbl_flags   = NULL;
+static lv_obj_t *s_lbl_target  = NULL;
+static lv_obj_t *s_lbl_link    = NULL;   /* "UNSTABLE LINK" banner */
+static lv_obj_t *s_btn_unit[3] = {0};
+static lv_obj_t *s_btn_mode[3] = {0};    /* OFF / NORMAL / RACE */
+static lv_obj_t *s_btn_slot[2] = {0};    /* NORMAL / RACE       */
+static lv_obj_t *s_btn_gear[OPENDASH_BOOST_GEARS] = {0};
+
+static lv_obj_t *s_cell_duty[OPENDASH_BOOST_MAP_POINTS];
+static lv_obj_t *s_cell_setp[OPENDASH_BOOST_MAP_POINTS];
+static lv_obj_t *s_cell_rpm [OPENDASH_BOOST_MAP_POINTS];
+
+static lv_timer_t *s_tick_timer = NULL;
+
+static uint8_t s_edit_slot = OPENDASH_BOOST_MODE_NORMAL;
+static uint8_t s_edit_gear = 0;
+static opendash_boost_mode_t s_active_mode = OPENDASH_BOOST_MODE_OFF;
+
+static uint8_t  s_buf_duty[OPENDASH_BOOST_MAP_POINTS];
+static uint16_t s_buf_setp[OPENDASH_BOOST_MAP_POINTS];
+
+/* Keypad popup. Created lazily on first cell tap, reused thereafter. */
+typedef enum { KP_KIND_DUTY = 0, KP_KIND_SETP = 1 } keypad_kind_t;
+static lv_obj_t *s_kp_root = NULL;
+static lv_obj_t *s_kp_ta   = NULL;
+static lv_obj_t *s_kp_kbd  = NULL;
+static lv_obj_t *s_kp_title= NULL;
+static keypad_kind_t s_kp_kind = KP_KIND_DUTY;
+static int8_t        s_kp_idx  = -1;
+
+/* ============================================================================
+ *  Helpers
+ * ==========================================================================*/
+
+static const char *node_label(opendash_node_t n)
+{
+    switch (n) {
+        case OPENDASH_NODE_MOS_4CH_A: return "MOS_4CH_A";
+        case OPENDASH_NODE_MOS_4CH_B: return "MOS_4CH_B";
+        default:                       return "(disabled)";
+    }
+}
+
+static const char *mode_label(opendash_boost_mode_t m)
+{
+    switch (m) {
+        case OPENDASH_BOOST_MODE_NORMAL: return "NORMAL";
+        case OPENDASH_BOOST_MODE_RACE:   return "RACE";
+        default:                         return "OFF";
+    }
+}
+
+/* Centi-bar → display unit. cBar and kPa are 1:1 (1 bar = 100 kPa). */
+static inline float cbar_to_unit(int cbar, opendash_pressure_unit_t u)
+{
+    return opendash_convert_pressure((float)cbar, u);
+}
+
+/* Display unit → centi-bar (rounded to nearest, clamped ≥0). */
+static int unit_to_cbar(float v, opendash_pressure_unit_t u)
+{
+    float kpa;
+    switch (u) {
+        case OPENDASH_PRESSURE_BAR: kpa = v * 100.0f;       break;
+        case OPENDASH_PRESSURE_PSI: kpa = v / 0.1450377f;   break;
+        default:                    kpa = v;                break;   /* kPa */
+    }
+    if (kpa < 0) kpa = 0;
+    int cbar = (int)(kpa + 0.5f);   /* cBar == kPa numerically */
+    if (cbar > 65535) cbar = 65535;
+    return cbar;
+}
+
+static const char *unit_suffix(opendash_pressure_unit_t u)
+{
+    return opendash_get_pressure_suffix(u);
+}
+
+static int unit_decimals(opendash_pressure_unit_t u)
+{
+    return (u == OPENDASH_PRESSURE_BAR) ? 2 : (u == OPENDASH_PRESSURE_KPA ? 0 : 1);
+}
+
+static void load_buffers_from_client(void)
+{
+    if (!boost_client_peek_duty_row(s_edit_slot, s_edit_gear, s_buf_duty)) {
+        memset(s_buf_duty, 0, sizeof(s_buf_duty));
+    }
+    if (!boost_client_peek_setpoint_row(s_edit_slot, s_edit_gear, s_buf_setp)) {
+        memset(s_buf_setp, 0, sizeof(s_buf_setp));
+    }
+}
+
+static void style_toggle(lv_obj_t *btn, bool on)
+{
+    if (!btn) return;
+    /* Avoid lv_obj_add_state(CHECKED) — it walks the style-transition list and
+     * crashes on theme transition_normal dsc. Toggle bg color manually. */
+    lv_color_t c = on ? lv_palette_main(LV_PALETTE_BLUE)
+                      : lv_palette_darken(LV_PALETTE_GREY, 3);
+    lv_obj_set_style_bg_color(btn, c, LV_PART_MAIN);
+}
+
+static void refresh_unit_buttons(void)
+{
+    for (int i = 0; i < 3; ++i) style_toggle(s_btn_unit[i], i == (int)g_boost_pressure_unit);
+}
+
+static void refresh_mode_buttons(void)
+{
+    style_toggle(s_btn_mode[0], s_active_mode == OPENDASH_BOOST_MODE_OFF);
+    style_toggle(s_btn_mode[1], s_active_mode == OPENDASH_BOOST_MODE_NORMAL);
+    style_toggle(s_btn_mode[2], s_active_mode == OPENDASH_BOOST_MODE_RACE);
+}
+
+static void refresh_slot_buttons(void)
+{
+    style_toggle(s_btn_slot[0], s_edit_slot == OPENDASH_BOOST_MODE_NORMAL);
+    style_toggle(s_btn_slot[1], s_edit_slot == OPENDASH_BOOST_MODE_RACE);
+}
+
+static void refresh_gear_buttons(void)
+{
+    for (int g = 0; g < OPENDASH_BOOST_GEARS; ++g) style_toggle(s_btn_gear[g], g == s_edit_gear);
+}
+
+static void refresh_cells(void)
+{
+    char tmp[16];
+    int dec = unit_decimals(g_boost_pressure_unit);
+    for (int i = 0; i < OPENDASH_BOOST_MAP_POINTS; ++i) {
+        if (s_cell_duty[i]) {
+            snprintf(tmp, sizeof(tmp), "%u", s_buf_duty[i]);
+            lv_label_set_text(s_cell_duty[i], tmp);
+        }
+        if (s_cell_setp[i]) {
+            float v = cbar_to_unit(s_buf_setp[i], g_boost_pressure_unit);
+            snprintf(tmp, sizeof(tmp), "%.*f", dec, v);
+            lv_label_set_text(s_cell_setp[i], tmp);
+        }
+    }
+}
+
+/* ============================================================================
+ *  Keypad popup
+ * ==========================================================================*/
+
+static void keypad_close(void)
+{
+    if (s_kp_root) {
+        lv_obj_del(s_kp_root);
+        s_kp_root  = NULL;
+        s_kp_ta    = NULL;
+        s_kp_kbd   = NULL;
+        s_kp_title = NULL;
+    }
+    s_kp_idx = -1;
+}
+
+static void on_kp_cancel(lv_event_t *e)
+{
+    (void)e;
+    keypad_close();
+}
+
+static void on_kp_ok(lv_event_t *e)
+{
+    (void)e;
+    if (!s_kp_ta || s_kp_idx < 0 || s_kp_idx >= OPENDASH_BOOST_MAP_POINTS) {
+        keypad_close();
+        return;
+    }
+    const char *txt = lv_textarea_get_text(s_kp_ta);
+    if (!txt || !*txt) { keypad_close(); return; }
+
+    if (s_kp_kind == KP_KIND_DUTY) {
+        int v = atoi(txt);
+        if (v < 0)   v = 0;
+        if (v > 255) v = 255;
+        s_buf_duty[s_kp_idx] = (uint8_t)v;
+        boost_client_set_duty_row(s_edit_slot, s_edit_gear, s_buf_duty);
+    } else {
+        float f = strtof(txt, NULL);
+        int cbar = unit_to_cbar(f, g_boost_pressure_unit);
+        if (cbar > 65535) cbar = 65535;
+        s_buf_setp[s_kp_idx] = (uint16_t)cbar;
+        boost_client_set_setpoint_row(s_edit_slot, s_edit_gear, s_buf_setp);
+    }
+    refresh_cells();
+    keypad_close();
+}
+
+static void on_kbd_event(lv_event_t *e)
+{
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_READY)  on_kp_ok(e);
+    if (code == LV_EVENT_CANCEL) on_kp_cancel(e);
+}
+
+static void keypad_open(keypad_kind_t kind, int idx)
+{
+    if (idx < 0 || idx >= OPENDASH_BOOST_MAP_POINTS) return;
+    keypad_close();
+    s_kp_kind = kind;
+    s_kp_idx  = (int8_t)idx;
+
+    s_kp_root = lv_obj_create(lv_layer_top());
+    lv_obj_set_size(s_kp_root, lv_pct(100), lv_pct(100));
+    lv_obj_set_style_bg_color(s_kp_root, lv_color_black(), 0);
+    lv_obj_set_style_bg_opa(s_kp_root, LV_OPA_70, 0);
+    lv_obj_set_style_pad_all(s_kp_root, 8, 0);
+    lv_obj_set_layout(s_kp_root, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(s_kp_root, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(s_kp_root, LV_FLEX_ALIGN_START,
+                          LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_remove_flag(s_kp_root, LV_OBJ_FLAG_SCROLLABLE);
+    /* Soak up gestures so they cannot escape to the screen-level handler. */
+    lv_obj_add_flag(s_kp_root, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_remove_flag(s_kp_root, LV_OBJ_FLAG_GESTURE_BUBBLE);
+
+    s_kp_title = lv_label_create(s_kp_root);
+    if (kind == KP_KIND_DUTY) {
+        lv_label_set_text_fmt(s_kp_title,
+                              "DUTY cell %d  (slot %s, gear %d)  range 0-255",
+                              idx + 1, mode_label((opendash_boost_mode_t)s_edit_slot),
+                              s_edit_gear + 1);
+    } else {
+        lv_label_set_text_fmt(s_kp_title,
+                              "SETPOINT cell %d  (slot %s, gear %d)  unit %s",
+                              idx + 1, mode_label((opendash_boost_mode_t)s_edit_slot),
+                              s_edit_gear + 1, unit_suffix(g_boost_pressure_unit));
+    }
+
+    s_kp_ta = lv_textarea_create(s_kp_root);
+    lv_obj_set_width(s_kp_ta, 240);
+    lv_textarea_set_one_line(s_kp_ta, true);
+    lv_textarea_set_accepted_chars(s_kp_ta, "0123456789.-");
+
+    char preload[16];
+    if (kind == KP_KIND_DUTY) {
+        snprintf(preload, sizeof(preload), "%u", s_buf_duty[idx]);
+    } else {
+        snprintf(preload, sizeof(preload), "%.*f",
+                 unit_decimals(g_boost_pressure_unit),
+                 cbar_to_unit(s_buf_setp[idx], g_boost_pressure_unit));
+    }
+    lv_textarea_set_text(s_kp_ta, preload);
+
+    /* OK / Cancel row */
+    lv_obj_t *btn_row = lv_obj_create(s_kp_root);
+    lv_obj_set_size(btn_row, 260, LV_SIZE_CONTENT);
+    lv_obj_set_layout(btn_row, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(btn_row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(btn_row, LV_FLEX_ALIGN_SPACE_EVENLY,
+                          LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_remove_flag(btn_row, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *btn_ok = lv_button_create(btn_row);
+    lv_obj_add_event_cb(btn_ok, on_kp_ok, LV_EVENT_CLICKED, NULL);
+    lv_obj_t *lbl_ok = lv_label_create(btn_ok); lv_label_set_text(lbl_ok, "OK");
+    lv_obj_center(lbl_ok);
+
+    lv_obj_t *btn_cancel = lv_button_create(btn_row);
+    lv_obj_add_event_cb(btn_cancel, on_kp_cancel, LV_EVENT_CLICKED, NULL);
+    lv_obj_t *lbl_cancel = lv_label_create(btn_cancel); lv_label_set_text(lbl_cancel, "Cancel");
+    lv_obj_center(lbl_cancel);
+
+    /* The numeric keyboard. */
+    s_kp_kbd = lv_keyboard_create(s_kp_root);
+    lv_keyboard_set_mode(s_kp_kbd, LV_KEYBOARD_MODE_NUMBER);
+    lv_keyboard_set_textarea(s_kp_kbd, s_kp_ta);
+    lv_obj_set_width(s_kp_kbd, lv_pct(95));
+    lv_obj_set_height(s_kp_kbd, 220);
+    lv_obj_add_event_cb(s_kp_kbd, on_kbd_event, LV_EVENT_READY,  NULL);
+    lv_obj_add_event_cb(s_kp_kbd, on_kbd_event, LV_EVENT_CANCEL, NULL);
+}
+
+/* ============================================================================
+ *  Event handlers
+ * ==========================================================================*/
+
+static void on_close_click(lv_event_t *e)
+{
+    (void)e;
+    boost_config_ui_close();
+}
+
+static void on_unit_click(lv_event_t *e)
+{
+    uintptr_t u = (uintptr_t)lv_event_get_user_data(e);
+    if (u > OPENDASH_PRESSURE_PSI) return;
+    g_boost_pressure_unit = (opendash_pressure_unit_t)u;
+    system_config_save_pressure_unit();
+    refresh_unit_buttons();
+    refresh_cells();
+}
+
+static void on_mode_click(lv_event_t *e)
+{
+    uintptr_t mode = (uintptr_t)lv_event_get_user_data(e);
+    s_active_mode = (opendash_boost_mode_t)mode;
+    boost_client_set_mode(s_active_mode);
+    refresh_mode_buttons();
+    ESP_LOGI(TAG, "Mode → %s", mode_label(s_active_mode));
+}
+
+static void on_slot_click(lv_event_t *e)
+{
+    s_edit_slot = (uint8_t)(uintptr_t)lv_event_get_user_data(e);
+    load_buffers_from_client();
+    refresh_slot_buttons();
+    refresh_cells();
+}
+
+static void on_gear_click(lv_event_t *e)
+{
+    s_edit_gear = (uint8_t)(uintptr_t)lv_event_get_user_data(e);
+    load_buffers_from_client();
+    refresh_gear_buttons();
+    refresh_cells();
+}
+
+static void on_duty_cell_click(lv_event_t *e)
+{
+    uintptr_t idx = (uintptr_t)lv_event_get_user_data(e);
+    keypad_open(KP_KIND_DUTY, (int)idx);
+}
+
+static void on_setp_cell_click(lv_event_t *e)
+{
+    uintptr_t idx = (uintptr_t)lv_event_get_user_data(e);
+    keypad_open(KP_KIND_SETP, (int)idx);
+}
+
+static void on_pull_click(lv_event_t *e)
+{
+    (void)e;
+    boost_client_request_pull_all();
+}
+
+static void on_target_click(lv_event_t *e)
+{
+    (void)e;
+    g_boost_target_node = (g_boost_target_node == OPENDASH_NODE_MOS_4CH_A)
+                         ? OPENDASH_NODE_MOS_4CH_B : OPENDASH_NODE_MOS_4CH_A;
+    system_config_save_boost_target();
+    if (s_lbl_target) lv_label_set_text_fmt(s_lbl_target, "Target: %s", node_label(g_boost_target_node));
+    boost_client_request_pull_all();
+}
+
+/* ============================================================================
+ *  UI assembly helpers
+ * ==========================================================================*/
+
+static void tick_timer_cb(lv_timer_t *t)
+{
+    (void)t;
+    boost_config_ui_tick();
+}
+
+static lv_obj_t *make_row(lv_obj_t *parent, const char *title)
+{
+    esp_task_wdt_reset();
+    ESP_LOGI(TAG, "make_row: title=%s parent=%p", title ? title : "(none)", parent);
+    lv_obj_t *row = lv_obj_create(parent);
+    ESP_LOGI(TAG, "make_row: row=%p created", row);
+    lv_obj_set_width(row, lv_pct(100));
+    lv_obj_set_height(row, LV_SIZE_CONTENT);
+    lv_obj_set_layout(row, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_all(row, 3, 0);
+    lv_obj_set_style_pad_column(row, 4, 0);
+    lv_obj_set_style_border_width(row, 0, 0);
+    lv_obj_remove_flag(row, LV_OBJ_FLAG_SCROLLABLE);
+    if (title && *title) {
+        lv_obj_t *lbl = lv_label_create(row);
+        lv_label_set_text(lbl, title);
+        lv_obj_set_width(lbl, 96);
+    }
+    return row;
+}
+
+static int s_btn_counter = 0;
+static lv_obj_t *add_button(lv_obj_t *parent, const char *txt, lv_event_cb_t cb, void *ud)
+{
+    esp_task_wdt_reset();
+    int n = ++s_btn_counter;
+    ESP_LOGI(TAG, "add_button #%d txt=%s parent=%p free=%u int=%u", n, txt, parent,
+             (unsigned)esp_get_free_heap_size(),
+             (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+    lv_obj_t *btn = lv_button_create(parent);
+    ESP_LOGI(TAG, "add_button #%d btn=%p", n, btn);
+    lv_obj_add_event_cb(btn, cb, LV_EVENT_CLICKED, ud);
+    lv_obj_t *lbl = lv_label_create(btn);
+    lv_label_set_text(lbl, txt);
+    lv_obj_center(lbl);
+    ESP_LOGI(TAG, "add_button #%d done", n);
+    return btn;
+}
+
+/* Build one row of cells (rpm header / duty / setp). */
+static lv_obj_t *make_grid_row(lv_obj_t *parent, const char *title,
+                                bool clickable, lv_event_cb_t cb,
+                                lv_obj_t **out_cells)
+{
+    lv_obj_t *row = lv_obj_create(parent);
+    lv_obj_set_width(row, lv_pct(100));
+    lv_obj_set_height(row, 38);
+    lv_obj_set_layout(row, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_all(row, 1, 0);
+    lv_obj_set_style_pad_column(row, 2, 0);
+    lv_obj_set_style_border_width(row, 0, 0);
+    lv_obj_remove_flag(row, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *hdr = lv_label_create(row);
+    lv_label_set_text(hdr, title);
+    lv_obj_set_width(hdr, 56);
+
+    for (int i = 0; i < OPENDASH_BOOST_MAP_POINTS; ++i) {
+        /* Feed the watchdog on every cell — creating 16 buttons in one tick
+         * with theme styling can easily blow the 5 s WDT on a populated tree. */
+        esp_task_wdt_reset();
+        /* DIAG/WORKAROUND: All rows now use plain labels (no button wrap).
+         * Button widgets exhaust the 218 KB internal-RAM pool well before the
+         * 4+ MB PSRAM heap shows any pressure. Cells will be made tappable via
+         * a single row-level event with hit-testing once the screen renders. */
+        (void)clickable;
+        (void)cb;
+        lv_obj_t *lbl = lv_label_create(row);
+        if (!lbl) {
+            ESP_LOGE(TAG, "make_grid_row: label create failed (i=%d) int=%u", i,
+                     (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+            out_cells[i] = NULL;
+            continue;
+        }
+        lv_obj_set_size(lbl, 42, 34);
+        lv_obj_set_style_pad_all(lbl, 0, 0);
+        lv_obj_set_style_bg_opa(lbl, LV_OPA_20, 0);
+        lv_obj_set_style_border_width(lbl, 1, 0);
+        lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
+        lv_label_set_text(lbl, "-");
+        out_cells[i] = lbl;
+    }
+    return row;
+}
+
+/* ============================================================================
+ *  Build / show / hide
+ * ==========================================================================*/
+
+lv_obj_t *boost_config_ui_create(lv_obj_t *parent)
+{
+    if (!parent) parent = lv_scr_act();
+    if (s_root) {
+        lv_obj_del(s_root);
+        s_root = NULL;
+    }
+    /* Reset every cached child pointer NOW, before any new widget is built,
+     * so a stray tick or callback can't see stale handles to freed widgets. */
+    keypad_close();
+    if (s_tick_timer) {
+        lv_timer_del(s_tick_timer);
+        s_tick_timer = NULL;
+    }
+    s_lbl_actual = s_lbl_setp = s_lbl_duty = s_lbl_flags = NULL;
+    s_lbl_target = s_lbl_link = NULL;
+    for (int i = 0; i < 3; ++i) { s_btn_unit[i] = s_btn_mode[i] = NULL; }
+    for (int i = 0; i < 2; ++i) s_btn_slot[i] = NULL;
+    for (int i = 0; i < OPENDASH_BOOST_GEARS; ++i) s_btn_gear[i] = NULL;
+    for (int i = 0; i < OPENDASH_BOOST_MAP_POINTS; ++i) {
+        s_cell_rpm[i] = s_cell_duty[i] = s_cell_setp[i] = NULL;
+    }
+
+    s_btn_counter = 0;
+    size_t heap_before = esp_get_free_heap_size();
+    ESP_LOGI(TAG, "boost_config_ui_create: free heap=%u parent=%p act_scr=%p", (unsigned)heap_before, parent, lv_scr_act());
+
+    s_root = lv_obj_create(parent);
+    ESP_LOGI(TAG, "boost_config_ui_create: s_root=%p", s_root);
+    lv_obj_set_size(s_root, lv_pct(100), lv_pct(100));
+    lv_obj_set_layout(s_root, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(s_root, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_all(s_root, 4, 0);
+    lv_obj_set_style_pad_row(s_root, 2, 0);
+    /* Don't let gestures from inside the editor reach the screen handler. */
+    lv_obj_remove_flag(s_root, LV_OBJ_FLAG_GESTURE_BUBBLE);
+    /* NOTE: scroll/clip styling deliberately deferred to end-of-build —
+     * applying scrollbar mode + clip-corner on s_root before children are
+     * added has been observed to interact badly with flex layout + many
+     * descendants and wedge the UI task. */
+    esp_task_wdt_reset();
+
+    /* ── Header: title + close ── */
+    {
+        lv_obj_t *row = make_row(s_root, NULL);
+        lv_obj_t *lbl = lv_label_create(row);
+        lv_label_set_text(lbl, "BOOST CONFIG");
+        lv_obj_set_flex_grow(lbl, 1);
+        add_button(row, "Close", on_close_click, NULL);
+    }
+
+    /* ── Units + target node ── */
+    {
+        lv_obj_t *row = make_row(s_root, "Units:");
+        s_btn_unit[0] = add_button(row, "kPa", on_unit_click, (void *)(uintptr_t)OPENDASH_PRESSURE_KPA);
+        s_btn_unit[1] = add_button(row, "BAR", on_unit_click, (void *)(uintptr_t)OPENDASH_PRESSURE_BAR);
+        s_btn_unit[2] = add_button(row, "PSI", on_unit_click, (void *)(uintptr_t)OPENDASH_PRESSURE_PSI);
+
+        lv_obj_t *spacer = lv_obj_create(row);
+        lv_obj_set_size(spacer, 20, 1);
+        lv_obj_set_style_bg_opa(spacer, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_width(spacer, 0, 0);
+        lv_obj_remove_flag(spacer, LV_OBJ_FLAG_SCROLLABLE);
+
+        s_lbl_target = lv_label_create(row);
+        lv_label_set_text_fmt(s_lbl_target, "Target: %s", node_label(g_boost_target_node));
+        lv_obj_set_flex_grow(s_lbl_target, 1);
+        add_button(row, "Switch",  on_target_click, NULL);
+        add_button(row, "Re-pull", on_pull_click,   NULL);
+    }
+
+    /* ── Mode picker ── */
+    {
+        lv_obj_t *row = make_row(s_root, "Mode:");
+        s_btn_mode[0] = add_button(row, "OFF",    on_mode_click, (void *)(uintptr_t)OPENDASH_BOOST_MODE_OFF);
+        s_btn_mode[1] = add_button(row, "NORMAL", on_mode_click, (void *)(uintptr_t)OPENDASH_BOOST_MODE_NORMAL);
+        s_btn_mode[2] = add_button(row, "RACE",   on_mode_click, (void *)(uintptr_t)OPENDASH_BOOST_MODE_RACE);
+    }
+
+    /* ── Link / limp banner (hidden until stale) ── */
+    {
+        s_lbl_link = lv_label_create(s_root);
+        lv_label_set_text(s_lbl_link, "UNSTABLE LINK — LIMP MODE (slave data stale)");
+        lv_obj_set_style_text_color(s_lbl_link, lv_color_hex(0xFFFFFF), 0);
+        lv_obj_set_style_bg_color(s_lbl_link, lv_color_hex(0xD32F2F), 0);
+        lv_obj_set_style_bg_opa(s_lbl_link, LV_OPA_COVER, 0);
+        lv_obj_set_style_pad_all(s_lbl_link, 4, 0);
+        lv_obj_set_width(s_lbl_link, lv_pct(100));
+        lv_obj_add_flag(s_lbl_link, LV_OBJ_FLAG_HIDDEN);
+    }
+
+    /* ── Live readout ── */
+    {
+        lv_obj_t *row = make_row(s_root, "Live:");
+        s_lbl_setp   = lv_label_create(row); lv_label_set_text(s_lbl_setp,   "set --");
+        s_lbl_actual = lv_label_create(row); lv_label_set_text(s_lbl_actual, "act --");
+        s_lbl_duty   = lv_label_create(row); lv_label_set_text(s_lbl_duty,   "duty --");
+        s_lbl_flags  = lv_label_create(row); lv_label_set_text(s_lbl_flags,  "flags --");
+    }
+
+    /* ── Slot + gear pickers (combined row) ── */
+    {
+        lv_obj_t *row = make_row(s_root, "Edit:");
+        s_btn_slot[0] = add_button(row, "NORMAL", on_slot_click, (void *)(uintptr_t)OPENDASH_BOOST_MODE_NORMAL);
+        s_btn_slot[1] = add_button(row, "RACE",   on_slot_click, (void *)(uintptr_t)OPENDASH_BOOST_MODE_RACE);
+
+        lv_obj_t *spacer = lv_obj_create(row);
+        lv_obj_set_size(spacer, 12, 1);
+        lv_obj_set_style_bg_opa(spacer, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_width(spacer, 0, 0);
+        lv_obj_remove_flag(spacer, LV_OBJ_FLAG_SCROLLABLE);
+
+        lv_obj_t *gear_lbl = lv_label_create(row);
+        lv_label_set_text(gear_lbl, "Gear:");
+
+        for (int g = 0; g < OPENDASH_BOOST_GEARS; ++g) {
+            char txt[4]; snprintf(txt, sizeof(txt), "%d", g + 1);
+            s_btn_gear[g] = add_button(row, txt, on_gear_click, (void *)(uintptr_t)g);
+        }
+    }
+
+    /* ── Cell grid: RPM / DUTY / SETP rows ── */
+    {
+        lv_obj_t *grid = lv_obj_create(s_root);
+        lv_obj_set_width(grid, lv_pct(100));
+        lv_obj_set_height(grid, LV_SIZE_CONTENT);
+        lv_obj_set_layout(grid, LV_LAYOUT_FLEX);
+        lv_obj_set_flex_flow(grid, LV_FLEX_FLOW_COLUMN);
+        lv_obj_set_style_pad_all(grid, 2, 0);
+        lv_obj_set_style_pad_row(grid, 2, 0);
+        lv_obj_set_style_border_width(grid, 1, 0);
+        lv_obj_remove_flag(grid, LV_OBJ_FLAG_SCROLLABLE);
+
+        ESP_LOGI(TAG, "heap check BEFORE grid: %s", heap_caps_check_integrity_all(true) ? "OK" : "CORRUPT");
+        make_grid_row(grid, "RPM",  false, NULL,                s_cell_rpm);
+        ESP_LOGI(TAG, "heap check after RPM row: %s", heap_caps_check_integrity_all(true) ? "OK" : "CORRUPT");
+        make_grid_row(grid, "DUTY", true,  on_duty_cell_click,  s_cell_duty);
+        ESP_LOGI(TAG, "heap check after DUTY row: %s", heap_caps_check_integrity_all(true) ? "OK" : "CORRUPT");
+        make_grid_row(grid, "SETP", true,  on_setp_cell_click,  s_cell_setp);
+        ESP_LOGI(TAG, "heap check after SETP row: %s", heap_caps_check_integrity_all(true) ? "OK" : "CORRUPT");
+    }
+
+    /* ── Footer ── (Pull button disabled while diagnosing heap corruption) */
+    {
+        ESP_LOGI(TAG, "section: FOOTER start, free=%u", (unsigned)esp_get_free_heap_size());
+        /* lv_obj_t *row = make_row(s_root, NULL); */
+        /* add_button(row, "Pull from slave", on_pull_click, NULL); */
+        ESP_LOGI(TAG, "section: FOOTER skipped for diag");
+    }
+
+    /* RPM header values are constant for the build. */
+    {
+        const float bin = (float)OPENDASH_BOOST_RPM_MAX / (OPENDASH_BOOST_MAP_POINTS - 1);
+        char tmp[8];
+        for (int i = 0; i < OPENDASH_BOOST_MAP_POINTS; ++i) {
+            int rpm = (int)(i * bin + 0.5f);
+            snprintf(tmp, sizeof(tmp), "%d", rpm);
+            if (s_cell_rpm[i]) lv_label_set_text(s_cell_rpm[i], tmp);
+        }
+    }
+
+    refresh_unit_buttons();
+    refresh_mode_buttons();
+    refresh_slot_buttons();
+    refresh_gear_buttons();
+    load_buffers_from_client();
+    refresh_cells();
+
+    /* Apply scroll/clip props AFTER all children are built, so a layout
+     * pass doesn't fight the still-growing flex tree. */
+    lv_obj_set_style_clip_corner(s_root, true, 0);
+    lv_obj_set_scroll_dir(s_root, LV_DIR_VER);
+    lv_obj_set_scrollbar_mode(s_root, LV_SCROLLBAR_MODE_AUTO);
+    esp_task_wdt_reset();
+
+    /* Self-ticking timer (200 ms) for live readout + limp banner. */
+    if (!s_tick_timer) {
+        s_tick_timer = lv_timer_create(tick_timer_cb, 200, NULL);
+    }
+
+    return s_root;
+}
+
+void boost_config_ui_show(void)
+{
+    if (!s_root) boost_config_ui_create(NULL);
+    if (s_root) lv_obj_clear_flag(s_root, LV_OBJ_FLAG_HIDDEN);
+    boost_client_request_pull_all();
+}
+
+void boost_config_ui_close(void)
+{
+    keypad_close();
+    if (s_tick_timer) {
+        lv_timer_del(s_tick_timer);
+        s_tick_timer = NULL;
+    }
+    if (s_root) {
+        lv_obj_del(s_root);
+        s_root = NULL;
+    }
+    /* Reset cached object pointers so we never dereference a stale handle. */
+    s_lbl_actual = s_lbl_setp = s_lbl_duty = s_lbl_flags = NULL;
+    s_lbl_target = s_lbl_link = NULL;
+    for (int i = 0; i < 3; ++i) { s_btn_unit[i] = s_btn_mode[i] = NULL; }
+    for (int i = 0; i < 2; ++i) s_btn_slot[i] = NULL;
+    for (int i = 0; i < OPENDASH_BOOST_GEARS; ++i) s_btn_gear[i] = NULL;
+    for (int i = 0; i < OPENDASH_BOOST_MAP_POINTS; ++i) {
+        s_cell_rpm[i] = s_cell_duty[i] = s_cell_setp[i] = NULL;
+    }
+}
+
+bool boost_config_ui_is_active(void)
+{
+    return s_root != NULL && !lv_obj_has_flag(s_root, LV_OBJ_FLAG_HIDDEN);
+}
+
+void boost_config_ui_tick(void)
+{
+    if (!boost_config_ui_is_active()) return;
+
+    opendash_boost_telemetry_t t;
+    boost_client_get_telemetry(&t);
+
+    int dec = unit_decimals(g_boost_pressure_unit);
+    const char *suf = unit_suffix(g_boost_pressure_unit);
+    if (s_lbl_setp)   lv_label_set_text_fmt(s_lbl_setp,   "set %.*f %s",
+                                            dec,
+                                            cbar_to_unit((int)t.setpoint_cbar, g_boost_pressure_unit),
+                                            suf);
+    if (s_lbl_actual) lv_label_set_text_fmt(s_lbl_actual, "act %.*f %s",
+                                            dec,
+                                            cbar_to_unit((int)t.boost_cbar, g_boost_pressure_unit),
+                                            suf);
+    if (s_lbl_duty)   lv_label_set_text_fmt(s_lbl_duty,   "duty %u/255", t.duty);
+    if (s_lbl_flags)  lv_label_set_text_fmt(s_lbl_flags,  "flags 0x%02X", t.safety_flags);
+
+    /* Limp / unstable-link banner. We treat any of the following as "limp":
+     *   - slave has explicitly raised DATA_STALE
+     *   - we haven't received telemetry in > 800 ms (link blackout)
+     *   - we have never received telemetry (slave offline) */
+    uint32_t age = boost_client_telemetry_age_ms();
+    bool stale = (t.safety_flags & OPENDASH_BOOST_SAFE_DATA_STALE) != 0;
+    bool link_dead = (age == UINT32_MAX) || (age > 800);
+    if (s_lbl_link) {
+        if (stale || link_dead) {
+            const char *why = link_dead
+                ? (age == UINT32_MAX ? "no telemetry from slave"
+                                      : "telemetry RX gap")
+                : "slave reports stale engine data";
+            lv_label_set_text_fmt(s_lbl_link,
+                                  "UNSTABLE LINK — LIMP MODE (%s)", why);
+            lv_obj_clear_flag(s_lbl_link, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(s_lbl_link, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+}

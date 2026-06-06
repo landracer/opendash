@@ -1,3 +1,4 @@
+<!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # Font System Testing Guide
 
 This guide explains how to test the new automatic font conversion system in OpenDash.

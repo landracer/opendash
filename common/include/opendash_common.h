@@ -1,3 +1,4 @@
+/* Licensed under Sovereign Individual License v1.0 — see LICENSE file */
 /**
  * @file opendash_common.h
  * @brief OpenDash Common Definitions
@@ -47,6 +48,10 @@ extern "C" {
  *
  * Each physical device in the system is assigned a unique node type. This is
  * used for I2C addressing, logging, and configuration management.
+ *
+ * POD nodes (POD1–POD8) allow unlimited expansion with additional
+ * Waveshare ESP32-S3 displays. Each pod gets a unique I2C address and
+ * can have independent splash/background images and gauge layouts.
  */
 typedef enum {
     OPENDASH_NODE_CENTER    = 0,    /**< Center display (4.3" LCD, I2C master) */
@@ -54,8 +59,30 @@ typedef enum {
     OPENDASH_NODE_RIGHT     = 2,    /**< Right gauge pod (2.8" round LCD) */
     OPENDASH_NODE_GPS       = 3,    /**< GPS/Telemetry unit (1.75" AMOLED) */
     OPENDASH_NODE_BMS       = 4,    /**< External BMS node (rAtTrax) */
-    OPENDASH_NODE_COUNT     = 5     /**< Total number of node types */
+    OPENDASH_NODE_POD1      = 5,    /**< Expansion pod 1 */
+    OPENDASH_NODE_POD2      = 6,    /**< Expansion pod 2 */
+    OPENDASH_NODE_POD3      = 7,    /**< Expansion pod 3 */
+    OPENDASH_NODE_POD4      = 8,    /**< Expansion pod 4 */
+    OPENDASH_NODE_POD5      = 9,    /**< Expansion pod 5 */
+    OPENDASH_NODE_POD6      = 10,   /**< Expansion pod 6 */
+    OPENDASH_NODE_POD7      = 11,   /**< Expansion pod 7 */
+    OPENDASH_NODE_POD8      = 12,   /**< Expansion pod 8 */
+    OPENDASH_NODE_RELAY_4CH = 13,   /**< 4-channel HD relay module (high-amp: fans, pumps) */
+    OPENDASH_NODE_RELAY_8CH_A = 14, /**< 8-channel relay module A (low-amp devices) */
+    OPENDASH_NODE_RELAY_8CH_B = 15, /**< 8-channel relay module B (low-amp devices) */
+    OPENDASH_NODE_MOS_4CH_A = 16,   /**< 4-channel MOS module A (PWM / on-off) */
+    OPENDASH_NODE_MOS_4CH_B = 17,   /**< 4-channel MOS module B (PWM / on-off) */
+    OPENDASH_NODE_COUNT     = 18    /**< Total number of node types */
 } opendash_node_t;
+
+/** @brief Check if a node type is a gauge pod (Left, Right, or POD1–POD8). */
+#define OPENDASH_NODE_IS_POD(n) \
+    ((n) == OPENDASH_NODE_LEFT || (n) == OPENDASH_NODE_RIGHT || \
+     ((n) >= OPENDASH_NODE_POD1 && (n) <= OPENDASH_NODE_POD8))
+
+/** @brief Check if a node type is a relay/MOS controller. */
+#define OPENDASH_NODE_IS_RELAY(n) \
+    ((n) >= OPENDASH_NODE_RELAY_4CH && (n) <= OPENDASH_NODE_MOS_4CH_B)
 
 /* ────────────────────────────────────────────────────────────────────────────
  * Display Screen Sections

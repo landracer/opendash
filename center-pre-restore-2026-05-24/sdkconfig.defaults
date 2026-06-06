@@ -1,0 +1,83 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# OpenDash Center Display — SDK Configuration Defaults
+#
+# Hardware: Waveshare ESP32-S3-Touch-LCD-4.3
+# Resolution: 800×480 IPS LCD
+# ─────────────────────────────────────────────────────────────────────────────
+
+#
+# Target Configuration
+#
+CONFIG_IDF_TARGET="esp32s3"
+
+#
+# Flash Configuration
+#
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
+
+#
+# Partition Table
+#
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+
+#
+# ESP32S3-Specific Configuration
+#
+CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240=y
+CONFIG_ESP32S3_DATA_CACHE_64KB=y
+CONFIG_ESP32S3_DATA_CACHE_LINE_64B=y
+
+#
+# Memory Configuration
+#
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_SPEED_80M=y
+CONFIG_SPIRAM_RODATA=y
+
+#
+# FreeRTOS Configuration
+#
+CONFIG_FREERTOS_HZ=1000
+CONFIG_FREERTOS_UNICORE=n
+
+#
+# Task Watchdog — IDLE0 check disabled because CPU0 is saturated
+# by WiFi (ESP-NOW) + espnow_master task. espnow_master feeds WDT
+# explicitly via esp_task_wdt_add/reset for deadlock protection.
+#
+CONFIG_ESP_TASK_WDT_EN=y
+CONFIG_ESP_TASK_WDT_INIT=y
+CONFIG_ESP_TASK_WDT_TIMEOUT_S=5
+CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU0=n
+CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU1=y
+
+#
+# LVGL Configuration
+#
+CONFIG_LV_COLOR_DEPTH_16=y
+CONFIG_LV_TICK_CUSTOM=y
+CONFIG_LV_MEM_CUSTOM=y
+
+#
+# LCD Configuration
+#
+CONFIG_LCD_RGB_REFRESH_TASK_PERIOD_MS=16
+CONFIG_LCD_RGB_RESTART_IN_VSYNC=y
+
+#
+# Compiler Options
+#
+CONFIG_COMPILER_OPTIMIZATION_PERF=y
+CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_DISABLE=y
+
+#
+# Logging
+#
+CONFIG_LOG_DEFAULT_LEVEL_INFO=y
+CONFIG_LOG_COLORS=y
+CONFIG_LV_FONT_FMT_TXT_LARGE=y

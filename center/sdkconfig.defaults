@@ -37,6 +37,7 @@ CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
 CONFIG_SPIRAM=y
 CONFIG_SPIRAM_MODE_OCT=y
 CONFIG_SPIRAM_SPEED_80M=y
+CONFIG_SPIRAM_RODATA=y
 
 #
 # FreeRTOS Configuration
@@ -45,11 +46,27 @@ CONFIG_FREERTOS_HZ=1000
 CONFIG_FREERTOS_UNICORE=n
 
 #
+# Task Watchdog — IDLE0 check disabled because CPU0 is saturated
+# by WiFi (ESP-NOW) + espnow_master task. espnow_master feeds WDT
+# explicitly via esp_task_wdt_add/reset for deadlock protection.
+#
+CONFIG_ESP_TASK_WDT_EN=y
+CONFIG_ESP_TASK_WDT_INIT=y
+CONFIG_ESP_TASK_WDT_TIMEOUT_S=5
+CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU0=n
+CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU1=y
+
+#
 # LVGL Configuration
 #
 CONFIG_LV_COLOR_DEPTH_16=y
 CONFIG_LV_TICK_CUSTOM=y
-CONFIG_LV_MEM_CUSTOM=y
+# Route ALL LVGL allocations through our PSRAM-preferred heap_caps hooks
+# (see main/lv_mem_psram.c). Internal RAM is only ~240KB on S3 and gets
+# starved fast by big screens (e.g. BOOST cell-grid editor); PSRAM has 6MB+.
+# CONFIG_LV_USE_BUILTIN_MALLOC is not set
+# CONFIG_LV_USE_CLIB_MALLOC is not set
+CONFIG_LV_USE_CUSTOM_MALLOC=y
 
 #
 # LCD Configuration
@@ -68,3 +85,4 @@ CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_DISABLE=y
 #
 CONFIG_LOG_DEFAULT_LEVEL_INFO=y
 CONFIG_LOG_COLORS=y
+CONFIG_LV_FONT_FMT_TXT_LARGE=y

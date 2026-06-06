@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenDash - Data Points</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .header {
+            text-align: center;
+            background: linear-gradient(135deg, #2c3e50, #3498db);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 2em;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 20px;
+        }
+        .main-content {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .sidebar {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            height: fit-content;
+        }
+        h2 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        h3 {
+            color: #3498db;
+        }
+        .toc {
+            list-style-type: none;
+            padding: 0;
+        }
+        .toc li {
+            margin: 8px 0;
+            padding: 5px;
+            border-left: 3px solid #3498db;
+            background-color: #f8f9fa;
+        }
+        .toc li a {
+            text-decoration: none;
+            color: #2c3e50;
+            font-weight: 500;
+        }
+        .toc li a:hover {
+            color: #3498db;
+        }
+        .card {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .code-block {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #3498db;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        .highlight {
+            background-color: #fff9c4;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+        .data-point {
+            display: grid;
+            grid-template-columns: 100px 1fr 80px;
+            gap: 10px;
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+        }
+        .data-point:last-child {
+            border-bottom: none;
+        }
+        .data-id {
+            font-weight: bold;
+            color: #3498db;
+        }
+        .data-name {
+            font-weight: 500;
+        }
+        .data-unit {
+            text-align: right;
+            color: #7f8c8d;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding: 20px;
+            color: #7f8c8d;
+            font-size: 0.9em;
+        }
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+            .header h1 {
+                font-size: 1.8em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>OpenDash - Data Points</h1>
+        <p>Comprehensive legend of all displayable data points</p>
+    </div>
+
+    <div class="container">
+        <div class="main-content">
+            <h2>Data Point Overview</h2>
+            <p>Every displayable value has a unique 16-bit ID. The UI renders whichever ID is assigned to each screen section. Data points are organized by category:</p>
+            
+            <div class="card">
+                <h3>Engine / OBD2 Data Points (0x0100 – 0x01FF)</h3>
+                <div class="data-point">
+                    <div class="data-id">0x0100</div>
+                    <div class="data-name">RPM</div>
+                    <div class="data-unit">rpm</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0101</div>
+                    <div class="data-name">Vehicle Speed</div>
+                    <div class="data-unit">km/h</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0102</div>
+                    <div class="data-name">Coolant Temp</div>
+                    <div class="data-unit">°C</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0103</div>
+                    <div class="data-name">Intake Air Temp</div>
+                    <div class="data-unit">°C</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0104</div>
+                    <div class="data-name">Engine Load</div>
+                    <div class="data-unit">%</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0105</div>
+                    <div class="data-name">Throttle Position</div>
+                    <div class="data-unit">%</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0106</div>
+                    <div class="data-name">Boost Pressure</div>
+                    <div class="data-unit">kPa</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0107</div>
+                    <div class="data-name">Oil Temp</div>
+                    <div class="data-unit">°C</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0108</div>
+                    <div class="data-name">Oil Pressure</div>
+                    <div class="data-unit">kPa</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0109</div>
+                    <div class="data-name">Fuel Pressure</div>
+                    <div class="data-unit">kPa</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x010A</div>
+                    <div class="data-name">AFR</div>
+                    <div class="data-unit">ratio</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x010B</div>
+                    <div class="data-name">Lambda</div>
+                    <div class="data-unit">ratio</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x010C</div>
+                    <div class="data-name">EGT</div>
+                    <div class="data-unit">°C</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x010D</div>
+                    <div class="data-name">Battery Voltage</div>
+                    <div class="data-unit">V</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x010E</div>
+                    <div class="data-name">Timing Advance</div>
+                    <div class="data-unit">°</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x010F</div>
+                    <div class="data-name">MAF Rate</div>
+                    <div class="data-unit">g/s</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0110</div>
+                    <div class="data-name">Fuel Level</div>
+                    <div class="data-unit">%</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0111</div>
+                    <div class="data-name">Trans Temp</div>
+                    <div class="data-unit">°C</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>GPS / Navigation Data Points (0x0200 – 0x02FF)</h3>
+                <div class="data-point">
+                    <div class="data-id">0x0200</div>
+                    <div class="data-name">GPS Speed</div>
+                    <div class="data-unit">km/h</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0201</div>
+                    <div class="data-name">GPS Heading</div>
+                    <div class="data-unit">°</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0202</div>
+                    <div class="data-name">Latitude</div>
+                    <div class="data-unit">°</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0203</div>
+                    <div class="data-name">Longitude</div>
+                    <div class="data-unit">°</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0204</div>
+                    <div class="data-name">Altitude</div>
+                    <div class="data-unit">m</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0205</div>
+                    <div class="data-name">Satellite Count</div>
+                    <div class="data-unit">count</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0206</div>
+                    <div class="data-name">HDOP</div>
+                    <div class="data-unit">ratio</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0207</div>
+                    <div class="data-name">Lap Number</div>
+                    <div class="data-unit">count</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0208</div>
+                    <div class="data-name">Lap Time</div>
+                    <div class="data-unit">ms</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0209</div>
+                    <div class="data-name">Best Lap Time</div>
+                    <div class="data-unit">ms</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x020A</div>
+                    <div class="data-name">Lap Delta</div>
+                    <div class="data-unit">ms</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x020B</div>
+                    <div class="data-name">Sector Time</div>
+                    <div class="data-unit">ms</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x020C</div>
+                    <div class="data-name">Predictive Lap</div>
+                    <div class="data-unit">ms</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x020D</div>
+                    <div class="data-name">GPS Fix</div>
+                    <div class="data-unit">flag</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>IMU / Motion Data Points (0x0300 – 0x03FF)</h3>
+                <div class="data-point">
+                    <div class="data-id">0x0300</div>
+                    <div class="data-name">G-Force Lateral</div>
+                    <div class="data-unit">g</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0301</div>
+                    <div class="data-name">G-Force Longitudinal</div>
+                    <div class="data-unit">g</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0302</div>
+                    <div class="data-name">G-Force Vertical</div>
+                    <div class="data-unit">g</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0303</div>
+                    <div class="data-name">Yaw Rate</div>
+                    <div class="data-unit">°/s</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0304</div>
+                    <div class="data-name">Pitch Rate</div>
+                    <div class="data-unit">°/s</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0305</div>
+                    <div class="data-name">Roll Rate</div>
+                    <div class="data-unit">°/s</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0306</div>
+                    <div class="data-name">Pitch Angle</div>
+                    <div class="data-unit">°</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0307</div>
+                    <div class="data-name">Roll Angle</div>
+                    <div class="data-unit">°</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Battery / BMS Data Points (0x0400 – 0x04FF)</h3>
+                <div class="data-point">
+                    <div class="data-id">0x0400</div>
+                    <div class="data-name">Pack Voltage</div>
+                    <div class="data-unit">V</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0401</div>
+                    <div class="data-name">Pack Current</div>
+                    <div class="data-unit">A</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0402</div>
+                    <div class="data-name">SOC</div>
+                    <div class="data-unit">%</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0403</div>
+                    <div class="data-name">Cell V Min</div>
+                    <div class="data-unit">V</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0404</div>
+                    <div class="data-name">Cell V Max</div>
+                    <div class="data-unit">V</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0405</div>
+                    <div class="data-name">Cell V Delta</div>
+                    <div class="data-unit">mV</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0406</div>
+                    <div class="data-name">BMS Temp Max</div>
+                    <div class="data-unit">°C</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0407</div>
+                    <div class="data-name">Pack Power</div>
+                    <div class="data-unit">W</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0408</div>
+                    <div class="data-name">Energy Used</div>
+                    <div class="data-unit">Wh</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0410</div>
+                    <div class="data-name">Cell 1 Voltage</div>
+                    <div class="data-unit">V</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0411</div>
+                    <div class="data-name">Cell 2 Voltage</div>
+                    <div class="data-unit">V</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0412</div>
+                    <div class="data-name">Cell 3 Voltage</div>
+                    <div class="data-unit">V</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0413</div>
+                    <div class="data-name">Cell 4 Voltage</div>
+                    <div class="data-unit">V</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0414</div>
+                    <div class="data-name">Cell 5 Voltage</div>
+                    <div class="data-unit">V</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0415</div>
+                    <div class="data-name">Cell 6 Voltage</div>
+                    <div class="data-unit">V</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0416</div>
+                    <div class="data-name">Cell 7 Voltage</div>
+                    <div class="data-unit">V</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0417</div>
+                    <div class="data-name">Cell 8 Voltage</div>
+                    <div class="data-unit">V</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0418</div>
+                    <div class="data-name">Cell 9 Voltage</div>
+                    <div class="data-unit">V</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0419</div>
+                    <div class="data-name">Cell 10 Voltage</div>
+                    <div class="data-unit">V</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x041A</div>
+                    <div class="data-name">Cell 11 Voltage</div>
+                    <div class="data-unit">V</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x041B</div>
+                    <div class="data-name">Cell 12 Voltage</div>
+                    <div class="data-unit">V</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x041C</div>
+                    <div class="data-name">Cell 13 Voltage</div>
+                    <div class="data-unit">V</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x041D</div>
+                    <div class="data-name">Cell 14 Voltage</div>
+                    <div class="data-unit">V</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x041E</div>
+                    <div class="data-name">Cell 15 Voltage</div>
+                    <div class="data-unit">V</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x041F</div>
+                    <div class="data-name">Cell 16 Voltage</div>
+                    <div class="data-unit">V</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>System Data Points (0x0500 – 0x05FF)</h3>
+                <div class="data-point">
+                    <div class="data-id">0x0500</div>
+                    <div class="data-name">CPU Temp</div>
+                    <div class="data-unit">°C</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0501</div>
+                    <div class="data-name">Free Heap</div>
+                    <div class="data-unit">KB</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0502</div>
+                    <div class="data-name">WiFi RSSI</div>
+                    <div class="data-unit">dBm</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0503</div>
+                    <div class="data-name">Uptime</div>
+                    <div class="data-unit">s</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0504</div>
+                    <div class="data-name">SD Card Free</div>
+                    <div class="data-unit">MB</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0505</div>
+                    <div class="data-name">Log Session</div>
+                    <div class="data-unit">count</div>
+                </div>
+            </div>
+
+            <h2>Data Point Categories</h2>
+            <div class="card">
+                <h3>Engine / OBD2 Data Points</h3>
+                <p>These data points represent engine parameters and OBD2 PIDs. They provide real-time information about engine performance and operation.</p>
+            </div>
+
+            <div class="card">
+                <h3>GPS / Navigation Data Points</h3>
+                <p>These data points provide location and navigation information including position, speed, heading, and timing data.</p>
+            </div>
+
+            <div class="card">
+                <h3>IMU / Motion Data Points</h3>
+                <p>These data points represent motion and orientation information from the 6-axis IMU sensor.</p>
+            </div>
+
+            <div class="card">
+                <h3>Battery / BMS Data Points</h3>
+                <p>These data points provide battery management system information including voltage, current, and state of charge.</p>
+            </div>
+
+            <div class="card">
+                <h3>System Data Points</h3>
+                <p>These data points provide system-level information including temperature, memory usage, and connectivity status.</p>
+            </div>
+
+            <h2>Usage in UI</h2>
+            <div class="card">
+                <p>Each data point is assigned to a specific screen section in the UI. The system supports:</p>
+                <ul>
+                    <li><span class="highlight">Configurable data views</span> - Choose which data points appear in each screen section</li>
+                    <li><span class="highlight">Unit conversion</span> - Automatic conversion between °C/°F, kPa/BAR/PSI, km/h/MPH, km/mi</li>
+                    <li><span class="highlight">Min/max tracking</span> - Session high/low displayed per gauge page</li>
+                    <li><span class="highlight">Shift-light blink</span> - Arc flashes red/blue when RPM exceeds configurable threshold</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="sidebar">
+            <h2>Navigation</h2>
+            <ul class="toc">
+                <li><a href="index.html">Home</a></li>
+                <li><a href="#overview">Data Point Overview</a></li>
+                <li><a href="#engine">Engine / OBD2</a></li>
+                <li><a href="#gps">GPS / Navigation</a></li>
+                <li><a href="#imu">IMU / Motion</a></li>
+                <li><a href="#bms">BMS</a></li>
+                <li><a href="#system">System</a></li>
+                <li><a href="#usage">UI Usage</a></li>
+            </ul>
+
+            <div class="card">
+                <h3>Quick Links</h3>
+                <ul>
+                    <li><a href="../readme.md">Main README</a></li>
+                    <li><a href="../PROJECT_INDEX.md">Project Index</a></li>
+                    <li><a href="../docs/data-points.md">Original Data Points Doc</a></li>
+                    <li><a href="protocol.html">I2C Protocol</a></li>
+                    <li><a href="hardware.html">Hardware Overview</a></li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h3>Related Pages</h3>
+                <ul>
+                    <li><a href="index.html">Home</a></li>
+                    <li><a href="features.html">Key Features</a></li>
+                    <li><a href="architecture.html">System Architecture</a></li>
+                    <li><a href="protocol.html">I2C Protocol</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>OpenDash — Universal Racecar Dashboard | Built for racers, by racers</p>
+        <p>Copyright © 2024–2026 uknowmelast & Axiom (AI Co-Architect)</p>
+    </div>
+</body>
+</html>

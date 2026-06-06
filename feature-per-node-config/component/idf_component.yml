@@ -1,0 +1,18 @@
+# Component manifest file for per-node display configuration feature
+
+## Component metadata
+name: opendash_per_node_config
+version: 0.1.0
+description: Per-node display configuration feature for OpenDash
+url: https://github.com/landracer/opendash
+license: MIT
+
+## Component dependencies
+dependencies:
+  idf: ">=5.0"
+  # Add any other dependencies here
+
+## Component configuration
+targets:
+  - esp32
+  - esp32s3

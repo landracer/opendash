@@ -1,0 +1,1147 @@
+/* Licensed under Sovereign Individual License v1.0 — see LICENSE file */
+/**
+ * @file gps_handler.c
+ * @brief OpenDash GPS Handler — LC76G via I2C (CASIC protocol)
+ *
+ * Interfaces with the LC76G GNSS module over I2C to read NMEA sentences
+ * and parse position, speed, heading, and satellite data.
+ *
+ * LC76G I2C Configuration (Waveshare ESP32-S3-Touch-AMOLED-1.75):
+ *   I2C bus: GPIO15 (SDA) / GPIO14 (SCL) — shared with touch, IMU, etc.
+ *   Write address: 0x50 (7-bit) — for sending CASIC commands
+ *   Read address:  0x54 (7-bit) — for receiving NMEA data
+ *   Clock: 100 kHz
+ *
+ * CASIC I2C Protocol (Quectel I2C Application Note v1.0):
+ *   Uses SEPARATE I2C slave addresses — NOT repeated-start:
+ *     0x50 = command/query write (CR_CMD / CW_CMD)
+ *     0x54 = data read (NMEA / length responses)
+ *     0x58 = data write (NMEA commands to module)
+ *
+ *   Read sequence (separate tx + rx transactions):
+ *   1. Query data length:
+ *      Transmit to 0x50: {0x08, 0x00, 0x51, 0xAA, 0x04, 0x00, 0x00, 0x00}
+ *        → uint32_t[2] LE: [(CR_CMD<<16)|TX_LEN_OFFSET, 4]
+ *      Receive from 0x54: 4 bytes → little-endian uint32 available byte count
+ *   2. Request NMEA data:
+ *      Transmit to 0x50: {0x00, 0x20, 0x51, 0xAA, <4 bytes length>}
+ *        → uint32_t[2] LE: [(CR_CMD<<16)|TX_BUF_OFFSET, length]
+ *      Receive from 0x54: N bytes → raw NMEA ASCII
+ *
+ *   Write sequence:
+ *   1. Query RX buffer free space:
+ *      Transmit to 0x50: {0x04, 0x00, 0x51, 0xAA, 0x04, 0x00, 0x00, 0x00}
+ *      Receive from 0x54: 4 bytes → free space
+ *   2. Config write:
+ *      Transmit to 0x50: {0x00, 0x10, 0x53, 0xAA, <4 bytes length>}
+ *   3. Write data:
+ *      Transmit to 0x58: actual NMEA command bytes
+ *
+ * Supported NMEA sentences:
+ *   $GPRMC / $GNRMC — Position, speed, heading, date/time
+ *   $GPGGA / $GNGGA — Fix quality, altitude, satellites, HDOP
+ *
+ * @see Waveshare ESP32-S3-LC76G-I2C example
+ */
+
+#include "gps_handler.h"
+#include "esp_log.h"
+#include "driver/i2c_master.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/semphr.h"
+#include "display_init.h"
+#include <string.h>
+#include <stdlib.h>
+#include <math.h>
+
+static const char *TAG = "gps_handler";
+
+/* LC76G I2C addresses (7-bit) — Waveshare ESP32-S3-Touch-AMOLED-1.75
+ * The LC76G uses CASIC protocol which has SEPARATE addresses for
+ * write (commands) and read (NMEA data):
+ *   0x50 = write endpoint (CASIC commands)
+ *   0x54 = read endpoint (NMEA responses)
+ * Using the wrong address for reads returns 0 bytes every time. */
+#define LC76G_I2C_ADDR_WRITE    0x50    /* CASIC command address */
+#define LC76G_I2C_ADDR_READ     0x54    /* CASIC data read address */
+#define LC76G_I2C_ADDR_DATA_WR  0x58    /* CASIC data write address */
+#define LC76G_I2C_ADDR          LC76G_I2C_ADDR_WRITE  /* For bus scan/probe */
+#define LC76G_I2C_CLK_HZ       100000   /* 100 kHz — matches Waveshare example */
+
+/* Maximum NMEA buffer size — large enough to drain the LC76G buffer quickly */
+#define GPS_NMEA_BUF_SIZE       4096
+#define GPS_STATUS_LOG_CYCLES   5       /* Log status every ~5 seconds (1000ms × 5) */
+
+/* GPS state */
+static gps_data_t current_gps_data = {0};
+static gps_debug_t current_gps_debug = {0};
+static SemaphoreHandle_t gps_mutex = NULL;
+static TaskHandle_t gps_task_handle = NULL;
+static i2c_master_dev_handle_t lc76g_handle = NULL;       /* Write endpoint (0x50) */
+static i2c_master_dev_handle_t lc76g_read_handle = NULL;  /* Read endpoint (0x54) */
+static i2c_master_dev_handle_t lc76g_dwr_handle = NULL;   /* Data write endpoint (0x58) */
+
+/* NMEA line parsing buffer */
+static char nmea_line[256];
+static int nmea_line_pos = 0;
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * NMEA Parsing Helpers
+ * ──────────────────────────────────────────────────────────────────────── */
+
+/**
+ * @brief Convert NMEA latitude/longitude (DDmm.mmmm) to decimal degrees.
+ */
+static double nmea_to_degrees(const char *val, const char *dir)
+{
+    if (val == NULL || val[0] == '\0') return 0.0;
+
+    double raw = atof(val);
+    int degrees = (int)(raw / 100.0);
+    double minutes = raw - (degrees * 100.0);
+    double result = degrees + (minutes / 60.0);
+
+    if (dir && (dir[0] == 'S' || dir[0] == 'W')) {
+        result = -result;
+    }
+    return result;
+}
+
+/**
+ * @brief Get the nth comma-separated field from an NMEA sentence.
+ * @param sentence  Full NMEA sentence string.
+ * @param field     Field index (0-based, 0 = sentence type e.g. "$GPRMC").
+ * @param out       Output buffer.
+ * @param out_len   Output buffer size.
+ * @return true if field was found.
+ */
+static bool nmea_get_field(const char *sentence, int field, char *out, size_t out_len)
+{
+    int current_field = 0;
+    const char *p = sentence;
+
+    while (*p && current_field < field) {
+        if (*p == ',') current_field++;
+        p++;
+    }
+    if (current_field != field) {
+        out[0] = '\0';
+        return false;
+    }
+
+    size_t i = 0;
+    while (*p && *p != ',' && *p != '*' && *p != '\r' && *p != '\n' && i < out_len - 1) {
+        out[i++] = *p++;
+    }
+    out[i] = '\0';
+    return i > 0;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * NMEA Command Writing via CASIC I2C Protocol
+ * ──────────────────────────────────────────────────────────────────────── */
+
+/**
+ * @brief Build a complete NMEA command with checksum and CR/LF.
+ * @param body  The command body without '$', '*', or CR/LF (e.g., "PQTMCOLD")
+ * @param out   Output buffer (must be large enough)
+ * @param out_sz Output buffer size
+ * @return Length of the complete command string, or 0 on error
+ */
+static size_t nmea_build_command(const char *body, char *out, size_t out_sz)
+{
+    uint8_t cksum = 0;
+    for (const char *p = body; *p; p++) {
+        cksum ^= (uint8_t)*p;
+    }
+    int len = snprintf(out, out_sz, "$%s*%02X\r\n", body, cksum);
+    if (len < 0 || (size_t)len >= out_sz) return 0;
+    return (size_t)len;
+}
+
+/**
+ * @brief Send an NMEA command to the LC76G via CASIC I2C write protocol.
+ *
+ * CASIC Write Protocol (from Quectel I2C Application Note):
+ *   1. Query RX buffer free space:
+ *      Write {0x04,0x00,0x51,0xAA, 0x04,0x00,0x00,0x00} to 0x50
+ *      Read 4 bytes from 0x54 → free space (little-endian uint32)
+ *   2. Config write:
+ *      Write {0x00,0x10,0x53,0xAA, len[0..3]} to 0x50
+ *   3. Write data:
+ *      Write actual command bytes to 0x58
+ *
+ * @param cmd_body  NMEA command body (e.g., "PQTMCOLD")
+ * @return ESP_OK on success
+ */
+static esp_err_t lc76g_send_command(const char *cmd_body)
+{
+    if (!lc76g_handle || !lc76g_read_handle || !lc76g_dwr_handle) {
+        ESP_LOGE(TAG, "send_command: device handles not initialized");
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    /* Build complete NMEA command with checksum */
+    char cmd_buf[128];
+    size_t cmd_len = nmea_build_command(cmd_body, cmd_buf, sizeof(cmd_buf));
+    if (cmd_len == 0) {
+        ESP_LOGE(TAG, "send_command: failed to build command for '%s'", cmd_body);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    ESP_LOGI(TAG, "Sending command to LC76G: %.*s", (int)(cmd_len - 2), cmd_buf);  /* Skip CR/LF */
+
+    /* Step 1: Query RX buffer free space — separate tx(0x50) + rx(0x54)
+     * Per Quectel app note: I2C_Master_Transmit to 0x50, I2C_Master_Receive from 0x54.
+     * The 8-byte query is a uint32_t[2] on little-endian ARM:
+     *   cmd[0] = (CW_CMD << 16) | RX_LEN_OFFSET = 0xAA510004 → {0x04, 0x00, 0x51, 0xAA}
+     *   cmd[1] = 4 → {0x04, 0x00, 0x00, 0x00} */
+    uint8_t query[] = {0x04, 0x00, 0x51, 0xAA, 0x04, 0x00, 0x00, 0x00};
+    uint8_t free_buf[4] = {0};
+    esp_err_t ret = i2c_master_transmit(lc76g_handle, query, sizeof(query), 500);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "send_command: query tx failed: %s", esp_err_to_name(ret));
+        return ret;
+    }
+    vTaskDelay(pdMS_TO_TICKS(100));  /* 100ms — matching Waveshare demo timing */
+    ret = i2c_master_receive(lc76g_read_handle, free_buf, sizeof(free_buf), 500);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "send_command: query rx failed: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    uint32_t free_space = (uint32_t)free_buf[0] | ((uint32_t)free_buf[1] << 8)
+                        | ((uint32_t)free_buf[2] << 16) | ((uint32_t)free_buf[3] << 24);
+    ESP_LOGI(TAG, "  LC76G RX buffer free: %lu bytes (need %u)", (unsigned long)free_space, (unsigned)cmd_len);
+
+    if (free_space < cmd_len && free_space != 0) {
+        ESP_LOGW(TAG, "  RX buffer too full (free=%lu, need=%u)", (unsigned long)free_space, (unsigned)cmd_len);
+        return ESP_ERR_NO_MEM;
+    }
+
+    /* Step 2: Config write command — tell LC76G we're about to write cmd_len bytes */
+    uint8_t config_cmd[8];
+    config_cmd[0] = 0x00;  /* cmd_id low */
+    config_cmd[1] = 0x10;  /* cmd_id high */
+    config_cmd[2] = 0x53;  /* tag low */
+    config_cmd[3] = 0xAA;  /* tag high */
+    config_cmd[4] = (uint8_t)(cmd_len & 0xFF);
+    config_cmd[5] = (uint8_t)((cmd_len >> 8) & 0xFF);
+    config_cmd[6] = (uint8_t)((cmd_len >> 16) & 0xFF);
+    config_cmd[7] = (uint8_t)((cmd_len >> 24) & 0xFF);
+
+    ret = i2c_master_transmit(lc76g_handle, config_cmd, sizeof(config_cmd), 1000);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "send_command: config tx failed: %s", esp_err_to_name(ret));
+        return ret;
+    }
+    vTaskDelay(pdMS_TO_TICKS(100));  /* 100ms — matching Waveshare demo timing */
+
+    /* Step 3: Write actual data to 0x58 */
+    ret = i2c_master_transmit(lc76g_dwr_handle, (const uint8_t *)cmd_buf, cmd_len, 1000);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "send_command: data write to 0x58 failed: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    ESP_LOGI(TAG, "  Command sent OK (%u bytes to 0x58)", (unsigned)cmd_len);
+    current_gps_debug.cmds_sent++;
+    current_gps_debug.cmds_ok++;
+    return ESP_OK;
+}
+
+/**
+ * @brief Parse $GPRMC sentence (or $GNRMC).
+ *
+ * Fields: $GPRMC,time,status,lat,N/S,lon,E/W,speed_knots,heading,date,...
+ */
+static void parse_rmc(const char *sentence, gps_data_t *data)
+{
+    char field[32];
+
+    /* Field 1: UTC time (hhmmss.ss) */
+    if (nmea_get_field(sentence, 1, field, sizeof(field)) && strlen(field) >= 6) {
+        data->hour   = (field[0] - '0') * 10 + (field[1] - '0');
+        data->minute = (field[2] - '0') * 10 + (field[3] - '0');
+        data->second = (field[4] - '0') * 10 + (field[5] - '0');
+    }
+
+    /* Field 2: Status (A=active/valid, V=void) */
+    if (nmea_get_field(sentence, 2, field, sizeof(field))) {
+        data->fix_valid = (field[0] == 'A');
+    }
+
+    /* Fields 3-4: Latitude + N/S */
+    char lat_val[20], lat_dir[4];
+    nmea_get_field(sentence, 3, lat_val, sizeof(lat_val));
+    nmea_get_field(sentence, 4, lat_dir, sizeof(lat_dir));
+    if (lat_val[0]) {
+        data->latitude = nmea_to_degrees(lat_val, lat_dir);
+    }
+
+    /* Fields 5-6: Longitude + E/W */
+    char lon_val[20], lon_dir[4];
+    nmea_get_field(sentence, 5, lon_val, sizeof(lon_val));
+    nmea_get_field(sentence, 6, lon_dir, sizeof(lon_dir));
+    if (lon_val[0]) {
+        data->longitude = nmea_to_degrees(lon_val, lon_dir);
+    }
+
+    /* Field 7: Speed over ground (knots → km/h) */
+    if (nmea_get_field(sentence, 7, field, sizeof(field)) && field[0]) {
+        data->speed = atof(field) * 1.852f;  /* knots to km/h */
+    }
+
+    /* Field 8: Track angle / heading (degrees true) */
+    if (nmea_get_field(sentence, 8, field, sizeof(field)) && field[0]) {
+        data->heading = atof(field);
+    }
+}
+
+/**
+ * @brief Parse $GPGGA sentence (or $GNGGA).
+ *
+ * Fields: $GPGGA,time,lat,N/S,lon,E/W,quality,sats,hdop,alt,M,...
+ */
+static void parse_gga(const char *sentence, gps_data_t *data)
+{
+    char field[32];
+
+    /* Field 6: Fix quality (0=invalid, 1=GPS, 2=DGPS, 6=estimated) */
+    if (nmea_get_field(sentence, 6, field, sizeof(field)) && field[0]) {
+        data->fix_quality = atoi(field);
+        if (data->fix_quality > 0) {
+            data->fix_valid = true;
+        }
+    }
+
+    /* Field 7: Satellites used */
+    if (nmea_get_field(sentence, 7, field, sizeof(field)) && field[0]) {
+        data->satellites = atoi(field);
+    }
+
+    /* Field 8: HDOP */
+    if (nmea_get_field(sentence, 8, field, sizeof(field)) && field[0]) {
+        data->hdop = atof(field);
+        /* Rough accuracy estimate: HDOP * 5 meters (typical GPS) */
+        data->accuracy = data->hdop * 5.0f;
+    }
+
+    /* Field 9: Altitude above MSL */
+    if (nmea_get_field(sentence, 9, field, sizeof(field)) && field[0]) {
+        data->altitude = atof(field);
+    }
+}
+
+/**
+ * @brief Parse $GPGSV / $GNGSV / $GLGSV / $GAGSV sentence for visible satellite count.
+ *
+ * GSV format: $xxGSV,totalMsgs,msgNum,totalSats,PRN,elev,azim,SNR,...*cs
+ * Field 3 = total visible satellites for this constellation
+ */
+static void parse_gsv(const char *sentence, gps_data_t *data)
+{
+    char field[32];
+    /* Field 3: total satellites in view (for this talker/constellation) */
+    if (nmea_get_field(sentence, 3, field, sizeof(field)) && field[0]) {
+        /* Only update on message 1 of N (field 2 = message number) */
+        char msgnum[8];
+        if (nmea_get_field(sentence, 2, msgnum, sizeof(msgnum)) && msgnum[0] == '1') {
+            /* This is the first GSV message — it has the total count */
+            int sats = atoi(field);
+            /* We accumulate visible sats from different constellations.
+             * Reset on first talker seen per cycle (GP), add for others (GL, GA, GB) */
+            if (strncmp(sentence, "$GP", 3) == 0) {
+                data->visible_sats = sats;  /* Reset with GPS count */
+            } else {
+                data->visible_sats += sats; /* Add GLONASS/Galileo/BeiDou */
+            }
+        }
+    }
+}
+
+/**
+ * @brief Process a complete NMEA line — parse + count sentence types.
+ */
+static void process_nmea_line(const char *line, gps_data_t *data)
+{
+    if (line[0] != '$') return;
+
+    /* Match sentence types (supports GP, GN, GL, GA, GB prefixes) */
+    const char *type = line + 3;  /* Skip "$GP", "$GN", etc. */
+
+    if (strncmp(type, "RMC", 3) == 0) {
+        parse_rmc(line, data);
+        current_gps_debug.cnt_rmc++;
+        /* Store raw RMC for debug display */
+        strncpy(current_gps_debug.last_rmc, line, sizeof(current_gps_debug.last_rmc) - 1);
+        current_gps_debug.last_rmc[sizeof(current_gps_debug.last_rmc) - 1] = '\0';
+    } else if (strncmp(type, "GGA", 3) == 0) {
+        parse_gga(line, data);
+        current_gps_debug.cnt_gga++;
+        /* Store raw GGA for debug display */
+        strncpy(current_gps_debug.last_gga, line, sizeof(current_gps_debug.last_gga) - 1);
+        current_gps_debug.last_gga[sizeof(current_gps_debug.last_gga) - 1] = '\0';
+        /* Log raw GGA sentence for first 60 cycles (diagnostics) */
+        if (current_gps_debug.cycle < 60) {
+            ESP_LOGI(TAG, "  [GGA] %s", line);
+        }
+    } else if (strncmp(type, "GSV", 3) == 0) {
+        parse_gsv(line, data);
+        current_gps_debug.cnt_gsv++;
+        /* Log raw GSV for first 10 cycles to diagnose satellite visibility */
+        if (current_gps_debug.cycle < 10) {
+            ESP_LOGI(TAG, "  [GSV] %s", line);
+        }
+    } else if (strncmp(type, "GSA", 3) == 0) {
+        current_gps_debug.cnt_gsa++;
+    } else if (strncmp(type, "GLL", 3) == 0) {
+        current_gps_debug.cnt_gll++;
+    } else if (strncmp(type, "VTG", 3) == 0) {
+        current_gps_debug.cnt_vtg++;
+    } else if (strncmp(line + 1, "PQTM", 4) == 0) {
+        current_gps_debug.cnt_pqtm++;
+        /* Always log PQTM responses */
+        ESP_LOGI(TAG, "  [PQTM] %s", line);
+    } else if (strncmp(type - 1, "TXT", 3) == 0 || strncmp(type, "TXT", 3) == 0) {
+        current_gps_debug.cnt_txt++;
+        /* Log TXT messages (module status info) */
+        ESP_LOGI(TAG, "  [TXT] %s", line);
+    } else {
+        current_gps_debug.cnt_other++;
+        /* Log unknown sentence types for first 30 cycles */
+        if (current_gps_debug.cycle < 30) {
+            ESP_LOGI(TAG, "  [???] %s", line);
+        }
+    }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * AXP2101 PMIC Diagnostic — Read and log power rail status
+ * ──────────────────────────────────────────────────────────────────────── */
+
+/**
+ * @brief Read a single AXP2101 register via I2C.
+ * Uses transmit_receive on a temporary device handle at address 0x34.
+ */
+static esp_err_t axp2101_read_reg(i2c_master_dev_handle_t pmu, uint8_t reg, uint8_t *val)
+{
+    return i2c_master_transmit_receive(pmu, &reg, 1, val, 1, 100);
+}
+
+/**
+ * @brief Log AXP2101 PMIC power rail status for diagnostics.
+ * Reads key registers and logs which LDO/DCDC rails are enabled and at what voltage.
+ * This helps diagnose whether the GPS module has power.
+ *
+ * AXP2101 Register Map (key addresses):
+ *   0x80: DCDC on/off control (DC1=b0, DC2=b1, DC3=b2, DC4=b3, DC5=b4)
+ *   0x90: LDO on/off control 0 (ALDO1=b0, ALDO2=b1, ALDO3=b2, ALDO4=b3, BLDO1=b4, BLDO2=b5)
+ *   0x91: LDO on/off control 1 (DLDO1=b0, DLDO2=b1, CPUSLDO=b2)
+ *   0x82-0x86: DCDC1-5 voltage setting
+ *   0x92-0x95: ALDO1-4 voltage (val * 100 + 500 mV)
+ *   0x96-0x97: BLDO1-2 voltage (val * 100 + 500 mV)
+ */
+static void axp2101_log_status(i2c_master_bus_handle_t bus)
+{
+    /* Create temporary device handle for AXP2101 at 0x34 */
+    i2c_master_dev_handle_t pmu = NULL;
+    i2c_device_config_t pmu_cfg = {
+        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+        .device_address = 0x34,
+        .scl_speed_hz = 400000,
+    };
+    esp_err_t ret = i2c_master_bus_add_device(bus, &pmu_cfg, &pmu);
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "PMIC: cannot add device 0x34: %s", esp_err_to_name(ret));
+        return;
+    }
+
+    uint8_t dcdc_ctrl = 0, ldo_ctrl0 = 0, ldo_ctrl1 = 0;
+    uint8_t aldo1_v = 0, aldo2_v = 0, aldo3_v = 0, aldo4_v = 0;
+    uint8_t bldo1_v = 0, bldo2_v = 0;
+
+    /* Read control registers */
+    bool ok = true;
+    ok &= (axp2101_read_reg(pmu, 0x80, &dcdc_ctrl) == ESP_OK);
+    ok &= (axp2101_read_reg(pmu, 0x90, &ldo_ctrl0) == ESP_OK);
+    ok &= (axp2101_read_reg(pmu, 0x91, &ldo_ctrl1) == ESP_OK);
+
+    if (!ok) {
+        ESP_LOGW(TAG, "PMIC: failed to read control registers");
+        i2c_master_bus_rm_device(pmu);
+        return;
+    }
+
+    /* Read voltage registers */
+    axp2101_read_reg(pmu, 0x92, &aldo1_v);
+    axp2101_read_reg(pmu, 0x93, &aldo2_v);
+    axp2101_read_reg(pmu, 0x94, &aldo3_v);
+    axp2101_read_reg(pmu, 0x95, &aldo4_v);
+    axp2101_read_reg(pmu, 0x96, &bldo1_v);
+    axp2101_read_reg(pmu, 0x97, &bldo2_v);
+
+    ESP_LOGI(TAG, "=== AXP2101 PMIC Rail Status ===");
+    ESP_LOGI(TAG, "  DCDC ctrl=0x%02X: DC1=%s DC2=%s DC3=%s DC4=%s DC5=%s",
+             dcdc_ctrl,
+             (dcdc_ctrl & 0x01) ? "ON" : "off",
+             (dcdc_ctrl & 0x02) ? "ON" : "off",
+             (dcdc_ctrl & 0x04) ? "ON" : "off",
+             (dcdc_ctrl & 0x08) ? "ON" : "off",
+             (dcdc_ctrl & 0x10) ? "ON" : "off");
+    ESP_LOGI(TAG, "  LDO ctrl0=0x%02X: ALDO1=%s(%umV) ALDO2=%s(%umV) ALDO3=%s(%umV) ALDO4=%s(%umV)",
+             ldo_ctrl0,
+             (ldo_ctrl0 & 0x01) ? "ON" : "off", (unsigned)(aldo1_v * 100 + 500),
+             (ldo_ctrl0 & 0x02) ? "ON" : "off", (unsigned)(aldo2_v * 100 + 500),
+             (ldo_ctrl0 & 0x04) ? "ON" : "off", (unsigned)(aldo3_v * 100 + 500),
+             (ldo_ctrl0 & 0x08) ? "ON" : "off", (unsigned)(aldo4_v * 100 + 500));
+    ESP_LOGI(TAG, "  LDO ctrl0=0x%02X: BLDO1=%s(%umV) BLDO2=%s(%umV)",
+             ldo_ctrl0,
+             (ldo_ctrl0 & 0x10) ? "ON" : "off", (unsigned)(bldo1_v * 100 + 500),
+             (ldo_ctrl0 & 0x20) ? "ON" : "off", (unsigned)(bldo2_v * 100 + 500));
+    ESP_LOGI(TAG, "  LDO ctrl1=0x%02X: DLDO1=%s DLDO2=%s CPUSLDO=%s",
+             ldo_ctrl1,
+             (ldo_ctrl1 & 0x01) ? "ON" : "off",
+             (ldo_ctrl1 & 0x02) ? "ON" : "off",
+             (ldo_ctrl1 & 0x04) ? "ON" : "off");
+
+    i2c_master_bus_rm_device(pmu);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * GPS Task — Multi-approach I2C read with auto-detection
+ * ──────────────────────────────────────────────────────────────────────── */
+
+/**
+ * @brief GPS reading task — tries multiple I2C approaches to find one that works.
+ *
+ * The Waveshare demo uses legacy I2C API with tx(0x50)+rx(0x54).
+ * On some boards/ESP-IDF versions, 0x54 doesn't respond (NACK).
+ * We try these approaches in order:
+ *   1. tx(0x50) + rx(0x54) — official CASIC protocol
+ *   2. transmit_receive on 0x50 — repeated-START, same address
+ *   3. tx(0x50) + rx(0x50) — separate transactions, same address
+ *   4. rx(0x54) with disable_ack_check — ignore NACK, read anyway
+ *   5. raw rx(0x50) — no query, just read
+ *
+ * Once a method works, we use it for the main loop.
+ */
+static void gps_task(void *pvParameters)
+{
+    ESP_LOGI(TAG, "GPS task started — multi-approach I2C auto-detection");
+
+    i2c_master_bus_handle_t bus = display_get_i2c_handle();
+
+    /* ── PMIC diagnostic — log which power rails are enabled ── */
+    axp2101_log_status(bus);
+
+    /* ── I2C bus reset — clear any stuck state ── */
+    esp_err_t rst = i2c_master_bus_reset(bus);
+    ESP_LOGI(TAG, "I2C bus reset: %s", esp_err_to_name(rst));
+    vTaskDelay(pdMS_TO_TICKS(100));
+
+    /* ── Create 0x54 device with disabled ACK check (for method 4) ── */
+    i2c_master_dev_handle_t lc76g_noack_handle = NULL;
+    {
+        i2c_device_config_t noack_cfg = {
+            .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+            .device_address = LC76G_I2C_ADDR_READ,
+            .scl_speed_hz = LC76G_I2C_CLK_HZ,
+            .flags = { .disable_ack_check = 1 },
+        };
+        esp_err_t r = i2c_master_bus_add_device(bus, &noack_cfg, &lc76g_noack_handle);
+        if (r != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to add no-ACK device for 0x54: %s", esp_err_to_name(r));
+        }
+    }
+
+    /* ── LC76G warm-up — try ALL approaches ──
+     * Try each method 3 times; select the first that returns ESP_OK.
+     * The CASIC query: {0x08,0x00,0x51,0xAA, 0x04,0x00,0x00,0x00}
+     */
+    int read_method = 0;  /* 0=unknown, 1=tx50+rx54, 2=txrx50, 3=tx50+rx50, 4=noack54, 5=raw50 */
+#if 0  /* BYPASS warm-up — go straight to method 2; warm-up queries corrupt LC76G state */
+    {
+        ESP_LOGI(TAG, "=== LC76G I2C METHOD DETECTION (testing ALL methods) ===");
+        uint8_t query[] = {0x08, 0x00, 0x51, 0xAA, 0x04, 0x00, 0x00, 0x00};
+        uint8_t resp[4] = {0};
+        int method_ok[6] = {0};  /* count of successes per method (index 1-5) */
+
+        /* ── Method 1: tx(0x50) + rx(0x54) — official CASIC protocol ── */
+        ESP_LOGI(TAG, "--- Method 1: tx(0x50) + rx(0x54) [100ms delay] ---");
+        for (int trial = 0; trial < 3; trial++) {
+            memset(resp, 0, sizeof(resp));
+            esp_err_t tx = i2c_master_transmit(lc76g_handle, query, sizeof(query), 1000);
+            vTaskDelay(pdMS_TO_TICKS(100));
+            esp_err_t rx = i2c_master_receive(lc76g_read_handle, resp, 4, 1000);
+            uint32_t avail = (uint32_t)resp[0] | ((uint32_t)resp[1]<<8) |
+                             ((uint32_t)resp[2]<<16) | ((uint32_t)resp[3]<<24);
+            ESP_LOGI(TAG, "  [1][%d]: tx=%s rx=%s avail=%lu [%02X %02X %02X %02X]",
+                     trial, esp_err_to_name(tx), esp_err_to_name(rx),
+                     (unsigned long)avail, resp[0], resp[1], resp[2], resp[3]);
+            if (tx == ESP_OK && rx == ESP_OK) method_ok[1]++;
+            vTaskDelay(pdMS_TO_TICKS(500));
+        }
+
+        /* ── Method 2: transmit_receive on 0x50 (repeated-START) ── */
+        ESP_LOGI(TAG, "--- Method 2: transmit_receive(0x50) [repeated-START] ---");
+        for (int trial = 0; trial < 3; trial++) {
+            memset(resp, 0, sizeof(resp));
+            esp_err_t r = i2c_master_transmit_receive(lc76g_handle, query,
+                                                       sizeof(query), resp, 4, 1000);
+            uint32_t avail = (uint32_t)resp[0] | ((uint32_t)resp[1]<<8) |
+                             ((uint32_t)resp[2]<<16) | ((uint32_t)resp[3]<<24);
+            ESP_LOGI(TAG, "  [2][%d]: %s avail=%lu [%02X %02X %02X %02X]",
+                     trial, esp_err_to_name(r),
+                     (unsigned long)avail, resp[0], resp[1], resp[2], resp[3]);
+            if (r == ESP_OK) method_ok[2]++;
+            vTaskDelay(pdMS_TO_TICKS(500));
+        }
+
+        /* ── Method 3: tx(0x50) + rx(0x50) — both same address ── */
+        ESP_LOGI(TAG, "--- Method 3: tx(0x50) + rx(0x50) [100ms delay] ---");
+        {
+            for (int trial = 0; trial < 3; trial++) {
+                memset(resp, 0, sizeof(resp));
+                esp_err_t tx = i2c_master_transmit(lc76g_handle, query, sizeof(query), 1000);
+                vTaskDelay(pdMS_TO_TICKS(100));
+                esp_err_t rx = i2c_master_receive(lc76g_handle, resp, 4, 1000);
+                uint32_t avail = (uint32_t)resp[0] | ((uint32_t)resp[1]<<8) |
+                                 ((uint32_t)resp[2]<<16) | ((uint32_t)resp[3]<<24);
+                ESP_LOGI(TAG, "  [3][%d]: tx=%s rx=%s avail=%lu [%02X %02X %02X %02X]",
+                         trial, esp_err_to_name(tx), esp_err_to_name(rx),
+                         (unsigned long)avail, resp[0], resp[1], resp[2], resp[3]);
+                if (tx == ESP_OK && rx == ESP_OK) method_ok[3]++;
+                vTaskDelay(pdMS_TO_TICKS(500));
+            }
+        }
+
+        /* ── Method 4: tx(0x50) + rx(0x54) with ACK-check disabled ── */
+        if (lc76g_noack_handle != NULL) {
+            ESP_LOGI(TAG, "--- Method 4: tx(0x50) + rx(0x54, no-ACK-check) [100ms delay] ---");
+            for (int trial = 0; trial < 3; trial++) {
+                memset(resp, 0, sizeof(resp));
+                esp_err_t tx = i2c_master_transmit(lc76g_handle, query, sizeof(query), 1000);
+                vTaskDelay(pdMS_TO_TICKS(100));
+                esp_err_t rx = i2c_master_receive(lc76g_noack_handle, resp, 4, 1000);
+                uint32_t avail = (uint32_t)resp[0] | ((uint32_t)resp[1]<<8) |
+                                 ((uint32_t)resp[2]<<16) | ((uint32_t)resp[3]<<24);
+                ESP_LOGI(TAG, "  [4][%d]: tx=%s rx=%s avail=%lu [%02X %02X %02X %02X]",
+                         trial, esp_err_to_name(tx), esp_err_to_name(rx),
+                         (unsigned long)avail, resp[0], resp[1], resp[2], resp[3]);
+                if (tx == ESP_OK && rx == ESP_OK) {
+                    bool plausible = !(resp[0] == resp[1] && resp[1] == resp[2] && resp[2] == resp[3]);
+                    if (plausible || avail == 0) method_ok[4]++;
+                    else ESP_LOGI(TAG, "  [4] ESP_OK but data looks bogus");
+                }
+                vTaskDelay(pdMS_TO_TICKS(500));
+            }
+        }
+
+        /* ── Method 5: raw rx(0x50) — no query, just read ── */
+        ESP_LOGI(TAG, "--- Method 5: raw rx(0x50) [no query] ---");
+        {
+            for (int trial = 0; trial < 3; trial++) {
+                uint8_t raw[32] = {0};
+                esp_err_t rx = i2c_master_receive(lc76g_handle, raw, 32, 1000);
+                bool has_ascii = false;
+                for (int i = 0; i < 32; i++) {
+                    if (raw[i] == '$' || (raw[i] >= 'A' && raw[i] <= 'Z')) has_ascii = true;
+                }
+                ESP_LOGI(TAG, "  [5][%d]: %s ascii=%d [%02X%02X%02X%02X %02X%02X%02X%02X]",
+                         trial, esp_err_to_name(rx), has_ascii,
+                         raw[0], raw[1], raw[2], raw[3],
+                         raw[4], raw[5], raw[6], raw[7]);
+                if (rx == ESP_OK && has_ascii) method_ok[5]++;
+                vTaskDelay(pdMS_TO_TICKS(500));
+            }
+        }
+
+        /* ── Summary and selection ── */
+        ESP_LOGI(TAG, "=== METHOD RESULTS: m1=%d/3  m2=%d/3  m3=%d/3  m4=%d/3  m5=%d/3 ===",
+                 method_ok[1], method_ok[2], method_ok[3], method_ok[4], method_ok[5]);
+
+        /* Pick method with most successes; prefer m3 > m2 > m1 > m4 > m5 for reliability */
+        int best = 0, best_count = 0;
+        int pref[] = {3, 2, 1, 4, 5};
+        for (int i = 0; i < 5; i++) {
+            if (method_ok[pref[i]] > best_count) {
+                best = pref[i];
+                best_count = method_ok[pref[i]];
+            }
+        }
+        if (best > 0) {
+            read_method = best;
+            ESP_LOGI(TAG, "  >>> Selected method %d (%d/3 successes)", read_method, best_count);
+        } else {
+            read_method = 3;  /* Default to separate tx+rx on 0x50 */
+            ESP_LOGW(TAG, "  !!! NO METHOD WORKS — defaulting to method 3 (tx+rx on 0x50)");
+        }
+
+        ESP_LOGI(TAG, "=== Selected method: %d ===", read_method);
+        current_gps_debug.warm_ups++;
+    }
+#endif  /* BYPASS warm-up */
+
+    /* ── Cold start DISABLED on boot ── */
+    ESP_LOGI(TAG, "Cold start SKIPPED (use debug screen to trigger manually)");
+    vTaskDelay(pdMS_TO_TICKS(1000));
+
+    static uint8_t nmea_buf[GPS_NMEA_BUF_SIZE];
+    gps_data_t local_data = {0};
+    uint32_t total_bytes = 0;
+    uint32_t total_sentences = 0;
+    uint32_t cycle = 0;
+    bool ever_received = false;
+    uint32_t consecutive_fails = 0;
+
+    /* ── Diagnostic: test each operation independently ── */
+    ESP_LOGI(TAG, "=== DIAGNOSTIC: Testing individual I2C ops on LC76G ===");
+
+    /* Test A: Can we TX to 0x50? (should always work) */
+    uint8_t query[] = {0x08, 0x00, 0x51, 0xAA, 0x04, 0x00, 0x00, 0x00};
+    for (int i = 0; i < 3; i++) {
+        esp_err_t e = i2c_master_transmit(lc76g_handle, query, sizeof(query), 1000);
+        ESP_LOGI(TAG, "  TX(0x50)[%d]: %s", i, esp_err_to_name(e));
+        vTaskDelay(pdMS_TO_TICKS(200));
+    }
+
+    /* Test B: Can we RX 1 byte from 0x50? */
+    for (int i = 0; i < 3; i++) {
+        uint8_t b = 0;
+        esp_err_t e = i2c_master_receive(lc76g_handle, &b, 1, 1000);
+        ESP_LOGI(TAG, "  RX(0x50,1byte)[%d]: %s data=0x%02X", i, esp_err_to_name(e), b);
+        vTaskDelay(pdMS_TO_TICKS(200));
+    }
+
+    /* Test C: Can we RX 1 byte from 0x54? */
+    for (int i = 0; i < 3; i++) {
+        uint8_t b = 0;
+        esp_err_t e = i2c_master_receive(lc76g_read_handle, &b, 1, 1000);
+        ESP_LOGI(TAG, "  RX(0x54,1byte)[%d]: %s data=0x%02X", i, esp_err_to_name(e), b);
+        vTaskDelay(pdMS_TO_TICKS(200));
+    }
+
+    /* Test D: TX to 0x50 then RX from 0x54 with various delays */
+    for (int delay_ms = 10; delay_ms <= 500; delay_ms *= 5) {
+        uint8_t resp[4] = {0};
+        esp_err_t tx = i2c_master_transmit(lc76g_handle, query, sizeof(query), 1000);
+        vTaskDelay(pdMS_TO_TICKS(delay_ms));
+        esp_err_t rx = i2c_master_receive(lc76g_read_handle, resp, 4, 1000);
+        ESP_LOGI(TAG, "  TX(0x50)+%dms+RX(0x54): tx=%s rx=%s [%02X%02X%02X%02X]",
+                 delay_ms, esp_err_to_name(tx), esp_err_to_name(rx),
+                 resp[0], resp[1], resp[2], resp[3]);
+        vTaskDelay(pdMS_TO_TICKS(300));
+    }
+
+    /* Test E: TX to 0x50 then RX from 0x50 with various delays */
+    for (int delay_ms = 10; delay_ms <= 500; delay_ms *= 5) {
+        uint8_t resp[4] = {0};
+        esp_err_t tx = i2c_master_transmit(lc76g_handle, query, sizeof(query), 1000);
+        vTaskDelay(pdMS_TO_TICKS(delay_ms));
+        esp_err_t rx = i2c_master_receive(lc76g_handle, resp, 4, 1000);
+        ESP_LOGI(TAG, "  TX(0x50)+%dms+RX(0x50): tx=%s rx=%s [%02X%02X%02X%02X]",
+                 delay_ms, esp_err_to_name(tx), esp_err_to_name(rx),
+                 resp[0], resp[1], resp[2], resp[3]);
+        vTaskDelay(pdMS_TO_TICKS(300));
+    }
+
+    /* Test F: transmit_receive on 0x50 (repeated-START) - 5 tries */
+    for (int i = 0; i < 5; i++) {
+        uint8_t resp[4] = {0};
+        esp_err_t e = i2c_master_transmit_receive(lc76g_handle, query,
+                                                   sizeof(query), resp, 4, 2000);
+        uint32_t avail = (uint32_t)resp[0] | ((uint32_t)resp[1]<<8) |
+                         ((uint32_t)resp[2]<<16) | ((uint32_t)resp[3]<<24);
+        ESP_LOGI(TAG, "  TxRx(0x50)[%d]: %s avail=%lu [%02X%02X%02X%02X]",
+                 i, esp_err_to_name(e), (unsigned long)avail,
+                 resp[0], resp[1], resp[2], resp[3]);
+        vTaskDelay(pdMS_TO_TICKS(500));
+        /* Bus reset between tries */
+        i2c_master_bus_reset(bus);
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+
+    /* Test G: TX 1 byte (register read style) then RX from 0x50 */
+    for (int i = 0; i < 3; i++) {
+        uint8_t reg = 0x00;
+        uint8_t resp[4] = {0};
+        esp_err_t tx = i2c_master_transmit(lc76g_handle, &reg, 1, 1000);
+        vTaskDelay(pdMS_TO_TICKS(100));
+        esp_err_t rx = i2c_master_receive(lc76g_handle, resp, 4, 1000);
+        ESP_LOGI(TAG, "  TX(0x50,reg=0)+100ms+RX(0x50)[%d]: tx=%s rx=%s [%02X%02X%02X%02X]",
+                 i, esp_err_to_name(tx), esp_err_to_name(rx),
+                 resp[0], resp[1], resp[2], resp[3]);
+        vTaskDelay(pdMS_TO_TICKS(300));
+    }
+
+    /* Test H: transmit_receive 1-byte write + 4 byte read (register-style) */
+    for (int i = 0; i < 3; i++) {
+        uint8_t reg = 0x00;
+        uint8_t resp[4] = {0};
+        esp_err_t e = i2c_master_transmit_receive(lc76g_handle, &reg, 1, resp, 4, 2000);
+        ESP_LOGI(TAG, "  TxRx(0x50,reg=0,4b)[%d]: %s [%02X%02X%02X%02X]",
+                 i, esp_err_to_name(e), resp[0], resp[1], resp[2], resp[3]);
+        vTaskDelay(pdMS_TO_TICKS(500));
+        i2c_master_bus_reset(bus);
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+
+    ESP_LOGI(TAG, "=== DIAGNOSTIC COMPLETE — entering main loop with method 2 ===");
+    read_method = 2;
+
+    /* Choose read handle based on detected method */
+    i2c_master_dev_handle_t rx_handle;
+    switch (read_method) {
+        case 1: rx_handle = lc76g_read_handle; break;
+        case 4: rx_handle = lc76g_noack_handle; break;
+        default: rx_handle = lc76g_handle; break;
+    }
+
+    while (1) {
+        /* ── Recovery: I2C bus reset after many consecutive failures ── */
+        if (consecutive_fails >= 10) {
+            ESP_LOGW(TAG, "Recovery: %lu consecutive fails — bus reset",
+                     (unsigned long)consecutive_fails);
+            i2c_master_bus_reset(bus);
+            vTaskDelay(pdMS_TO_TICKS(500));
+            consecutive_fails = 0;
+            current_gps_debug.warm_ups++;
+        }
+
+        /* ── Declarations for this iteration ── */
+        uint8_t queryData[] = {0x08, 0x00, 0x51, 0xAA, 0x04, 0x00, 0x00, 0x00};
+        uint8_t readData[4] = {0};
+        esp_err_t ret = ESP_FAIL;
+        uint32_t readLen = 0;
+        bool data_ready = false;
+
+        /* Every cycle: bus reset + transmit_receive */
+        i2c_master_bus_reset(bus);
+        vTaskDelay(pdMS_TO_TICKS(20));
+
+        ret = i2c_master_transmit_receive(lc76g_handle, queryData,
+                                          sizeof(queryData), readData, 4, 2000);
+
+        if (ret != ESP_OK) {
+            consecutive_fails++;
+            if (cycle < 10 || (cycle % 20) == 0)
+                ESP_LOGW(TAG, "query failed (m=%d): tx=%s rx=%s (c=%lu, f=%lu)",
+                         read_method, esp_err_to_name(ret), "",
+                         (unsigned long)cycle, (unsigned long)consecutive_fails);
+            cycle++;
+            vTaskDelay(pdMS_TO_TICKS(500));
+            continue;
+        }
+
+        /* Parse available data length (little-endian uint32) */
+        uint32_t dataLength = (uint32_t)readData[0] | ((uint32_t)readData[1] << 8)
+                            | ((uint32_t)readData[2] << 16) | ((uint32_t)readData[3] << 24);
+
+        consecutive_fails = 0;
+
+        if (dataLength == 0) {
+            if (cycle < 20 || (cycle % 20) == 0)
+                ESP_LOGI(TAG, "avail=0 (c=%lu)", (unsigned long)cycle);
+            cycle++;
+            vTaskDelay(pdMS_TO_TICKS(500));
+            continue;
+        }
+
+        if (dataLength > 65536) {
+            ESP_LOGW(TAG, "bogus avail=%lu [%02X%02X%02X%02X] (c=%lu)",
+                     (unsigned long)dataLength, readData[0], readData[1],
+                     readData[2], readData[3], (unsigned long)cycle);
+            cycle++;
+            vTaskDelay(pdMS_TO_TICKS(500));
+            continue;
+        }
+
+        ESP_LOGI(TAG, "avail=%lu (c=%lu)", (unsigned long)dataLength, (unsigned long)cycle);
+
+        /* ── Step 2: Request NMEA data ── */
+        readLen = dataLength;
+        if (readLen > (GPS_NMEA_BUF_SIZE - 1)) readLen = GPS_NMEA_BUF_SIZE - 1;
+
+        uint8_t data2[8];
+        data2[0] = 0x00;
+        data2[1] = 0x20;
+        data2[2] = 0x51;
+        data2[3] = 0xAA;
+        data2[4] = readData[0];
+        data2[5] = readData[1];
+        data2[6] = readData[2];
+        data2[7] = readData[3];
+
+        vTaskDelay(pdMS_TO_TICKS(100));
+
+        esp_err_t tx_ret = i2c_master_transmit(lc76g_handle, data2, sizeof(data2), 1000);
+        if (tx_ret != ESP_OK) {
+            ESP_LOGW(TAG, "data request tx failed: %s (c=%lu)",
+                     esp_err_to_name(tx_ret), (unsigned long)cycle);
+            cycle++;
+            vTaskDelay(pdMS_TO_TICKS(500));
+            continue;
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(100));
+
+        esp_err_t rx_ret = i2c_master_receive(lc76g_handle, nmea_buf, readLen, 2000);
+        if (rx_ret != ESP_OK) {
+            ESP_LOGW(TAG, "data read(%lu) failed: %s (c=%lu)",
+                     (unsigned long)readLen, esp_err_to_name(rx_ret), (unsigned long)cycle);
+            cycle++;
+            vTaskDelay(pdMS_TO_TICKS(500));
+            continue;
+        }
+
+        data_ready = true;
+
+        /* ── Process received data ── */
+        if (!data_ready) {
+            cycle++;
+            vTaskDelay(pdMS_TO_TICKS(500));
+            continue;
+        }
+
+        /* Trim trailing zeros */
+        uint32_t got_len = readLen;
+        while (got_len > 0 && nmea_buf[got_len - 1] == 0) got_len--;
+
+        /* Check for NMEA content (look for '$' marker) */
+        bool has_nmea = false;
+        for (uint32_t i = 0; i < got_len && i < 256; i++) {
+            if (nmea_buf[i] == '$') { has_nmea = true; break; }
+        }
+
+        if (!has_nmea || got_len == 0) {
+            if (got_len > 0) {
+                char preview[65];
+                size_t plen = got_len < 64 ? got_len : 64;
+                memcpy(preview, nmea_buf, plen);
+                for (size_t i = 0; i < plen; i++) {
+                    if (preview[i] < 32 || preview[i] > 126) preview[i] = '.';
+                }
+                preview[plen] = '\0';
+                ESP_LOGI(TAG, "  non-NMEA data(%lu): %.64s", (unsigned long)got_len, preview);
+            }
+            cycle++;
+            vTaskDelay(pdMS_TO_TICKS(500));
+            continue;
+        }
+
+        /* ── NMEA data received successfully ── */
+        nmea_buf[got_len] = '\0';
+        total_bytes += got_len;
+
+        if (!ever_received) {
+            ESP_LOGI(TAG, "=== FIRST GPS DATA RECEIVED! (%lu bytes at cycle %lu) ===",
+                     (unsigned long)got_len, (unsigned long)cycle);
+            char preview[161];
+            size_t plen = got_len < 160 ? got_len : 160;
+            memcpy(preview, nmea_buf, plen);
+            preview[plen] = '\0';
+            ESP_LOGI(TAG, "  %.160s", preview);
+            ever_received = true;
+        }
+
+        /* Feed bytes into line parser */
+        for (uint32_t i = 0; i < got_len; i++) {
+            char c = (char)nmea_buf[i];
+            if (c == '\n' || c == '\r') {
+                if (nmea_line_pos > 0) {
+                    nmea_line[nmea_line_pos] = '\0';
+                    process_nmea_line(nmea_line, &local_data);
+                    total_sentences++;
+                    nmea_line_pos = 0;
+                }
+            } else if (nmea_line_pos < (int)(sizeof(nmea_line) - 1)) {
+                nmea_line[nmea_line_pos++] = c;
+            }
+        }
+
+        /* Thread-safe update (GPS data + debug counters) */
+        if (gps_mutex && xSemaphoreTake(gps_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+            memcpy(&current_gps_data, &local_data, sizeof(gps_data_t));
+            current_gps_debug.total_bytes = total_bytes;
+            current_gps_debug.total_sentences = total_sentences;
+            current_gps_debug.cycle = cycle;
+            current_gps_debug.consecutive_fails = consecutive_fails;
+            xSemaphoreGive(gps_mutex);
+        }
+
+        /* Status log every ~5 seconds */
+        if ((cycle % GPS_STATUS_LOG_CYCLES) == 0 && cycle > 0) {
+            ESP_LOGI(TAG, "GPS: fix=%s sats=%d/%d speed=%.1f hdop=%.1f bytes=%lu sentences=%lu c=%lu",
+                     local_data.fix_valid ? "YES" : "no",
+                     local_data.satellites,
+                     local_data.visible_sats,
+                     local_data.speed,
+                     local_data.hdop,
+                     (unsigned long)total_bytes,
+                     (unsigned long)total_sentences,
+                     (unsigned long)cycle);
+            ESP_LOGI(TAG, "  Sentences: GGA=%lu RMC=%lu GSV=%lu GSA=%lu GLL=%lu VTG=%lu TXT=%lu PQTM=%lu other=%lu",
+                     (unsigned long)current_gps_debug.cnt_gga,
+                     (unsigned long)current_gps_debug.cnt_rmc,
+                     (unsigned long)current_gps_debug.cnt_gsv,
+                     (unsigned long)current_gps_debug.cnt_gsa,
+                     (unsigned long)current_gps_debug.cnt_gll,
+                     (unsigned long)current_gps_debug.cnt_vtg,
+                     (unsigned long)current_gps_debug.cnt_txt,
+                     (unsigned long)current_gps_debug.cnt_pqtm,
+                     (unsigned long)current_gps_debug.cnt_other);
+            if (local_data.fix_valid) {
+                ESP_LOGI(TAG, "  Position: %.6f, %.6f  Alt: %.1fm  Heading: %.1f deg",
+                         local_data.latitude, local_data.longitude,
+                         local_data.altitude, local_data.heading);
+            }
+        }
+        cycle++;
+        vTaskDelay(pdMS_TO_TICKS(500));  /* 500ms loop — matching Waveshare demo */
+    }   /* end while(1) */
+
+}   /* end gps_task */
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Public API
+ * ──────────────────────────────────────────────────────────────────────── */
+
+esp_err_t gps_handler_init(void)
+{
+    ESP_LOGI(TAG, "Initializing GPS handler (LC76G via I2C at 0x%02X)", LC76G_I2C_ADDR);
+
+    /* Create mutex for thread-safe GPS data access */
+    gps_mutex = xSemaphoreCreateMutex();
+    if (gps_mutex == NULL) {
+        ESP_LOGE(TAG, "Failed to create GPS mutex");
+        return ESP_FAIL;
+    }
+
+    /* Get the shared I2C bus handle from display_init */
+    i2c_master_bus_handle_t i2c_bus = display_get_i2c_handle();
+    if (i2c_bus == NULL) {
+        ESP_LOGE(TAG, "I2C bus handle is NULL — call display_init() first");
+        return ESP_FAIL;
+    }
+
+    /* ── I2C Bus Scan — skip LC76G addresses (probing corrupts CASIC state) ── */
+    ESP_LOGI(TAG, "I2C bus scan (0x03–0x77, SKIPPING LC76G 0x50/0x54/0x58):");
+    int found_count = 0;
+    for (uint8_t addr = 0x03; addr <= 0x77; addr++) {
+        if (addr == 0x50 || addr == 0x54 || addr == 0x58) continue;
+        esp_err_t probe_ret = i2c_master_probe(i2c_bus, addr, 50);
+        if (probe_ret == ESP_OK) {
+            const char *name = "";
+            if (addr == 0x5A) name = " (CST9217 touch)";
+            else if (addr == 0x6B) name = " (QMI8658 IMU)";
+            else if (addr == 0x34) name = " (AXP2101 PMIC)";
+            else if (addr == 0x20) name = " (TCA9554 IO exp)";
+            else if (addr == 0x51) name = " (PCF85063 RTC)";
+            else if (addr == 0x18) name = " (ES8311 codec)";
+            else if (addr == 0x40) name = " (ES7210 ADC)";
+            ESP_LOGI(TAG, "  0x%02X%s", addr, name);
+            found_count++;
+        }
+    }
+    ESP_LOGI(TAG, "  Total: %d devices (LC76G 0x50/0x54/0x58 skipped)", found_count);
+
+    /* ── LC76G device handles — NO PROBE ── */
+    ESP_LOGI(TAG, "Adding LC76G devices (0x50 write, 0x54 read) — no probe");
+
+    /* Add LC76G write device (0x50 — CASIC command endpoint) */
+    i2c_device_config_t write_cfg = {
+        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+        .device_address = LC76G_I2C_ADDR_WRITE,
+        .scl_speed_hz = LC76G_I2C_CLK_HZ,
+    };
+    esp_err_t ret = i2c_master_bus_add_device(i2c_bus, &write_cfg, &lc76g_handle);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to add LC76G write device (0x%02X): %s",
+                 LC76G_I2C_ADDR_WRITE, esp_err_to_name(ret));
+        return ret;
+    }
+
+    /* Add LC76G read device (0x54 — CASIC NMEA data endpoint) */
+    i2c_device_config_t read_cfg = {
+        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+        .device_address = LC76G_I2C_ADDR_READ,
+        .scl_speed_hz = LC76G_I2C_CLK_HZ,
+    };
+    ret = i2c_master_bus_add_device(i2c_bus, &read_cfg, &lc76g_read_handle);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to add LC76G read device (0x%02X): %s",
+                 LC76G_I2C_ADDR_READ, esp_err_to_name(ret));
+        return ret;
+    }
+
+    /* Add LC76G data write device (0x58 — for sending NMEA commands) */
+    i2c_device_config_t dwr_cfg = {
+        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+        .device_address = LC76G_I2C_ADDR_DATA_WR,
+        .scl_speed_hz = LC76G_I2C_CLK_HZ,
+    };
+    ret = i2c_master_bus_add_device(i2c_bus, &dwr_cfg, &lc76g_dwr_handle);
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to add LC76G data write device (0x%02X): %s — commands disabled",
+                 LC76G_I2C_ADDR_DATA_WR, esp_err_to_name(ret));
+        /* Non-fatal: GPS reading will work, just can't send commands */
+    }
+
+    memset(&current_gps_data, 0, sizeof(gps_data_t));
+    memset(&current_gps_debug, 0, sizeof(gps_debug_t));
+
+    ESP_LOGI(TAG, "GPS handler initialized — write=0x%02X read=0x%02X dwr=0x%02X (CASIC on I2C_NUM_0)",
+             LC76G_I2C_ADDR_WRITE, LC76G_I2C_ADDR_READ, LC76G_I2C_ADDR_DATA_WR);
+    return ESP_OK;
+}
+
+esp_err_t gps_handler_start(void)
+{
+    BaseType_t ret = xTaskCreatePinnedToCore(
+        gps_task, "gps_task", 8192, NULL,
+        5,   /* High priority for real-time GPS data */
+        &gps_task_handle,
+        0    /* Core 0 */
+    );
+
+    if (ret != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create GPS task");
+        return ESP_FAIL;
+    }
+
+    ESP_LOGI(TAG, "GPS task started on core 0");
+    return ESP_OK;
+}
+
+esp_err_t gps_handler_get_data(gps_data_t *data)
+{
+    if (data == NULL) return ESP_ERR_INVALID_ARG;
+
+    if (gps_mutex && xSemaphoreTake(gps_mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+        memcpy(data, &current_gps_data, sizeof(gps_data_t));
+        xSemaphoreGive(gps_mutex);
+        return ESP_OK;
+    }
+
+    return ESP_ERR_TIMEOUT;
+}
+
+esp_err_t gps_handler_get_debug(gps_debug_t *debug)
+{
+    if (debug == NULL) return ESP_ERR_INVALID_ARG;
+
+    if (gps_mutex && xSemaphoreTake(gps_mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+        memcpy(debug, &current_gps_debug, sizeof(gps_debug_t));
+        xSemaphoreGive(gps_mutex);
+        return ESP_OK;
+    }
+
+    return ESP_ERR_TIMEOUT;
+}
+
+esp_err_t gps_handler_send_cold_start(void)
+{
+    return lc76g_send_command("PQTMCOLD");
+}

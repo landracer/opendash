@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenDash - Universal Racecar Dashboard</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .header {
+            text-align: center;
+            background: linear-gradient(135deg, #2c3e50, #3498db);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 2.5em;
+        }
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+            margin: 10px 0 0 0;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 20px;
+        }
+        .main-content {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .sidebar {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            height: fit-content;
+        }
+        h2 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        h3 {
+            color: #3498db;
+        }
+        .toc {
+            list-style-type: none;
+            padding: 0;
+        }
+        .toc li {
+            margin: 8px 0;
+            padding: 5px;
+            border-left: 3px solid #3498db;
+            background-color: #f8f9fa;
+        }
+        .toc li a {
+            text-decoration: none;
+            color: #2c3e50;
+            font-weight: 500;
+        }
+        .toc li a:hover {
+            color: #3498db;
+        }
+        .card {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .code-block {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+        .data-point {
+            display: grid;
+            grid-template-columns: 100px 1fr 80px;
+            gap: 10px;
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+        }
+        .data-point:last-child {
+            border-bottom: none;
+        }
+        .data-id {
+            font-weight: bold;
+            color: #3498db;
+        }
+        .data-name {
+            font-weight: 500;
+        }
+        .data-unit {
+            text-align: right;
+            color: #7f8c8d;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #3498db;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        .highlight {
+            background-color: #fff9c4;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding: 20px;
+            color: #7f8c8d;
+            font-size: 0.9em;
+        }
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+            .header h1 {
+                font-size: 2em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🏁 OpenDash — Universal Racecar Dashboard</h1>
+        <p>A modular, bleeding-edge digital dashboard system for race cars</p>
+    </div>
+
+    <div class="container">
+        <div class="main-content">
+            <h2>About OpenDash</h2>
+            <p>OpenDash is an open-source, modular racecar dashboard system with four ESP32-S3 display nodes communicating over a shared I2C bus. It presents real-time engine, GPS, IMU, and battery data to the driver.</p>
+            
+            <div class="card">
+                <h3>System Components</h3>
+                <ul>
+                    <li><strong>Center Display:</strong> 4.3" main dash — I2C master, OBD2/CAN, data aggregator</li>
+                    <li><strong>Left Gauge Pod:</strong> 2.8" round gauge pod — I2C slave <code>0x10</code>, oil pressure/temp</li>
+                    <li><strong>Right Gauge Pod:</strong> 2.8" round gauge pod — I2C slave <code>0x11</code>, boost/AFR</li>
+                    <li><strong>GPS / Telemetry Unit:</strong> 1.75" AMOLED — I2C slave <code>0x12</code>, GNSS + IMU + parachute</li>
+                </ul>
+            </div>
+
+            <h2>Hardware Overview</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Node</th>
+                        <th>Board</th>
+                        <th>Display</th>
+                        <th>Resolution</th>
+                        <th>Controller</th>
+                        <th>MCU</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Center</td>
+                        <td>Waveshare ESP32-S3-Touch-LCD-4.3</td>
+                        <td>4.3" IPS</td>
+                        <td>800×480</td>
+                        <td>ST7262 RGB</td>
+                        <td>ESP32-S3</td>
+                    </tr>
+                    <tr>
+                        <td>Left</td>
+                        <td>Waveshare ESP32-S3-Touch-LCD-2.8C</td>
+                        <td>2.8" Round IPS</td>
+                        <td>480×480</td>
+                        <td>ST7701S + TCA9554</td>
+                        <td>ESP32-S3</td>
+                    </tr>
+                    <tr>
+                        <td>Right</td>
+                        <td>Waveshare ESP32-S3-Touch-LCD-2.8C</td>
+                        <td>2.8" Round IPS</td>
+                        <td>480×480</td>
+                        <td>ST7701S + TCA9554</td>
+                        <td>ESP32-S3</td>
+                    </tr>
+                    <tr>
+                        <td>GPS</td>
+                        <td>Waveshare ESP32-S3-Touch-AMOLED-1.75</td>
+                        <td>1.75" Round AMOLED</td>
+                        <td>466×466</td>
+                        <td>CO5300</td>
+                        <td>ESP32-S3</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>Communication Protocol</h2>
+            <p>All OpenDash nodes communicate over a shared I2C bus at <strong>400 kHz</strong> (Fast Mode). The <strong>Center</strong> display is always the I2C master. All other nodes (Left, Right, GPS, and external BMS) are slaves.</p>
+            
+            <div class="card">
+                <h3>I2C Node Addresses</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Node</th>
+                            <th>Address</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Left Gauge</td>
+                            <td><code>0x10</code></td>
+                            <td>Left-side 2.8" round gauge</td>
+                        </tr>
+                        <tr>
+                            <td>Right Gauge</td>
+                            <td><code>0x11</code></td>
+                            <td>Right-side 2.8" round gauge</td>
+                        </tr>
+                        <tr>
+                            <td>GPS / Telemetry</td>
+                            <td><code>0x12</code></td>
+                            <td>GPS + IMU unit</td>
+                        </tr>
+                        <tr>
+                            <td>BMS (rAtTrax)</td>
+                            <td><code>0x20</code></td>
+                            <td>External BMS logger node</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="card">
+                <h3>Message Format</h3>
+                <p>Every I2C message uses a fixed-header format for reliability:</p>
+                <div class="code-block">
+                    ┌──────┬──────┬────────┬────────────────┬──────────┐<br>
+                    │ SYNC │ CMD  │ LENGTH │    PAYLOAD     │ CHECKSUM │<br>
+                    │ 0xAA │ 1B   │  1B    │  0–248 bytes   │   1B     │<br>
+                    └──────┴──────┴────────┴────────────────┴──────────┘
+                </div>
+                <p>Fields:</p>
+                <ul>
+                    <li><span class="highlight">SYNC</span> - Always <code>0xAA</code> — marks start of valid message</li>
+                    <li><span class="highlight">CMD</span> - Command identifier</li>
+                    <li><span class="highlight">LENGTH</span> - Number of payload bytes (0–248)</li>
+                    <li><span class="highlight">PAYLOAD</span> - Command-specific data</li>
+                    <li><span class="highlight">CHECKSUM</span> - XOR of all preceding bytes</li>
+                </ul>
+            </div>
+
+            <h2>Data Points</h2>
+            <p>Every displayable value has a unique 16-bit ID. The UI renders whichever ID is assigned to each screen section.</p>
+            
+            <div class="card">
+                <h3>Engine / OBD2 Data Points (0x0100 – 0x01FF)</h3>
+                <div class="data-point">
+                    <div class="data-id">0x0100</div>
+                    <div class="data-name">RPM</div>
+                    <div class="data-unit">rpm</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0101</div>
+                    <div class="data-name">Vehicle Speed</div>
+                    <div class="data-unit">km/h</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0102</div>
+                    <div class="data-name">Coolant Temp</div>
+                    <div class="data-unit">°C</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0106</div>
+                    <div class="data-name">Boost Pressure</div>
+                    <div class="data-unit">kPa</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0107</div>
+                    <div class="data-name">Oil Temp</div>
+                    <div class="data-unit">°C</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0108</div>
+                    <div class="data-name">Oil Pressure</div>
+                    <div class="data-unit">kPa</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x010A</div>
+                    <div class="data-name">AFR</div>
+                    <div class="data-unit">ratio</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>GPS / Navigation Data Points (0x0200 – 0x02FF)</h3>
+                <div class="data-point">
+                    <div class="data-id">0x0200</div>
+                    <div class="data-name">GPS Speed</div>
+                    <div class="data-unit">km/h</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0208</div>
+                    <div class="data-name">Lap Time</div>
+                    <div class="data-unit">ms</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x020A</div>
+                    <div class="data-name">Lap Delta</div>
+                    <div class="data-unit">ms</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>IMU / Motion Data Points (0x0300 – 0x03FF)</h3>
+                <div class="data-point">
+                    <div class="data-id">0x0300</div>
+                    <div class="data-name">G-Force Lateral</div>
+                    <div class="data-unit">g</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Battery / BMS Data Points (0x0400 – 0x04FF)</h3>
+                <div class="data-point">
+                    <div class="data-id">0x0400</div>
+                    <div class="data-name">Pack Voltage</div>
+                    <div class="data-unit">V</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0402</div>
+                    <div class="data-name">SOC</div>
+                    <div class="data-unit">%</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>System Data Points (0x0500 – 0x05FF)</h3>
+                <div class="data-point">
+                    <div class="data-id">0x0500</div>
+                    <div class="data-name">CPU Temp</div>
+                    <div class="data-unit">°C</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0501</div>
+                    <div class="data-name">Free Heap</div>
+                    <div class="data-unit">KB</div>
+                </div>
+                <div class="data-point">
+                    <div class="data-id">0x0502</div>
+                    <div class="data-name">WiFi RSSI</div>
+                    <div class="data-unit">dBm</div>
+                </div>
+            </div>
+
+            <h2>Key Features</h2>
+            <div class="card">
+                <h3>Display & UI</h3>
+                <ul>
+                    <li>LVGL-based UI — Gauges, arcs, bar charts, and numeric readouts</li>
+                    <li>Multi-page gauge system — Up to 8 configurable gauge pages</li>
+                    <li>Min/max tracking — Session high/low displayed per gauge page</li>
+                    <li>Shift-light blink — Arc flashes red/blue when RPM exceeds threshold</li>
+                    <li>Configurable data views — Choose which data points appear in each screen section</li>
+                    <li>Touch-screen support — GT911 hardware reset sequence</li>
+                    <li>Unit conversion — °C/°F, kPa/BAR/PSI, km/h/MPH, km/mi</li>
+                    <li>Easy background/asset swaps — Drop converted C-array images</li>
+                    <li>Warning system — Flashing colored overlays for critical/caution alerts</li>
+                    <li>Outlined text rendering — 4-shadow technique for readable text</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h3>Communication</h3>
+                <ul>
+                    <li>I2C inter-node bus — All displays share data as I2C nodes</li>
+                    <li>BMS integration — I2C node for rAtTrax BMS data</li>
+                    <li>OBD2 support — Read any standard OBD2 PID</li>
+                    <li>CAN bus ready — Center unit has onboard CAN for direct ECU communication</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h3>GPS & Telemetry</h3>
+                <ul>
+                    <li>LC76G GNSS — Multi-constellation positioning</li>
+                    <li>Predictive lap timing — Real-time delta vs. best lap</li>
+                    <li>QMI8658 6-axis IMU — Accelerometer + gyroscope</li>
+                    <li>Parachute deployment — Gyro-triggered safety system</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h3>Data Logging</h3>
+                <ul>
+                    <li>SD card logging — CSV format, configurable sample rate</li>
+                    <li>Per-session files — Automatic file naming with timestamps</li>
+                    <li>Post-session analysis — Compatible with common data analysis tools</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h3>Pre-Flight Checklist</h3>
+                <ul>
+                    <li>Crew task lists — Customizable per-team checklists</li>
+                    <li>Touch confirmation — Tap to mark items complete</li>
+                    <li>Status sharing — Checklist state shared across all nodes via I2C</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h3>Connectivity</h3>
+                <ul>
+                    <li>WiFi mode — For OTA firmware updates and data transfer</li>
+                    <li>BLE mode — For low-power data sync</li>
+                    <li>Individual control — Each unit manages its own wireless independently</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h3>Customization & Extensibility</h3>
+                <ul>
+                    <li>Data point legend — Full list of displayable values</li>
+                    <li>Modular sensor support — Add custom sensors via I2C/SPI/ADC</li>
+                    <li>Programmable alarms — Threshold-based warnings</li>
+                    <li>Drag-and-drop assets — Convert images with LVGL tools</li>
+                    <li>Display Mode System — Center display supports multiple cycling data views</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="sidebar">
+            <h2>Navigation</h2>
+            <ul class="toc">
+                <li><a href="#about">About OpenDash</a></li>
+                <li><a href="#hardware">Hardware Overview</a></li>
+                <li><a href="#protocol">Communication Protocol</a></li>
+                <li><a href="#data-points">Data Points</a></li>
+                <li><a href="#features">Key Features</a></li>
+                <li><a href="#build">Build Instructions</a></li>
+                <li><a href="#docs">Documentation</a></li>
+            </ul>
+
+            <div class="card">
+                <h3>Quick Links</h3>
+                <ul>
+                    <li><a href="https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4.3">Waveshare 4.3" Display</a></li>
+                    <li><a href="https://www.waveshare.com/wiki/ESP32-S3-LCD-2.8C">Waveshare 2.8" Display</a></li>
+                    <li><a href="https://www.waveshare.com/wiki/ESP32-S3-Touch-AMOLED-1.75">Waveshare 1.75" Display</a></li>
+                    <li><a href="https://docs.espressif.com/projects/esp-idf/en/release-v5.3/esp32s3/get-started/index.html">ESP-IDF Documentation</a></li>
+                    <li><a href="https://docs.lvgl.io/master/">LVGL Documentation</a></li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h3>Project Resources</h3>
+                <ul>
+                    <li><a href="../readme.md">Main README</a></li>
+                    <li><a href="../PROJECT_INDEX.md">Project Index</a></li>
+                    <li><a href="../docs/i2c-protocol.md">I2C Protocol</a></li>
+                    <li><a href="../docs/data-points.md">Data Points Legend</a></li>
+                    <li><a href="../docs/hardware.md">Hardware Specs</a></li>
+                    <li><a href="../docs/architecture.md">System Architecture</a></li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h3>GPS &amp; Hardware Guides</h3>
+                <ul>
+                    <li><a href="LC76G-I2C-GPS-Driver-Guide.md">LC76G I2C GPS Driver Guide</a> — Definitive reference</li>
+                    <li><a href="waveshare-1.75-opendash-conversion.md">Waveshare 1.75" Conversion Guide</a></li>
+                    <li><a href="gps-unit.md">GPS Unit Overview</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>OpenDash — Universal Racecar Dashboard | Built for racers, by racers</p>
+        <p>Copyright © 2024–2026 uknowmelast & Axiom (AI Co-Architect)</p>
+    </div>
+</body>
+</html>

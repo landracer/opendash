@@ -1,8 +1,9 @@
 <p align="center">
   <h1 align="center">🏁 OpenDash — Universal Racecar Dashboard</h1>
   <p align="center">
-    An open-source, modular, bleeding-edge digital dashboard system for race cars.<br>
-    Built on <strong>ESP-IDF v5.3</strong> + <strong>LVGL</strong> for three ESP32-S3 display units.
+    A modular, bleeding-edge digital dashboard system for race cars.<br>
+    Built on <strong>ESP-IDF v6.1</strong> + <strong>LVGL 9</strong> + <strong>ESP-NOW</strong> for three ESP32-S3 display units.<br>
+    <em>Licensed under Sovereign Individual License v1.0 — see LICENSE file</em>
   </p>
 </p>
 
@@ -13,10 +14,16 @@
 | Display Unit | Hardware | Resolution | Directory |
 |---|---|---|---|
 | **Center** (Main Dash) | [ESP32-S3-Touch-LCD-4.3](https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4.3) | 800×480 IPS | [`center/`](./center/) |
-| **Left & Right** (Gauge Pods) | [ESP32-S3-LCD-2.8C](https://www.waveshare.com/wiki/ESP32-S3-LCD-2.8C) | 480×480 Round | [`left-right/`](./left-right/) |
+| **Left Gauge** | [ESP32-S3-LCD-2.8C](https://www.waveshare.com/wiki/ESP32-S3-LCD-2.8C) | 480×480 Round | [`left/`](./left/) |
+| **Right Gauge** | [ESP32-S3-LCD-2.8C](https://www.waveshare.com/wiki/ESP32-S3-LCD-2.8C) | 480×480 Round | [`right/`](./right/) |
 | **GPS / Telemetry** | [ESP32-S3-Touch-AMOLED-1.75](https://www.waveshare.com/wiki/ESP32-S3-Touch-AMOLED-1.75) | 466×466 AMOLED | [`gps/`](./gps/) |
+| **BMS Logger** *(ext)* | ESP32-DOIT-DevKit-V1 | SSD1306 128×64 OLED | External: `rAtTrax_BMS_Logger/` |
 
-> **Shared code** lives in [`common/`](./common/) — I2C protocol, data models, OBD2 PIDs, display configuration, and the pre-flight checklist system.
+> **Shared code** lives in [`common/`](./common/) — ESP-NOW protocol, data models, OBD2 PIDs, display configuration, and the pre-flight checklist system.
+>
+> **Detailed project roadmap:** [`TODO.md`](./TODO.md) | **Central reference:** [`PROJECT_INDEX.md`](./PROJECT_INDEX.md)
+>
+> **Additional documentation:** The project includes extensive documentation in the [`wiki/`](./wiki/) directory with integration guides and technical details.
 
 ---
 
@@ -30,6 +37,7 @@ opendash/
 │   ├── hardware.md              — Hardware specifications & pin mappings
 │   ├── i2c-protocol.md          — I2C inter-node communication protocol
 │   ├── data-points.md           — Legend of all displayable data points
+│   ├── font-system-testing.md   — Font system implementation and testing
 │   └── setup-guide.md           — Development environment setup
 │
 ├── common/                      ← Shared libraries (all units include this)
@@ -53,17 +61,24 @@ opendash/
 │   ├── sdkconfig.defaults
 │   └── README.md
 │
-├── left-right/                  ← ESP32-S3-LCD-2.8C project
+├── left/                        ← Left gauge pod (ESP32-S3-LCD-2.8C)
 │   ├── main/
-│   │   ├── main.c
-│   │   ├── display_init.c/h     — ST7701 round LCD init
-│   │   ├── ui_manager.c/h
-│   │   └── assets/
+│   │   ├── main.c               — Entry point, I2C slave (addr 0x10)
+│   │   ├── display_init.c/h     — ST7701S 3-wire SPI + RGB init
+│   │   └── ui_manager.c/h       — Round gauge UI
+│   ├── display.ini              — Hardware pin reference
 │   ├── CMakeLists.txt
 │   ├── sdkconfig.defaults
 │   └── README.md
 │
-└── gps/                         ← ESP32-S3-Touch-AMOLED-1.75 project
+├── right/                       ← Right gauge pod (same hardware)
+│   ├── main/                    — Same code as left/, uses addr 0x11
+│   ├── display.ini
+│   ├── CMakeLists.txt
+│   ├── sdkconfig.defaults
+│   └── README.md
+│
+├── gps/                         ← ESP32-S3-Touch-AMOLED-1.75 project
     ├── main/
     │   ├── main.c
     │   ├── display_init.c/h     — CO5300 AMOLED init
@@ -75,6 +90,9 @@ opendash/
     ├── CMakeLists.txt
     ├── sdkconfig.defaults
     └── README.md
+
+├── rAtTrax_BMS_Logger/          ← External ESP-NOW node (separate repo)
+│   └── See: rAtTrax_BMS_Logger/docs/opendash-integration.md
 ```
 
 ---
@@ -83,16 +101,24 @@ opendash/
 
 ### 🖥️ Display & UI
 - **LVGL-based UI** — Gauges, arcs, bar charts, and numeric readouts with minimal CPU overhead
+- **Multi-page gauge system** — Left/Right pods: up to 8 configurable gauge pages (oil, water, RPM, etc.) cycled via boot button. Same layout, different data per page.
+- **Min/max tracking** — Session high/low displayed per gauge page
+- **Shift-light blink** — Arc flashes red/blue when RPM exceeds configurable threshold
 - **Configurable data views** — Choose which data points appear in each screen section
-- **Touch-screen interaction** — Swipe between screens, tap to configure
+- **Touch-screen support** — GT911 hardware reset sequence for reliable detection
+- **Unit conversion** — °C/°F, kPa/BAR/PSI, km/h/MPH, km/mi — auto-applied to all displays
 - **Easy background/asset swaps** — Drop converted C-array images into `assets/` folders
-- **Compartmentalized layout** — Each screen section is independently configurable
+- **Warning system** — Flashing colored overlays (red/orange) for critical/caution alerts
+- **Outlined text rendering** — 4-shadow technique for readable text over any background
 
 ### 📡 Communication
-- **I2C inter-node bus** — All three displays share data as I2C nodes
-- **BMS integration** — I2C node for rAtTrax BMS data (cell voltages, temps, SOC)
+- **ESP-NOW wireless bus** — All three displays communicate wirelessly using ESP-NOW (WiFi peer-to-peer) instead of I2C due to hardware limitations and GPIO conflicts
+- **BMS integration** — ESP-NOW node for rAtTrax BMS data (cell voltages, temps, SOC)
 - **OBD2 support** — Read any standard OBD2 PID (RPM, speed, coolant temp, boost, AFR, etc.)
 - **CAN bus ready** — Center unit has onboard CAN for direct ECU communication
+
+### ⚠️ Important Note
+The original design intended to use I2C for inter-node communication, but due to hardware limitations and GPIO conflicts, the system was re-implemented to use ESP-NOW (WiFi peer-to-peer) for communication between nodes. This provides zero-wire communication with no GPIO conflicts and better reliability.
 
 ### 🛰️ GPS & Telemetry (GPS Unit)
 - **LC76G GNSS** — Multi-constellation (GPS, GLONASS, BeiDou, Galileo) positioning
@@ -108,7 +134,7 @@ opendash/
 ### 📋 Pre-Flight Checklist
 - **Crew task lists** — Customizable per-team checklists before each run
 - **Touch confirmation** — Tap to mark items complete on any display
-- **Status sharing** — Checklist state shared across all nodes via I2C
+- **Status sharing** — Checklist state shared across all nodes via ESP-NOW
 
 ### 📶 Connectivity
 - **WiFi mode** — For OTA firmware updates and data transfer to companion app
@@ -172,19 +198,29 @@ idf.py -p /dev/ttyUSB0 flash monitor
 
 | Document | Description |
 |---|---|
+| [**PROJECT INDEX**](PROJECT_INDEX.md) | **★ Central glossary & index — maps the entire project** |
 | [**Quick Start Guide**](QUICKSTART.md) | **5-minute setup guide — start here!** |
 | [**Build Dependencies**](BUILD_DEPENDENCIES.md) | **Complete dependency installation guide** |
-| [**Compile Errors Resolution**](COMPILE_ERRORS_RESOLUTION.md) | **Troubleshooting compilation issues** |
+| [**Compile Errors Resolution**](docs/archived/COMPILE_ERRORS_RESOLUTION.md) | **Troubleshooting compilation issues** |
 | [**Display Mode Refactoring**](DISPLAY_MODE_REFACTORING.md) | **Technical deep-dive: Center display architecture redesign** |
 | [`docs/vscode-setup.md`](docs/vscode-setup.md) | Visual Studio Code configuration guide |
 | [`docs/setup-guide.md`](docs/setup-guide.md) | Detailed development environment setup |
 | [`docs/architecture.md`](docs/architecture.md) | System architecture, data flow, and node roles |
 | [`docs/hardware.md`](docs/hardware.md) | Hardware specs, pin mappings, and wiring |
-| [`docs/i2c-protocol.md`](docs/i2c-protocol.md) | I2C communication protocol between nodes |
+| [`docs/i2c-protocol.md`](docs/i2c-protocol.md) | ESP-NOW communication protocol between nodes |
 | [`docs/data-points.md`](docs/data-points.md) | Full legend of displayable data points |
+| [`docs/font-system-testing.md`](docs/font-system-testing.md) | Font system implementation and testing |
 | [`center/README.md`](center/README.md) | **Center display project guide** — Display mode system, customization |
-| [`left-right/README.md`](left-right/README.md) | Left/Right gauge pods guide |
+| [`left/README.md`](left/README.md) | Left gauge pod guide |
+| [`right/README.md`](right/README.md) | Right gauge pod guide |
 | [`gps/README.md`](gps/README.md) | GPS/Telemetry unit guide |
+| [`wiki/`](wiki/) | **Wiki documentation** — Additional project documentation and integration guides |
+| [`wiki/system-overview.md`](wiki/system-overview.md) | **★ End-user system guide — start here for usage** |
+| [`wiki/ota-bluetooth.md`](wiki/ota-bluetooth.md) | **★ BLE OTA step-by-step guide (Linux desktop)** |
+| [`wiki/ota-android-plan.md`](wiki/ota-android-plan.md) | Roadmap & options for Android-based OTA |
+| [`BLE_OTA.md`](BLE_OTA.md) | BLE OTA architecture & root-cause reference |
+
+> **Note:** The project includes extensive documentation in the [`wiki/`](wiki/) directory with additional integration guides and technical details.
 
 ---
 
@@ -202,7 +238,7 @@ idf.py -p /dev/ttyUSB0 flash monitor
 
 ## 🤝 Contributing
 
-This project is designed so that anyone can learn from, understand, and extend the code:
+This is a proprietary project — all rights reserved. The codebase is designed for clarity and maintainability:
 
 1. **All code is thoroughly annotated** — Every function, register write, and API call includes explanations referencing the ESP-IDF API docs
 2. **Consistent structure** — All three display projects follow the same code layout
@@ -213,10 +249,12 @@ This project is designed so that anyone can learn from, understand, and extend t
 
 ## 📄 License
 
-This project is open source. See individual display project READMEs for specific details.
+Copyright © 2024–2026 **uknowmelast** & **Axiom** (AI Co-Architect).
+All rights reserved. See [`LICENSE`](./LICENSE) for details.
 
 ---
 
 <p align="center">
-  <strong>Built for racers, by racers. 🏎️💨</strong>
+  <strong>Built for racers, by racers. 🏎️💨</strong><br>
+  <sub>Designed by uknowmelast • Architected with Axiom</sub>
 </p>

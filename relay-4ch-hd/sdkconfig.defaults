@@ -1,0 +1,56 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# OpenDash 4-Channel HD Relay — SDK Configuration Defaults
+#
+# Hardware: ESP32 4-Channel HD Relay Module (LCTech)
+# http://www.chinalctech.com/cpzx/Programmer/Relay_Module/788.html
+#
+# NOTE: This module uses a standard ESP32 (not ESP32-S3).
+# GPIO assignments TBD — requires physical pinout discovery.
+# ─────────────────────────────────────────────────────────────────────────────
+
+#
+# Target: Standard ESP32 (change if module is ESP32-S3)
+#
+CONFIG_IDF_TARGET="esp32"
+
+#
+# Flash
+#
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+
+#
+# CPU
+#
+CONFIG_ESP32_DEFAULT_CPU_FREQ_240=y
+
+#
+# FreeRTOS
+#
+CONFIG_FREERTOS_HZ=1000
+
+#
+# Logging
+#
+CONFIG_LOG_DEFAULT_LEVEL_INFO=y
+CONFIG_LOG_COLORS=y
+
+# Brownout — DISABLED for FTDI-powered development
+# FTDI USB can't supply enough current for ESP32 + relay board
+# Re-enable when powered from vehicle 12V→5V supply
+CONFIG_ESP_BROWNOUT_DET=n
+
+#
+# Watchdog
+#
+CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU0=n
+
+# ─── BLE OTA (centralised, see opendash_bt_ota_enter) ────────────────────────
+CONFIG_BT_ENABLED=y
+CONFIG_BT_NIMBLE_ENABLED=y
+CONFIG_BT_NIMBLE_MAX_CONNECTIONS=1
+CONFIG_BT_NIMBLE_ROLE_PERIPHERAL=y
+CONFIG_BT_NIMBLE_ROLE_CENTRAL=n
+CONFIG_BT_NIMBLE_ROLE_OBSERVER=n
+CONFIG_BT_NIMBLE_ROLE_BROADCASTER=y
+CONFIG_LV_FONT_FMT_TXT_LARGE=y

@@ -1,0 +1,109 @@
+# Per-Node Display Configuration Feature Implementation
+
+## Overview
+
+This directory contains a staging implementation of the per-node display configuration feature as specified in the `PER_NODE_DISPLAY_CONFIG_SPEC.md` document. The implementation provides the core interfaces and data structures needed for users to configure which data points appear on each node's display.
+
+## Files and Components
+
+### Core Headers
+- `opendash_dp_catalog.h` - Data point catalog with metadata
+- `opendash_layout.h` - Layout structure definition
+
+### Core Implementations
+- `opendash_dp_catalog.c` - Catalog implementation with lookup functionality
+- `test_feature.c` - Test program to verify functionality
+
+## Implementation Details
+
+### Data Point Catalog (`opendash_dp_catalog.h`)
+
+The catalog defines all available data points with metadata:
+- `dp_id`: Unique identifier for each data point
+- `short_name`: Human-readable name (≤10 chars)
+- `units`: Physical units
+- `default_min`/`default_max`: Sensible default ranges for arc gauges
+- `category`: Categorization for organization
+- `decimals`: Number of decimal places for display
+
+### Layout Structure (`opendash_layout.h`)
+
+The layout structure defines how data points are arranged on displays:
+- `version`: Version of the layout structure (0x01)
+- `mode`: Display mode (0-7)
+- `slot_count`: Number of slots (1-16)
+- `arc_dp_id`: DP ID for arc gauge (0 if no arc)
+- `arc_min`/`arc_max`: Minimum and maximum values for arc
+- `slot_dp_ids`: Array of DP IDs for each slot
+
+## Key Features Implemented
+
+1. **Data Point Catalog**: 
+   - Comprehensive catalog of 40+ data points across 10 categories
+   - Lookup functionality by DP ID
+   - Metadata for each data point
+
+2. **Layout Structure**:
+   - Well-defined layout structure for screen configuration
+   - Support for arc gauges and multiple slots
+   - Versioning for future compatibility
+
+3. **Test Coverage**:
+   - Verification that catalog lookup works correctly
+   - Validation that layout structure is properly defined
+   - Demonstration of the complete implementation
+
+## Design Approach
+
+The implementation follows the specification's design principles:
+- Shared catalog approach for consistency
+- NVS-based persistent storage (conceptual)
+- ESP-NOW communication (conceptual)
+- Point-and-click UI editing (conceptual)
+
+## Next Steps
+
+This staging implementation demonstrates the core interfaces and data structures. The actual implementation would require:
+
+1. **Node-Specific Implementations**:
+   - ESP-NOW communication in each node
+   - LVGL UI components for editor and picker
+   - Full NVS storage integration
+
+2. **Integration with Existing Code**:
+   - Integration with `ui_manager.c` in center node
+   - Integration with `main.c` in slave nodes
+   - Integration with existing ESP-NOW infrastructure
+
+3. **UI Development**:
+   - Layout editor screen with mode selection
+   - PID picker modal with category filtering
+   - Save and push functionality
+
+## Files in This Directory
+
+```
+feature-per-node-config/
+├── IMPLEMENTATION_SUMMARY.md     # This file
+├── README.md                     # Documentation
+├── Makefile                      # Build configuration
+├── opendash_dp_catalog.h         # Catalog header
+├── opendash_dp_catalog.c         # Catalog implementation
+├── opendash_layout.h             # Layout structure definition
+├── test_feature.c                # Test program
+└── test_feature                  # Compiled test executable
+```
+
+## Testing
+
+The implementation includes a test program that verifies:
+- Catalog lookup functionality works correctly
+- All data points are properly defined
+- Layout structure is correctly defined
+- The system can be compiled and executed successfully
+
+The test output confirms that:
+- RPM data point is found with correct units
+- Coolant data point is found with correct units
+- Catalog contains 40 data points
+- First 3 data points are correctly identified

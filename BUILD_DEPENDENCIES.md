@@ -1,3 +1,4 @@
+<!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # OpenDash Build Dependencies Guide
 
 This document explains all the dependencies required to build OpenDash and how to install them on your local machine.

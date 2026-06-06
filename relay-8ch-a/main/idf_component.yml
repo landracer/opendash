@@ -1,0 +1,4 @@
+## IDF Component Manager Manifest File
+## Dependencies for OpenDash 8-Channel Relay Controller A
+## Headless (no display, no LVGL)
+dependencies: {}

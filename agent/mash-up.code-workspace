@@ -1,0 +1,53 @@
+{
+	"folders": [
+		{
+			"path": "../../../git/Marlin-X5SA-6-23-23-use current firmware-ACTIVE"
+		},
+		{
+			"name": "rAtTrax_BMS_Logger",
+			"path": "../../../PlatformIO/Projects/rAtTrax_BMS_Logger"
+		},
+		{
+			"name": "multidisplay-app",
+			"path": "../../../multidisplay-app/multidisplay-app"
+		},
+		{
+			"name": "multidisplay",
+			"path": "../../../multidisplay-firmware/multidisplay"
+		},
+		{
+			"name": "opendash",
+			"path": ".."
+		}
+	],
+	"settings": {
+		"workbench.colorTheme": "Visual Studio 2017 Dark - C++",
+		"codellm.provider": "ollama",
+		"codellm.ollama.url": "http://127.0.0.1:11434",
+		"ollama.apiHost": "http://127.0.0.1:11434",
+		"ollama-autocoder.endpoint": "http://127.0.0.1:11434",
+		"ollama-autocoder.model": "qwen3-coder:30b",
+	
+		"cody.autocomplete.advanced.provider": "experimental-ollama",
+		"cody.mcpServers": {
+
+		},
+		"chat.tools.terminal.sandbox.macFileSystem": {
+
+			"denyRead": [],
+			"allowWrite": [
+				"."
+			],
+			"denyWrite": []
+		},
+		"chat.tools.terminal.sandbox.linuxFileSystem": {
+			"denyRead": [],
+			"allowWrite": [
+				"."
+			],
+			"denyWrite": []
+		},
+		"inlineChat.enableV2": true,
+		"github.copilot.chat.commitMessageGeneration.instructions": []
+	}
+}

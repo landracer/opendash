@@ -1,3 +1,4 @@
+/* Licensed under Sovereign Individual License v1.0 — see LICENSE file */
 /**
  * @file main.c
  * @brief OpenDash Left/Right Gauges — Entry Point

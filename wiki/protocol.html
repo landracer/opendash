@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenDash - I2C Communication Protocol</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .header {
+            text-align: center;
+            background: linear-gradient(135deg, #2c3e50, #3498db);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 2em;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 20px;
+        }
+        .main-content {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .sidebar {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            height: fit-content;
+        }
+        h2 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        h3 {
+            color: #3498db;
+        }
+        .toc {
+            list-style-type: none;
+            padding: 0;
+        }
+        .toc li {
+            margin: 8px 0;
+            padding: 5px;
+            border-left: 3px solid #3498db;
+            background-color: #f8f9fa;
+        }
+        .toc li a {
+            text-decoration: none;
+            color: #2c3e50;
+            font-weight: 500;
+        }
+        .toc li a:hover {
+            color: #3498db;
+        }
+        .card {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .code-block {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #3498db;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        .highlight {
+            background-color: #fff9c4;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding: 20px;
+            color: #7f8c8d;
+            font-size: 0.9em;
+        }
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+            .header h1 {
+                font-size: 1.8em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>OpenDash - I2C Communication Protocol</h1>
+        <p>Detailed specification of inter-node communication</p>
+    </div>
+
+    <div class="container">
+        <div class="main-content">
+            <h2>Overview</h2>
+            <p>All OpenDash nodes communicate over a shared I2C bus at <strong>400 kHz</strong> (Fast Mode). The <strong>Center</strong> display is always the I2C master. All other nodes (Left, Right, GPS, and external BMS) are slaves.</p>
+            
+            <div class="card">
+                <h3>Message Format</h3>
+                <p>Every I2C message uses a fixed-header format for reliability:</p>
+                <div class="code-block">
+                    ┌──────┬──────┬────────┬────────────────┬──────────┐<br>
+                    │ SYNC │ CMD  │ LENGTH │    PAYLOAD     │ CHECKSUM │<br>
+                    │ 0xAA │ 1B   │  1B    │  0–248 bytes   │   1B     │<br>
+                    └──────┴──────┴────────┴────────────────┴──────────┘
+                </div>
+                <p>Fields:</p>
+                <ul>
+                    <li><span class="highlight">SYNC</span> - Always <code>0xAA</code> — marks start of valid message</li>
+                    <li><span class="highlight">CMD</span> - Command identifier</li>
+                    <li><span class="highlight">LENGTH</span> - Number of payload bytes (0–248)</li>
+                    <li><span class="highlight">PAYLOAD</span> - Command-specific data</li>
+                    <li><span class="highlight">CHECKSUM</span> - XOR of all preceding bytes</li>
+                </ul>
+            </div>
+
+            <h2>Command Table</h2>
+            
+            <div class="card">
+                <h3>Master → Slave Commands</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>CMD</th>
+                            <th>Name</th>
+                            <th>Payload</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>0x01</code></td>
+                            <td><code>SET_DATA_POINT</code></td>
+                            <td><code>[dp_id:2][value:4]</code></td>
+                            <td>Send a data point value to display</td>
+                        </tr>
+                        <tr>
+                            <td><code>0x02</code></td>
+                            <td><code>SET_SCREEN_LAYOUT</code></td>
+                            <td><code>[section:1][dp_id:2]...</code></td>
+                            <td>Configure which data points to show</td>
+                        </tr>
+                        <tr>
+                            <td><code>0x03</code></td>
+                            <td><code>SET_ALARM</code></td>
+                            <td><code>[dp_id:2][lo:4][hi:4][flags:1]</code></td>
+                            <td>Set alarm thresholds</td>
+                        </tr>
+                        <tr>
+                            <td><code>0x04</code></td>
+                            <td><code>SET_BRIGHTNESS</code></td>
+                            <td><code>[level:1]</code></td>
+                            <td>Set display brightness (0–255)</td>
+                        </tr>
+                        <tr>
+                            <td><code>0x05</code></td>
+                            <td><code>CHECKLIST_UPDATE</code></td>
+                            <td><code>[item_id:1][status:1]</code></td>
+                            <td>Update checklist item status</td>
+                        </tr>
+                        <tr>
+                            <td><code>0x06</code></td>
+                            <td><code>REQUEST_DATA</code></td>
+                            <td><code>[dp_id:2]</code></td>
+                            <td>Request a data point from slave</td>
+                        </tr>
+                        <tr>
+                            <td><code>0x07</code></td>
+                            <td><code>SYSTEM_CMD</code></td>
+                            <td><code>[subcmd:1][params...]</code></td>
+                            <td>System commands (reboot, OTA, etc.)</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="card">
+                <h3>Slave → Master Responses</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>CMD</th>
+                            <th>Name</th>
+                            <th>Payload</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>0x81</code></td>
+                            <td><code>DATA_RESPONSE</code></td>
+                            <td><code>[dp_id:2][value:4][ts:4]</code></td>
+                            <td>Response to REQUEST_DATA</td>
+                        </tr>
+                        <tr>
+                            <td><code>0x82</code></td>
+                            <td><code>STATUS_REPORT</code></td>
+                            <td><code>[node_id:1][flags:2]</code></td>
+                            <td>Node health status</td>
+                        </tr>
+                        <tr>
+                            <td><code>0x83</code></td>
+                            <td><code>CHECKLIST_STATUS</code></td>
+                            <td><code>[item_id:1][status:1]</code></td>
+                            <td>Checklist item status from this node</td>
+                        </tr>
+                        <tr>
+                            <td><code>0x84</code></td>
+                            <td><code>ALARM_TRIGGERED</code></td>
+                            <td><code>[dp_id:2][value:4]</code></td>
+                            <td>Alarm triggered notification</td>
+                        </tr>
+                        <tr>
+                            <td><code>0xFF</code></td>
+                            <td><code>NAK</code></td>
+                            <td><code>[error_code:1]</code></td>
+                            <td>Error / not acknowledged</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h2>Polling Cycle</h2>
+            <p>The Center (master) runs a polling loop at approximately <strong>50 Hz</strong>:</p>
+            <div class="code-block">
+                1. Poll GPS unit for position, speed, heading, lap data      (every cycle)<br>
+                2. Poll GPS unit for IMU data (g-force, orientation)          (every cycle)<br>
+                3. Send data point updates to Left gauge                      (every cycle)<br>
+                4. Send data point updates to Right gauge                     (every cycle)<br>
+                5. Poll BMS for battery data                                  (every 500ms)<br>
+                6. Exchange checklist status                                  (every 1s)<br>
+                7. Process alarms and warnings                                (every cycle)
+            </div>
+
+            <h2>Error Handling</h2>
+            <div class="card">
+                <ul>
+                    <li><span class="highlight">NAK responses</span> — If a slave sends NAK, master retries up to 3 times</li>
+                    <li><span class="highlight">Timeout</span> — If no response within 10ms, mark node as offline</li>
+                    <li><span class="highlight">Checksum failure</span> — Discard message, request retransmission</li>
+                    <li><span class="highlight">Node offline</span> — Display warning indicator, continue with available data</li>
+                    <li><span class="highlight">Bus recovery</span> — If bus is stuck, master performs clock recovery sequence</li>
+                </ul>
+            </div>
+
+            <h2>Data Types</h2>
+            <p>All multi-byte values are transmitted <strong>little-endian</strong>.</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Size</th>
+                        <th>Range</th>
+                        <th>Example</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>int16_t</code></td>
+                        <td>2 bytes</td>
+                        <td>-32768 to 32767</td>
+                        <td>Temperature in 0.1°C</td>
+                    </tr>
+                    <tr>
+                        <td><code>uint16_t</code></td>
+                        <td>2 bytes</td>
+                        <td>0 to 65535</td>
+                        <td>RPM, data point IDs</td>
+                    </tr>
+                    <tr>
+                        <td><code>int32_t</code></td>
+                        <td>4 bytes</td>
+                        <td>±2 billion</td>
+                        <td>GPS coordinates (microdegrees)</td>
+                    </tr>
+                    <tr>
+                        <td><code>float</code></td>
+                        <td>4 bytes</td>
+                        <td>IEEE 754</td>
+                        <td>Voltage, pressure, AFR</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2>BMS Integration</h2>
+            <p>The BMS node (address <code>0x20</code>) provides:</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Data Point</th>
+                        <th>Type</th>
+                        <th>Unit</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Pack Voltage</td>
+                        <td>float</td>
+                        <td>V</td>
+                        <td>Total battery pack voltage</td>
+                    </tr>
+                    <tr>
+                        <td>Pack Current</td>
+                        <td>float</td>
+                        <td>A</td>
+                        <td>Current draw (+ discharge, - charge)</td>
+                    </tr>
+                    <tr>
+                        <td>SOC</td>
+                        <td>uint8_t</td>
+                        <td>%</td>
+                        <td>State of charge</td>
+                    </tr>
+                    <tr>
+                        <td>Cell Voltages</td>
+                        <td>float[16]</td>
+                        <td>V</td>
+                        <td>Individual cell voltages</td>
+                    </tr>
+                    <tr>
+                        <td>Cell Temps</td>
+                        <td>int16_t[8]</td>
+                        <td>0.1°C</td>
+                        <td>Cell temperature probes</td>
+                    </tr>
+                    <tr>
+                        <td>BMS Status</td>
+                        <td>uint16_t</td>
+                        <td>flags</td>
+                        <td>Error flags, balance status</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="sidebar">
+            <h2>Navigation</h2>
+            <ul class="toc">
+                <li><a href="index.html">Home</a></li>
+                <li><a href="#overview">Overview</a></li>
+                <li><a href="#format">Message Format</a></li>
+                <li><a href="#commands">Command Table</a></li>
+                <li><a href="#polling">Polling Cycle</a></li>
+                <li><a href="#errors">Error Handling</a></li>
+                <li><a href="#types">Data Types</a></li>
+                <li><a href="#bms">BMS Integration</a></li>
+            </ul>
+
+            <div class="card">
+                <h3>Quick Links</h3>
+                <ul>
+                    <li><a href="../readme.md">Main README</a></li>
+                    <li><a href="../PROJECT_INDEX.md">Project Index</a></li>
+                    <li><a href="../docs/i2c-protocol.md">Original Protocol Doc</a></li>
+                    <li><a href="../docs/data-points.md">Data Points Legend</a></li>
+                    <li><a href="https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4.3">Waveshare 4.3" Display</a></li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h3>Related Pages</h3>
+                <ul>
+                    <li><a href="hardware.html">Hardware Overview</a></li>
+                    <li><a href="features.html">Key Features</a></li>
+                    <li><a href="architecture.html">System Architecture</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>OpenDash — Universal Racecar Dashboard | Built for racers, by racers</p>
+        <p>Copyright © 2024–2026 uknowmelast & Axiom (AI Co-Architect)</p>
+    </div>
+</body>
+</html>

@@ -1,3 +1,4 @@
+/* Licensed under Sovereign Individual License v1.0 — see LICENSE file */
 /**
  * @file display_init.c
  * @brief OpenDash Center Display — Hardware Initialization
@@ -80,6 +81,10 @@
 
 static const char *TAG = "display_init";
 
+/* Forward declarations for GT911 register access */
+static esp_err_t gt911_write_reg(uint16_t reg, const uint8_t *data, size_t len);
+static esp_err_t gt911_read_reg(uint16_t reg, uint8_t *data, size_t len);
+
 /* Display dimensions */
 #define LCD_H_RES   800
 #define LCD_V_RES   480
@@ -111,12 +116,16 @@ static const char *TAG = "display_init";
  * @see GT911 Datasheet: https://files.waveshare.com/upload/3/3e/GT911_Datasheet.pdf
  */
 #define TOUCH_I2C_NUM           I2C_NUM_0
-#define TOUCH_I2C_SCL_PIN       GPIO_NUM_20   /* SCL on GPIO20 */
-#define TOUCH_I2C_SDA_PIN       GPIO_NUM_19   /* SDA on GPIO19 */
-#define TOUCH_I2C_FREQ_HZ       400000        /* 400 kHz I2C clock */
-#define TOUCH_GT911_ADDR        0x5D          /* GT911 I2C address */
-#define TOUCH_GT911_INT_PIN     GPIO_NUM_4    /* Interrupt pin (input) */
-#define TOUCH_GT911_RST_PIN     GPIO_NUM_8    /* Reset pin (output) */
+#define TOUCH_I2C_SCL_PIN       GPIO_NUM_9    /* SCL on GPIO9 (per Waveshare demo) */
+#define TOUCH_I2C_SDA_PIN       GPIO_NUM_8    /* SDA on GPIO8 */
+#define TOUCH_I2C_FREQ_HZ       400000        /* 400 kHz (per Waveshare demo) */
+#define TOUCH_GT911_ADDR        0x5D          /* GT911 I2C address (alt: 0x14) */
+
+/* Touch polling interval for PSRAM bandwidth optimization:
+ * - Reduced from 50 Hz to 10 Hz (100 ms delay)
+ * - Moved to core 1 (CPU1) to avoid LCD DMA contention on core 0
+ * - I2C transactions can block PSRAM for 50-100 us, enough to miss DMA deadlines */
+#define TOUCH_POLL_INTERVAL_MS  100
 
 /* GT911 useful register addresses */
 #define GT911_REG_STATUS        0x814E        /* Touch status register */
@@ -147,14 +156,14 @@ static const char *TAG = "display_init";
 #define LCD_PIN_NUM_DATA9       GPIO_NUM_47  /* G6 */
 #define LCD_PIN_NUM_DATA10      GPIO_NUM_21  /* G7 */
 #define LCD_PIN_NUM_DATA11      GPIO_NUM_1   /* R3 */
-#define LCD_PIN_NUM_DATA12      GPIO_NUM_42  /* R4 */
-#define LCD_PIN_NUM_DATA13      GPIO_NUM_41  /* R5 */
-#define LCD_PIN_NUM_DATA14      GPIO_NUM_40  /* R6 */
-#define LCD_PIN_NUM_DATA15      GPIO_NUM_9   /* R7 */
+#define LCD_PIN_NUM_DATA12      GPIO_NUM_2   /* R4 (per Waveshare demo) */
+#define LCD_PIN_NUM_DATA13      GPIO_NUM_42  /* R5 */
+#define LCD_PIN_NUM_DATA14      GPIO_NUM_41  /* R6 */
+#define LCD_PIN_NUM_DATA15      GPIO_NUM_40  /* R7 — frees GPIO9 for I2C SCL */
 
 /* LVGL Configuration */
 #define LVGL_TICK_PERIOD_MS     2
-#define LVGL_BUFFER_HEIGHT      50   /* Height of LVGL draw buffer (partial buffer) */
+#define LVGL_BUFFER_HEIGHT      20   /* Reduced from 50 to minimize PSRAM write spikes */
 #define LVGL_DRAW_BUF_LINES     LVGL_BUFFER_HEIGHT
 
 /* Backlight PWM Configuration */
@@ -167,15 +176,23 @@ static const char *TAG = "display_init";
 /* Static handles */
 static esp_lcd_panel_handle_t panel_handle = NULL;
 static SemaphoreHandle_t lvgl_mux = NULL;
+static SemaphoreHandle_t s_vsync_sem = NULL;  /* Vsync synchronization for tear-free rendering */
 static lv_display_t *lvgl_disp = NULL;
+/* Framebuffer pointers cached at lvgl_disp_init() so lvgl_flush_cb can mirror
+ * the dirty rect into the buffer LVGL will render into NEXT cycle. Without
+ * this mirror, DIRECT mode + 2 FBs leaks frame N-2 pixels through any area
+ * that's not invalidated this frame (documented in DATAFLOW.md §6). */
+static void *s_fb0 = NULL;
+static void *s_fb1 = NULL;
 static uint8_t current_brightness = 100;  /* Default to full brightness */
 static lv_indev_t *touch_indev = NULL;    /* LVGL touch input device */
 static lv_indev_t *button_indev = NULL;   /* LVGL button input device */
-static QueueHandle_t touch_queue = NULL;  /* Queue for touch events */
 static TaskHandle_t touch_task_handle = NULL;  /* Touch reading task */
 static TaskHandle_t button_task_handle = NULL; /* Button reading task */
 static bool touched = false;              /* Current touch state */
 static uint16_t touch_x = 0, touch_y = 0; /* Current touch coordinates */
+static i2c_master_bus_handle_t touch_i2c_bus = NULL;    /* I2C bus for GT911 */
+static i2c_master_dev_handle_t gt911_dev     = NULL;    /* GT911 device handle */
 
 /**
  * @brief LVGL tick timer callback
@@ -189,28 +206,71 @@ static void lvgl_tick_timer_cb(void *arg)
 }
 
 /**
- * @brief LVGL flush callback for LVGL 9.x
+ * @brief VSYNC event callback — fires in ISR context when the LCD has finished
+ *        displaying a complete frame.  Unblocks the flush callback so LVGL only
+ *        writes to the "back" framebuffer while the "front" one is being scanned.
+ */
+static IRAM_ATTR bool on_vsync_event(esp_lcd_panel_handle_t panel,
+                                      const esp_lcd_rgb_panel_event_data_t *edata,
+                                      void *user_ctx)
+{
+    BaseType_t high_task_wakeup = pdFALSE;
+    if (s_vsync_sem) {
+        xSemaphoreGiveFromISR(s_vsync_sem, &high_task_wakeup);
+    }
+    return high_task_wakeup == pdTRUE;
+}
+
+/**
+ * @brief LVGL flush callback — double-framebuffer + vsync synchronization.
  *
- * This function is called by LVGL when it has rendered a portion of the screen
- * and needs to transfer it to the display.
+ * In DIRECT render mode with 2 framebuffers, px_map IS one of the HW frame
+ * buffers (allocated by esp_lcd_new_rgb_panel).  draw_bitmap recognises its
+ * own pointer and performs a zero-copy DMA source swap on the next vsync.
+ * We block here until the swap completes so that LVGL never writes into the
+ * buffer currently being scanned to the panel.
  *
- * @param disp      Pointer to the display driver
- * @param area      Area that was rendered
- * @param px_map    Pointer to the rendered pixel data
+ * Two-bug fix (see proposal 2026-05-24):
+ *   A) Drain any stale vsync token BEFORE scheduling the swap. The vsync ISR
+ *      gives `s_vsync_sem` every ~25 ms unconditionally; if the LVGL render
+ *      phase ran longer than one vsync period the semaphore is already given
+ *      when we enter, and the subsequent take returns instantly → LVGL writes
+ *      into the buffer the panel is still scanning out → rolling tear from
+ *      the bottom.
+ *   B) After the real next vsync, mirror the dirty rect into the OTHER FB so
+ *      subsequent partial updates don't expose frame N-2 stale pixels.
  */
 static void lvgl_flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map)
 {
     esp_lcd_panel_handle_t panel = (esp_lcd_panel_handle_t)lv_display_get_user_data(disp);
-    
-    const int offsetx1 = area->x1;
-    const int offsetx2 = area->x2;
-    const int offsety1 = area->y1;
-    const int offsety2 = area->y2;
-    
-    /* Copy rendered data to the RGB frame buffer */
-    esp_lcd_panel_draw_bitmap(panel, offsetx1, offsety1, offsetx2 + 1, offsety2 + 1, px_map);
-    
-    /* Inform LVGL that flushing is done */
+
+    /* Fix A: clear any vsync token left over from before this flush so the
+     * take below waits for the genuine NEXT vsync. */
+    xSemaphoreTake(s_vsync_sem, 0);
+
+    /* Schedule the framebuffer swap — effective on next vsync. */
+    esp_lcd_panel_draw_bitmap(panel, area->x1, area->y1,
+                              area->x2 + 1, area->y2 + 1, px_map);
+
+    /* Block until the panel actually switched to px_map. */
+    xSemaphoreTake(s_vsync_sem, pdMS_TO_TICKS(100));
+
+    /* Fix B: mirror the dirty rectangle into the OTHER framebuffer so the
+     * next LVGL render cycle — which will draw into that buffer — sees an
+     * up-to-date background everywhere it doesn't invalidate. RGB565 = 2 bpp.
+     * Cost: one bounded memcpy per dirty rect per frame (typically < 1 ms). */
+    if (s_fb0 && s_fb1) {
+        void *other = (px_map == s_fb0) ? s_fb1 : s_fb0;
+        const int pitch    = LCD_H_RES * 2;
+        const int row_len  = (area->x2 - area->x1 + 1) * 2;
+        const int col_byte = area->x1 * 2;
+        for (int y = area->y1; y <= area->y2; ++y) {
+            memcpy((uint8_t *)other  + y * pitch + col_byte,
+                   (uint8_t *)px_map + y * pitch + col_byte,
+                   row_len);
+        }
+    }
+
     lv_display_flush_ready(disp);
 }
 
@@ -249,13 +309,37 @@ static esp_err_t lcd_backlight_init(void)
 }
 
 /**
- * @brief Initialize I2C for GT911 touch controller communication
+ * @brief Initialize I2C bus 0 for GT911 touch controller
  */
 static esp_err_t touch_i2c_init(void)
 {
-    /* I2C will be initialized on demand if needed for GT911 communication
-     * For now, just log that touch initialization is deferred */
-    ESP_LOGI(TAG, "I2C touch controller disabled (will implement full GT911 driver in future)");
+    i2c_master_bus_config_t bus_cfg = {
+        .i2c_port   = TOUCH_I2C_NUM,
+        .sda_io_num = TOUCH_I2C_SDA_PIN,
+        .scl_io_num = TOUCH_I2C_SCL_PIN,
+        .clk_source = I2C_CLK_SRC_DEFAULT,
+        .glitch_ignore_cnt = 7,
+        .flags.enable_internal_pullup = true,
+    };
+    esp_err_t ret = i2c_new_master_bus(&bus_cfg, &touch_i2c_bus);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to create touch I2C bus: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    i2c_device_config_t dev_cfg = {
+        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+        .device_address  = TOUCH_GT911_ADDR,
+        .scl_speed_hz    = TOUCH_I2C_FREQ_HZ,
+    };
+    ret = i2c_master_bus_add_device(touch_i2c_bus, &dev_cfg, &gt911_dev);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to add GT911 device: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    ESP_LOGI(TAG, "Touch I2C bus initialized (SDA=%d, SCL=%d, addr=0x%02X)",
+             TOUCH_I2C_SDA_PIN, TOUCH_I2C_SCL_PIN, TOUCH_GT911_ADDR);
     return ESP_OK;
 }
 
@@ -268,53 +352,221 @@ static esp_err_t touch_gt911_init(void)
 {
     ESP_LOGI(TAG, "Initializing GT911 touch controller...");
     
-    /* Configure reset pin (output) */
-    gpio_config_t rst_config = {
-        .pin_bit_mask = (1ULL << TOUCH_GT911_RST_PIN),
-        .mode = GPIO_MODE_OUTPUT,
-        .pull_up_en = GPIO_PULLUP_DISABLE,
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_DISABLE,
-    };
-    ESP_ERROR_CHECK(gpio_config(&rst_config));
+    /* ── CH422G IO Expander — reset GT911 via hardware reset line ──
+     * The Waveshare ESP32-S3-Touch-LCD-4.3 board uses a CH422G IO expander
+     * (I2C addrs 0x24 / 0x38) to control the GT911 reset pin.
+     * Sequence from Waveshare demo:
+     *   1. Write 0x01 to 0x24 → set CH422G to output mode
+     *   2. Write 0x2C to 0x38 → assert reset (touch reset LOW)
+     *   3. Delay 100ms
+     *   4. Write 0x2E to 0x38 → de-assert reset (touch reset HIGH)
+     *   5. Delay 200ms → GT911 boot
+     */
+    {
+        /* GPIO4 LOW during reset selects I2C address 0x5D */
+        gpio_config_t io4_cfg = {
+            .pin_bit_mask = (1ULL << GPIO_NUM_4),
+            .mode         = GPIO_MODE_OUTPUT,
+            .pull_up_en   = GPIO_PULLUP_DISABLE,
+            .pull_down_en = GPIO_PULLDOWN_DISABLE,
+            .intr_type    = GPIO_INTR_DISABLE,
+        };
+        gpio_config(&io4_cfg);
+        gpio_set_level(GPIO_NUM_4, 0);
+        
+        /* Create temporary device handles for CH422G IO expander */
+        i2c_master_dev_handle_t ch422g_mode_dev = NULL;
+        i2c_master_dev_handle_t ch422g_port_dev = NULL;
+        i2c_device_config_t ch422g_mode_cfg = {
+            .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+            .device_address  = 0x24,
+            .scl_speed_hz    = TOUCH_I2C_FREQ_HZ,
+        };
+        i2c_device_config_t ch422g_port_cfg = {
+            .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+            .device_address  = 0x38,
+            .scl_speed_hz    = TOUCH_I2C_FREQ_HZ,
+        };
+        esp_err_t ret = i2c_master_bus_add_device(touch_i2c_bus, &ch422g_mode_cfg, &ch422g_mode_dev);
+        esp_err_t ret2 = i2c_master_bus_add_device(touch_i2c_bus, &ch422g_port_cfg, &ch422g_port_dev);
+        
+        if (ret == ESP_OK && ret2 == ESP_OK) {
+            /* Set CH422G to output mode */
+            uint8_t ch422g_mode = 0x01;
+            ret = i2c_master_transmit(ch422g_mode_dev, &ch422g_mode, 1, 100);
+            if (ret == ESP_OK) {
+                ESP_LOGI(TAG, "CH422G mode set (0x24 → 0x01)");
+                
+                /* Assert touch reset via CH422G */
+                uint8_t reset_assert = 0x2C;
+                i2c_master_transmit(ch422g_port_dev, &reset_assert, 1, 100);
+                vTaskDelay(pdMS_TO_TICKS(100));
+                
+                /* De-assert touch reset */
+                uint8_t reset_deassert = 0x2E;
+                i2c_master_transmit(ch422g_port_dev, &reset_deassert, 1, 100);
+                ESP_LOGI(TAG, "GT911 reset via CH422G complete");
+            } else {
+                ESP_LOGW(TAG, "CH422G not found at 0x24 (ret=%s) — skipping HW reset",
+                         esp_err_to_name(ret));
+            }
+        } else {
+            ESP_LOGW(TAG, "Failed to add CH422G devices to I2C bus");
+        }
+        
+        /* Clean up CH422G device handles */
+        if (ch422g_mode_dev) i2c_master_bus_rm_device(ch422g_mode_dev);
+        if (ch422g_port_dev) i2c_master_bus_rm_device(ch422g_port_dev);
+        
+        /* Wait for GT911 to boot after reset */
+        vTaskDelay(pdMS_TO_TICKS(200));
+    }
     
-    /* Configure interrupt pin (input) */
-    gpio_config_t int_config = {
-        .pin_bit_mask = (1ULL << TOUCH_GT911_INT_PIN),
-        .mode = GPIO_MODE_INPUT,
-        .pull_up_en = GPIO_PULLUP_ENABLE,
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_DISABLE,
-    };
-    ESP_ERROR_CHECK(gpio_config(&int_config));
+    /* ── I2C Bus Scan — determine what's actually on the bus ── */
+    ESP_LOGI(TAG, "Touch I2C bus scan (SDA=%d, SCL=%d, %d Hz):",
+             TOUCH_I2C_SDA_PIN, TOUCH_I2C_SCL_PIN, TOUCH_I2C_FREQ_HZ);
+    int found_count = 0;
+    for (uint8_t addr = 0x03; addr <= 0x77; addr++) {
+        esp_err_t probe_ret = i2c_master_probe(touch_i2c_bus, addr, 100);
+        if (probe_ret == ESP_OK) {
+            found_count++;
+            ESP_LOGI(TAG, "  0x%02X %s%s",
+                     addr,
+                     (addr == 0x5D) ? "(GT911 addr A)" : 
+                     (addr == 0x14) ? "(GT911 addr B)" :
+                     (addr == 0x2D) ? "(unknown — half-shifted 0x5D?)" : "",
+                     (addr == TOUCH_GT911_ADDR) ? " ← configured" : "");
+        }
+    }
+    ESP_LOGI(TAG, "  Total: %d devices on touch I2C bus", found_count);
     
-    /* Perform reset sequence: pull low then high */
-    gpio_set_level(TOUCH_GT911_RST_PIN, 0);
-    vTaskDelay(pdMS_TO_TICKS(10));
-    gpio_set_level(TOUCH_GT911_RST_PIN, 1);
-    vTaskDelay(pdMS_TO_TICKS(50));
+    /* ── No INT/RST pins available on this board — probe directly ── */
+    /* Waveshare ESP32-S3-Touch-LCD-4.3: TP_INT=-1, TP_RST=-1 */
     
-    ESP_LOGI(TAG, "GT911 touch controller initialized (Addr=0x%02X, Reset=%d, INT=%d)",
-             TOUCH_GT911_ADDR, TOUCH_GT911_RST_PIN, TOUCH_GT911_INT_PIN);
-    return ESP_OK;
+    /* Check configured address first */
+    esp_err_t probe_ret = i2c_master_probe(touch_i2c_bus, TOUCH_GT911_ADDR, 100);
+    if (probe_ret == ESP_OK) {
+        ESP_LOGI(TAG, "GT911 FOUND at 0x%02X ✓", TOUCH_GT911_ADDR);
+        
+        /* Read GT911 config registers to check resolution */
+        uint8_t cfg[5];  /* 0x8047: version, 0x8048-49: X max, 0x804A-4B: Y max */
+        esp_err_t cfg_ret = gt911_read_reg(0x8047, cfg, 5);
+        if (cfg_ret == ESP_OK) {
+            uint16_t cfg_x = (cfg[2] << 8) | cfg[1];
+            uint16_t cfg_y = (cfg[4] << 8) | cfg[3];
+            ESP_LOGI(TAG, "GT911 config: version=0x%02X, X_max=%d, Y_max=%d",
+                     cfg[0], cfg_x, cfg_y);
+            if (cfg_x != LCD_H_RES || cfg_y != LCD_V_RES) {
+                ESP_LOGW(TAG, "GT911 resolution MISMATCH! Config=%dx%d Display=%dx%d",
+                         cfg_x, cfg_y, LCD_H_RES, LCD_V_RES);
+            }
+        } else {
+            ESP_LOGW(TAG, "Failed to read GT911 config: %s", esp_err_to_name(cfg_ret));
+        }
+        
+        return ESP_OK;
+    }
+    
+    /* Try alternate address */
+    probe_ret = i2c_master_probe(touch_i2c_bus, 0x14, 100);
+    if (probe_ret == ESP_OK) {
+        ESP_LOGW(TAG, "GT911 at ALTERNATE addr 0x14 — reconfiguring device handle");
+        i2c_master_bus_rm_device(gt911_dev);
+        i2c_device_config_t dev_cfg = {
+            .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+            .device_address  = 0x14,
+            .scl_speed_hz    = TOUCH_I2C_FREQ_HZ,
+        };
+        esp_err_t ret = i2c_master_bus_add_device(touch_i2c_bus, &dev_cfg, &gt911_dev);
+        if (ret == ESP_OK) {
+            ESP_LOGI(TAG, "GT911 reconfigured at 0x14 ✓");
+        }
+        return ret;
+    }
+    
+    ESP_LOGE(TAG, "GT911 NOT found at 0x5D or 0x14 — touch will NOT work");
+    return ESP_ERR_NOT_FOUND;
 }
 
 /**
- * @brief Read touch point from GT911 using new I2C master API
+ * @brief Write to a 16-bit GT911 register.
+ */
+static esp_err_t gt911_write_reg(uint16_t reg, const uint8_t *data, size_t len)
+{
+    if (!gt911_dev) return ESP_ERR_INVALID_STATE;
+    uint8_t buf[2 + len];
+    buf[0] = (reg >> 8) & 0xFF;
+    buf[1] = reg & 0xFF;
+    if (data && len) memcpy(&buf[2], data, len);
+    return i2c_master_transmit(gt911_dev, buf, 2 + len, 50);
+}
+
+/**
+ * @brief Read from a 16-bit GT911 register.
+ */
+static esp_err_t gt911_read_reg(uint16_t reg, uint8_t *data, size_t len)
+{
+    if (!gt911_dev) return ESP_ERR_INVALID_STATE;
+    uint8_t addr[2] = { (reg >> 8) & 0xFF, reg & 0xFF };
+    return i2c_master_transmit_receive(gt911_dev, addr, 2, data, len, 50);
+}
+
+/**
+ * @brief Read touch point from GT911 via I2C.
  *
- * Performs polled I2C reads from GT911 registers for touch coordinates.
- * Note: This is a simplified implementation that polls the touch controller.
+ * GT911 register map:
+ *   0x814E — Status register (bit7=buffer_ready, bits3:0=num_touches)
+ *   0x8150 — Touch point 1 (8 bytes: id, xL, xH, yL, yH, sizeL, sizeH, reserved)
+ *
+ * After reading, status register must be cleared (write 0x00).
  */
 static esp_err_t touch_gt911_read_point(uint16_t *x, uint16_t *y, bool *touched)
 {
-    uint8_t buffer[1] = {0};
-    
-    /* For now, just report no touch - full GT911 driver is a future enhancement */
     *touched = false;
     *x = 0;
     *y = 0;
-    
-    ESP_LOGD(TAG, "Touch read: no touch detected (simplified implementation)");
+
+    if (!gt911_dev) return ESP_ERR_INVALID_STATE;
+
+    /* Read status register */
+    uint8_t status = 0;
+    esp_err_t ret = gt911_read_reg(GT911_REG_STATUS, &status, 1);
+    if (ret != ESP_OK) return ret;
+
+    /* Bit 7 = buffer ready, bits 3:0 = number of touches (0-5) */
+    bool buffer_ready = (status & 0x80) != 0;
+    uint8_t num_touches = status & 0x0F;
+
+
+    /* Clear status register (must be done every read) */
+    uint8_t zero = 0x00;
+    gt911_write_reg(GT911_REG_STATUS, &zero, 1);
+
+    if (!buffer_ready || num_touches == 0 || num_touches > 5) {
+        return ESP_OK;  /* No touch */
+    }
+
+    /* Read first touch point (6 bytes starting at 0x8150) */
+    uint8_t touch_data[6];
+    ret = gt911_read_reg(GT911_REG_TOUCHES_BASE, touch_data, 6);
+    if (ret != ESP_OK) return ret;
+
+    /* Waveshare ESP32-S3-Touch-LCD-4.3 GT911 data layout at 0x8150:
+     *   [0]=XL, [1]=XH, [2]=YL, [3]=YH, [4]=SzL, [5]=SzH
+     * Note: NO Track ID prefix — verified via raw byte dump. */
+    uint16_t raw_x = (touch_data[1] << 8) | touch_data[0];
+    uint16_t raw_y = (touch_data[3] << 8) | touch_data[2];
+
+
+
+    /* Clamp to display resolution */
+    if (raw_x >= LCD_H_RES) raw_x = LCD_H_RES - 1;
+    if (raw_y >= LCD_V_RES) raw_y = LCD_V_RES - 1;
+
+    *x = raw_x;
+    *y = raw_y;
+    *touched = true;
+
     return ESP_OK;
 }
 
@@ -434,20 +686,41 @@ static void touch_read_task(void *pvParameters)
     (void)pvParameters;
     uint16_t x, y;
     bool pressed;
+    uint32_t touch_count = 0;
+    uint32_t error_count = 0;
+    uint32_t last_report = 0;
     
-    ESP_LOGI(TAG, "Touch reading task started");
+    ESP_LOGI(TAG, "Touch reading task started (10Hz, core %d)", xPortGetCoreID());
     
     while (1) {
-        if (touch_gt911_read_point(&x, &y, &pressed) == ESP_OK) {
-            if (display_lvgl_lock(10)) {
-                touch_x = x;
-                touch_y = y;
-                touched = pressed;
-                display_lvgl_unlock();
+        esp_err_t ret = touch_gt911_read_point(&x, &y, &pressed);
+        if (ret == ESP_OK) {
+            /* Write touch state — no lock needed for atomic scalar writes.
+             * touch_input_cb reads these from LVGL timer context; both
+             * run on separate cores but uint16_t/bool writes are atomic
+             * on Xtensa.  The old 10ms lock was causing silent drops. */
+            touch_x = x;
+            touch_y = y;
+            touched = pressed;
+            if (pressed) {
+                touch_count++;
+            }
+        } else {
+            error_count++;
+            if (error_count <= 5) {
+                ESP_LOGW(TAG, "GT911 read error #%"PRIu32": %s", error_count, esp_err_to_name(ret));
             }
         }
         
-        vTaskDelay(pdMS_TO_TICKS(20));  /* 50 Hz polling rate */
+        /* Periodic status every 60s */
+        uint32_t now = esp_log_timestamp();
+        if (now - last_report > 60000) {
+            last_report = now;
+            ESP_LOGI(TAG, "Touch stats: touches=%"PRIu32" errors=%"PRIu32"",
+                     touch_count, error_count);
+        }
+        
+        vTaskDelay(pdMS_TO_TICKS(TOUCH_POLL_INTERVAL_MS));  /* Reduced to 10 Hz for PSRAM stability */
     }
 }
 
@@ -490,7 +763,7 @@ static esp_err_t start_touch_task(void)
         NULL,
         4,  /* Above UI task priority */
         &touch_task_handle,
-        0   /* Core 0 */
+        1   /* Core 1 - avoids LCD DMA contention on core 0 */
     );
     
     if (ret != pdPASS) {
@@ -498,7 +771,7 @@ static esp_err_t start_touch_task(void)
         return ESP_FAIL;
     }
     
-    ESP_LOGI(TAG, "Touch reading task started on core 0");
+    ESP_LOGI(TAG, "Touch reading task started on core 1 (reduced jitter)");
     return ESP_OK;
 }
 
@@ -540,9 +813,14 @@ static esp_err_t lcd_panel_init(void)
             .vsync_front_porch = 8,   /* Datasheet: 4-8-12, using typical */
         },
         .data_width = 16,  /* RGB565 = 16 bits */
-        .num_fbs = 1,
-        /* Bounce buffer: copies PSRAM->SRAM in chunks before DMA, prevents visual noise */
-        .bounce_buffer_size_px = LCD_BOUNCE_BUFFER_SIZE,
+        .num_fbs = 2,  /* Double framebuffer for tear-free vsync rendering */
+        /* TODO #14 NOTE: tried bounce_buffer_size_px=0 to make the vsync gate
+         * fire on real vsync (not bounce-refill boundary) — produced horizontal
+         * chop/wave artifacts within seconds (PSRAM bandwidth contention as the
+         * file header predicted). Reverted. Residual bottom-up tearing must be
+         * attacked from a different angle: try pclk drop to 14 MHz, or move
+         * heavy ui_task work off the LVGL flush path. */
+        .bounce_buffer_size_px = LCD_BOUNCE_BUFFER_SIZE,  /* 20-line bounce buffer — prevents PSRAM DMA contention artifacts */
         .hsync_gpio_num = LCD_PIN_NUM_HSYNC,
         .vsync_gpio_num = LCD_PIN_NUM_VSYNC,
         .de_gpio_num = LCD_PIN_NUM_DE,
@@ -577,7 +855,15 @@ static esp_err_t lcd_panel_init(void)
     
     ESP_ERROR_CHECK(esp_lcd_panel_init(panel_handle));
     ESP_LOGI(TAG, "RGB LCD panel initialized");
-    
+
+    /* Register vsync callback for tear-free rendering */
+    s_vsync_sem = xSemaphoreCreateBinary();
+    esp_lcd_rgb_panel_event_callbacks_t cbs = {
+        .on_vsync = on_vsync_event,
+    };
+    ESP_ERROR_CHECK(esp_lcd_rgb_panel_register_event_callbacks(panel_handle, &cbs, NULL));
+    ESP_LOGI(TAG, "Vsync callback registered (double-buffer tear-free mode)");
+
     return ESP_OK;
 }
 
@@ -617,22 +903,21 @@ static esp_err_t lvgl_init(void)
     /* Store panel handle as user data for the flush callback */
     lv_display_set_user_data(lvgl_disp, panel_handle);
     
-    /* Allocate LVGL draw buffers in PSRAM — sized for RGB565 (2 bytes/pixel) */
-    size_t buffer_size = LCD_H_RES * LVGL_DRAW_BUF_LINES * sizeof(uint16_t);
-    void *buf1 = heap_caps_aligned_alloc(64, buffer_size, MALLOC_CAP_SPIRAM);
-    if (buf1 == NULL) {
-        ESP_LOGE(TAG, "Failed to allocate LVGL draw buffer 1 (%zu bytes)", buffer_size);
-        return ESP_FAIL;
-    }
-    
-    void *buf2 = heap_caps_aligned_alloc(64, buffer_size, MALLOC_CAP_SPIRAM);
-    if (buf2 == NULL) {
-        ESP_LOGW(TAG, "Failed to allocate LVGL draw buffer 2, using single buffer mode");
-        /* Single buffer mode is fine, just less efficient */
-    }
-    
-    /* Set the draw buffers (LVGL 9.x API) */
-    lv_display_set_buffers(lvgl_disp, buf1, buf2, buffer_size, LV_DISPLAY_RENDER_MODE_PARTIAL);
+    /* Get the two hardware framebuffers allocated by the RGB panel driver.
+     * In DIRECT mode, LVGL renders directly into these — no intermediate copy.
+     * The flush callback just swaps which one the DMA reads from. */
+    void *fb0 = NULL, *fb1 = NULL;
+    ESP_ERROR_CHECK(esp_lcd_rgb_panel_get_frame_buffer(panel_handle, 2, &fb0, &fb1));
+    size_t fb_size = LCD_H_RES * LCD_V_RES * sizeof(uint16_t);  /* RGB565 */
+    ESP_LOGI(TAG, "  Framebuffers: fb0=%p fb1=%p (%zu KB each)", fb0, fb1, fb_size / 1024);
+
+    /* Cache pointers so lvgl_flush_cb can mirror dirty rects between FBs. */
+    s_fb0 = fb0;
+    s_fb1 = fb1;
+
+    /* DIRECT render mode: LVGL writes into one FB while the other is displayed.
+     * Combined with the vsync-gated flush callback, this eliminates tearing. */
+    lv_display_set_buffers(lvgl_disp, fb0, fb1, fb_size, LV_DISPLAY_RENDER_MODE_DIRECT);
     
     /* Create and start LVGL tick timer */
     const esp_timer_create_args_t lvgl_tick_timer_args = {
@@ -645,8 +930,8 @@ static esp_err_t lvgl_init(void)
     
     ESP_LOGI(TAG, "LVGL 9.x initialized successfully");
     ESP_LOGI(TAG, "  Display: %dx%d", LCD_H_RES, LCD_V_RES);
-    ESP_LOGI(TAG, "  Draw buffer: %d lines (%zu bytes)", LVGL_DRAW_BUF_LINES, buffer_size);
-    ESP_LOGI(TAG, "  Double buffer: %s", buf2 != NULL ? "yes" : "no");
+    ESP_LOGI(TAG, "  Render mode: DIRECT (double-framebuffer, tear-free)");
+    ESP_LOGI(TAG, "  Framebuffer size: %zu KB each", fb_size / 1024);
     
     return ESP_OK;
 }
@@ -813,4 +1098,14 @@ esp_err_t display_set_brightness(uint8_t brightness)
 uint8_t display_get_brightness(void)
 {
     return current_brightness;
+}
+
+/**
+ * @brief Get the touch I2C bus handle for shared access
+ *
+ * @return I2C master bus handle, or NULL if not initialized
+ */
+i2c_master_bus_handle_t display_get_i2c_bus(void)
+{
+    return touch_i2c_bus;
 }
