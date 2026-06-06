@@ -1,6 +1,0 @@
-# Place your TrueType (.ttf) or OpenType (.otf) font files here
-# They will be automatically converted to LVGL format during build
-
-# Example fonts (uncomment to ignore certain patterns)
-# *.ttf
-# *.otf

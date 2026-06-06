@@ -1,8 +1,0 @@
-# Auto-generated image files - do not commit
-*.c
-*.h
-*.bin
-
-# Keep this directory but not the generated content
-!.gitignore
-!README.md

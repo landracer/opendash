@@ -1,8 +1,0 @@
-# Auto-generated font files - do not commit
-*.c
-
-# Keep the generated header that defines default fonts
-!opendash_font_config.h
-
-# Keep this directory but not the generated content
-!.gitignore

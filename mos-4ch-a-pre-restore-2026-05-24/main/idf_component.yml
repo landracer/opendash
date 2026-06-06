@@ -1,4 +1,0 @@
-## IDF Component Manager Manifest File
-## Dependencies for OpenDash 4-Channel MOS FET Controller A
-## Headless (no display, no LVGL)
-dependencies: {}

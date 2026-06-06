@@ -40,3 +40,13 @@ tearing-logs/
 # Local-only — never push
 archive/
 docs/archived/
+
+# Local backup / working-copy directories — kept locally, never committed
+center-bk/
+center copy/
+center-pre-restore-*/
+common-pre-restore-*/
+gps-bk/
+mos-4ch-a-pre-restore-*/
+*-bk/
+*-pre-restore-*/
