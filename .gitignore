@@ -50,3 +50,7 @@ gps-bk/
 mos-4ch-a-pre-restore-*/
 *-bk/
 *-pre-restore-*/
+
+# Copyrighted datasheets — never commit
+docs/pdf/
+*.pdf
