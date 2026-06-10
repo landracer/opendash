@@ -1,11 +1,14 @@
-feat(ota): comprehensive BLE OTA hardening and full-fleet coverage
+feat(nodes): add openDstream ESP-NOW → USB Serial/JTAG relay node
 
-- Fixed LEFT SDK configuration for proper PPCP parameters (corrected prefix from CONFIG_BT_NIMBLE_PPCP_* to CONFIG_BT_NIMBLE_SVC_GAP_PPCP_*)
-- Expanded ble_ota.py with new command-line options (--list, --device, --address, --scan-timeout, --chunk-size)
-- Added full-fleet BLE OTA coverage for all 11 node families (center, left, right, gps, pod1, pod2, relay-4ch-hd, relay-8ch-a, relay-8ch-b, mos-4ch-a, mos-4ch-b)
-- Improved OTA handler consistency and reliability across all nodes
-- Enhanced throughput optimization with 2M PHY, larger ACL buffers, and proper connection parameters
-- Fixed CENTER demo data path to ensure safe operation with live sensor data
-- Updated documentation including BLE_OTA.md, wiki/ota-bluetooth.md, and comprehensive OTA troubleshooting guide
+- Created standalone headless project (openDstream/) for ESP32-S3 with native USB-OTG
+- Implements pure ESP-NOW slave relay: receives all frames on channel 6, pipes to USB Serial/JTAG
+- Uses ESP-IDF v6.x high-level driver API (driver/usb_serial_jtag.h) — no HAL/LL complexity
+- Zero display dependencies: no LVGL, no common component, no peripherals required
+- Build verified: openDstream.bin (~267KB) compiles cleanly on ESP32-S3 target
+- Status LED on GPIO8 (active-low) for alive indication
+- Wiki documentation added: wiki/opendstream-relay-node.md with architecture, usage, troubleshooting
+- Updated TODO.md: active node families count 11→12, added §2 section for openDstream development tracking
+- Designed for bidirectional relay (PC ↔ ESP-NOW) — current implementation is unidirectional (ESP-NOW → USB)
+- Future enhancements: bidirectional support, TinyUSB CDC-ACM, frame filtering, buffering
 
-This release significantly improves the reliability and performance of the OTA system, bringing it to a production-ready state for all node types with consistent behavior and optimized throughput.
+This node bridges the wireless OpenDash ESP-NOW network to multidisplay-app on PC via USB, enabling real-time telemetry visualization without display hardware.

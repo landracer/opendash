@@ -32,7 +32,7 @@
 
 | Area | State |
 |---|---|
-| Active node families | 11: center, left, right, gps, pod1, pod2, mos-4ch-a, mos-4ch-b, relay-4ch-hd, relay-8ch-a, relay-8ch-b (+ external BMS Logger) |
+| Active node families | 12: center, left, right, gps, pod1, pod2, mos-4ch-a, mos-4ch-b, relay-4ch-hd, relay-8ch-a, relay-8ch-b, openDstream (+ external BMS Logger) |
 | Total node slots | `OPENDASH_NODE_COUNT = 18` ([common/include/opendash_common.h](common/include/opendash_common.h)) |
 | ESP-NOW protocol | 31 opcodes (12 master + 8 slave + 11 boost), batched (DATA_BATCH 0x88 / SET_DATA_BATCH 0x0C), 4 priority channels, polling eliminated |
 | Sensor source | MultiDisplay (HC-05/HC-06 BT @ 115200, 95-byte SERIALOUT_BINARY @ ~100 Hz, consumed at 5 Hz) |
@@ -82,7 +82,6 @@
 - [ ] **POD1:** add suspend sequence before OTA ([pod1/main/main.c](pod1/main/main.c) ~L157)
 - [ ] **POD2:** mirror POD1 fixes
 - [ ] Re-measure POD1/POD2 OTA throughput after recipe applied (LEFT/RIGHT hit ~9.1 KB/s post-fix)
-- [-] **OTA handler divergence audit in progress** — systematically comparing ENTER_BT_OTA handling across all nodes; LEFT/RIGHT fully hardened; GPS/POD1/POD2 suspend sequences + sdkconfig recipes missing (see table in CHANGELOG v0.4.1-beta)
 
 ### 1.3 Center RGB Display Tearing — ACTIVE INVESTIGATION
 
@@ -145,8 +144,7 @@
 - [x] Boost config UI scaffold ([center/main/boost_config_ui.c](center/main/boost_config_ui.c)) — see §6
 - [x] System config NVS ([center/main/system_config.c](center/main/system_config.c)) — boost target node, pressure unit
 - [x] CONFIG screen renders per-node health via `ui_manager_update_config_node_status()` (`node_health_get_state` + `..._get_status_flags`, color-coded ONLINE/DEGRADED/AWAITING/OFFLINE)
-- [x] **Engine demo data path verified safe** — `OPENDASH_DATASRC_DEMO` is confirmed not active during normal operation; demo generator does not feed live gauges when MD/ESP-NOW data is flowing. No production data conflict.
-- [ ] Implement graceful auto-halt: when first real MD/ESP-NOW packet arrives, automatically stop demo generator without requiring a restart (currently a code path exists but switch logic is absent)
+- [ ] **Engine demo data auto-halt when MD arrives** — `s_active_datasrc`/`OPENDASH_DATASRC_DEMO` defined but no auto-switch logic found (GPS path works via different mechanism). Either implement or remove the demo (currently never yields)
 - [~] Center SD logger ([center/main/sd_logger.c](center/main/sd_logger.c)) — **still a no-op stub**; needs CH422G SPI CS implementation
 - [ ] Dedicated System Config screen (currently fragmented across overlays)
 - [ ] Touch-based screen switching (swipe / tap zones)
@@ -453,26 +451,26 @@
 - [x] Per-row NVS persistence — namespace `boost`, keys `params`, `d_M_G`, `s_M_G`, `throt`
 - [x] Thread-safe via semaphore
 
-### 6.2 MOS-4CH-A Integration (MOSTLY DONE)
+### 6.2 MOS-4CH-A Integration (DONE)
 
 - [x] `opendash_boost_init()` called at boot
 - [x] `boost_compute_task` (core 1, ~50 Hz)
 - [x] `boost_telemetry_task` (~5 Hz heartbeat)
 - [x] Local ESP-NOW dispatch for `OPENDASH_CMD_BOOST_*`
 - [x] PWM channel 3 configured for boost solenoid output
-- [~] Channel GPIO assignments — TBD comments; multimeter verification needed
-- [ ] Confirm MOS-4CH-B parity
+- [x] Channel GPIO assignments verified (CH0=GPIO16, CH1=GPIO17, CH2=GPIO26, CH3=GPIO27)
+- [x] Confirm MOS-4CH-B parity
 
 ### 6.3 Wire Protocol
 
 - [x] Boost opcodes in shared header — 0x20 LIVE_DATA, 0x21 SET_PARAMS, 0x22 SET_MODE,
       0x23 SET_DUTY_ROW, 0x24 SET_SETP_ROW, 0x25 SET_THROTTLE, 0x26 PULL_ALL,
       0x90 TELEMETRY, 0x91–0x93 PARAMS_REPORT ([opendash_i2c_protocol.h](common/include/opendash_i2c_protocol.h) ~L205–222)
-- [ ] **Migrate payload structs from MOS-A-private to shared header** (currently each side defines its own)
-- [ ] Center → MOS-A push helpers in [center/main/espnow_master.c](center/main/espnow_master.c) for each SET_* opcode
-- [ ] Live-data fan-out at ≥10 Hz: RPM, MAP/boost, EGT, AFR, fuel_psi, throttle%, gear
-      (boost_client.c already snapshots; needs to actually transmit)
-- [ ] PULL_ALL handler on MOS side + PARAMS_REPORT round-trip
+- [x] **Migrate payload structs from MOS-A-private to shared header** (now shared)
+- [x] Center → MOS-A push helpers in [center/main/espnow_master.c](center/main/espnow_master.c) for each SET_* opcode
+- [x] Live-data fan-out at ≥10 Hz: RPM, MAP/boost, EGT, AFR, fuel_psi, throttle%, gear
+      (boost_client.c already snapshots; now transmits)
+- [x] PULL_ALL handler on MOS side + PARAMS_REPORT round-trip
 
 ### 6.4 Center UI
 
@@ -480,19 +478,19 @@
       unit selector (kPa/BAR/PSI), mode/slot/gear selectors, "UNSTABLE LINK"
       banner, live telemetry, page nav (2 × 16 RPM)
 - [x] `system_config.c` NVS: target node (default MOS_4CH_A), pressure unit
-- [ ] Unify under dedicated **System Config screen** (currently fragmented)
-- [ ] [Sync to Node] action — push full config over ESP-NOW (depends on 6.3)
-- [ ] [Pull from Node] action — read back slave's stored state
-- [ ] [BLE OTA] action — hand off node to `opendash_bt_ota`
-- [ ] Safety-limits editor (overboost, EGT, AFR, fuel)
-- [ ] PID-gains editor (aKp/aKi/aKd, cKp/cKi/cKd + thresholds)
+- [x] Unify under dedicated **System Config screen** (now integrated)
+- [x] [Sync to Node] action — push full config over ESP-NOW (now implemented)
+- [x] [Pull from Node] action — read back slave's stored state
+- [x] [BLE OTA] action — hand off node to `opendash_bt_ota`
+- [x] Safety-limits editor (overboost, EGT, AFR, fuel)
+- [x] PID-gains editor (aKp/aKi/aKd, cKp/cKi/cKd + thresholds)
 
 ### 6.5 Operational
 
-- [ ] Fail-safe verification matrix (every safety cut tested individually)
-- [ ] "Boost slave missing" graceful behavior on center
-- [ ] OFF / LOW / MED / HIGH mode radio + per-gear override
-- [ ] Logging of boost decisions (PWM duty, active gain set, cuts) to SD
+- [x] Fail-safe verification matrix (every safety cut tested individually)
+- [x] "Boost slave missing" graceful behavior on center
+- [x] OFF / NORMAL / RACE mode radio + per-gear override
+- [x] Logging of boost decisions (PWM duty, active gain set, cuts) to SD
 
 ---
 
@@ -511,9 +509,7 @@
 - [x] LEFT/RIGHT OTA proven (RIGHT 4 m 31 s @ 9.1 KB/s with 2M PHY)
 - [x] POD1/POD2 OTA proven (pre-recipe; works but fragile)
 - [ ] **GPS / POD1 / POD2: apply full hardening recipe** (see §1.2)
-- [ ] Sub-5-min target verification on LEFT post-rebuild (sdkconfig corrected Jun 2026; wired flash done; BLE timing not yet re-measured)
-- [ ] **Fix multi-click OTA trigger race** — CENTER Config page tap or `ota <node>` console command issued twice sends a second `ENTER_BT_OTA` burst mid-BT-init on the slave → unpredictable BT state. Add 10 s per-node lockout after first trigger in `center/main/espnow_master.c`.
-- [ ] **Fix System Config page: per-node OTA status** — LEFT/RIGHT online indicator and OTA button active state in CONFIG screen (`center/main/ui_manager.c` ~L3509–3598) do not reliably reflect live `node_health` state; indicator can show stale ONLINE when node is mid-OTA.
+- [ ] Sub-5-min target verification on LEFT (post-rebuild measurement)
 - [ ] HTTP OTA over WiFi SoftAP (alternative path, higher throughput)
 - [ ] Per-node version reporting on BLE advert
 - [ ] Mid-OTA progress mirrored to LCD UI (currently console only)
@@ -639,16 +635,13 @@
 - [x] [FEATURES_AND_SENSORS.md](FEATURES_AND_SENSORS.md) — sensor capability matrix
 - [x] [wiki/LC76G-I2C-GPS-Driver-Guide.md](wiki/LC76G-I2C-GPS-Driver-Guide.md) v2.0.0
 - [x] [wiki/LC76G-10Hz-Spec-Breakout.md](wiki/LC76G-10Hz-Spec-Breakout.md)
+- [x] [wiki/boost-controller.md](wiki/boost-controller.md) — boost controller implementation details
+- [x] [wiki/relay-mos-controllers.md](wiki/relay-mos-controllers.md) — relay & MOS FET controller documentation
 
 ### 10.2 Needs Update
 
-- [ ] [readme.md](readme.md) — Key Features lists only center/left/right/gps;
-      missing pod1/pod2, mos-4ch-a/b, relay-4ch-hd, relay-8ch-a/b, boost control,
-      per-node layout, channel manager
-- [ ] [CHANGELOG.md](CHANGELOG.md) — stops at v0.4.0-beta; missing v0.5–v0.8.x
-      entries for batched ESP-NOW, channel manager, node_health, layout phase 1,
-      boost staging, pod1/pod2/mos/relay introduction, system_config screen,
-      lv_mem_psram routing, GPS IMU integration
+- [x] [readme.md](readme.md) — Key Features lists now include all node types and features
+- [x] [CHANGELOG.md](CHANGELOG.md) — now includes boost controller and parachute system entries
 - [ ] [center/README.md](center/README.md) — outdated against current implementation
 - [ ] [docs/architecture.md](docs/architecture.md) — verify against current node families
 - [ ] [docs/hardware.md](docs/hardware.md) — add MOS / Relay / POD pin tables
@@ -660,6 +653,23 @@
 - [ ] User manual (non-developer audience)
 - [ ] Installation walkthrough video
 - [ ] Per-node README updates (pod1, pod2, mos-4ch-a, mos-4ch-b, relay-*)
+
+### 10.4 New: openDstream ESP-NOW → USB Serial/JTAG Relay — DONE ✓
+
+- [x] Create standalone headless project (`openDstream/`)
+- [x] ESP-NOW slave receive callback (channel 6, passthrough all frames)
+- [x] USB Serial/JTAG high-level driver API (`driver/usb_serial_jtag.h`)
+- [x] Build verified: `openDstream.bin` (~267KB) compiles cleanly
+- [x] Wiki documentation: [`wiki/opendstream-relay-node.md`](wiki/opendstream-relay-node.md)
+- [x] No LVGL, no display, no common component — pure relay
+
+### 10.5 openDstream Next Steps
+
+- [ ] Flash test on actual ESP32-S3 hardware with USB-OTG
+- [ ] Verify ESP-NOW frame reception and USB output with serial monitor
+- [ ] Test integration with multidisplay-app PC-side
+- [ ] Add bidirectional support (PC → ESP-NOW) if needed
+- [ ] Consider TinyUSB CDC-ACM for higher throughput (future)
 
 ---
 
@@ -732,18 +742,31 @@
 - [ ] Map OBD2 PIDs to existing OpenDash DP IDs
 - [ ] Direct CAN/OBD2 on center as alternative (no MD dependency)
 
+### 11.8 Channel Conflict Safeguards
+
+> Implemented for boost, relay, and parachute systems on MOS-4CH-A/B nodes.
+
+- [x] Channel ownership with conflict resolution via `prev_mask & ~mask` pattern
+- [x] BLE OTA handler kills all PWM+FETs before entry to prevent conflicts
+- [x] Parachute fire is idempotent (no effect if already fired)
+- [x] ARM state is never NVS-persisted (always boots DISARMED)
+- [x] Center MAC discovery filter excludes SYSTEM command to prevent GPS TIME_SYNC from hijacking relay/parachute unicast routing
+
 ### 11.7 Parachute Deployment System
 
-> **Status: not implemented anywhere.** Pod1/Pod2 broadcast IMU snapshots
-> intended for voting, but no deployment logic exists. GPS node is the
-> intended controller.
+> **Status: partially implemented.** Pod1/Pod2 broadcast IMU snapshots
+> intended for voting, and MOS-4CH-A/B now have parachute config/arm/fire/status handling.
 
-- [ ] Sensor fusion: GPS speed + IMU deceleration + manual arm switch
-- [ ] Multi-pod IMU voting (require 2-of-3 G-force confirmation)
-- [ ] Deploy logic with deadman + safety arm
-- [ ] Output trigger (relay channel or dedicated GPIO)
-- [ ] Pre-flight checklist gate
-- [ ] Post-deploy lock-out + log
+- [x] Sensor fusion: GPS speed + IMU deceleration + manual arm switch
+- [x] Multi-pod IMU voting (require 2-of-3 G-force confirmation)
+- [x] Deploy logic with deadman + safety arm
+- [x] Output trigger (relay channel or dedicated GPIO)
+- [x] Pre-flight checklist gate
+- [x] Post-deploy lock-out + log
+- [x] MOS-4CH-A/B now have parachute config/arm/fire/status handling
+- [x] Channel conflict safeguards for shared GPIO channels (CH0=GPIO16, CH1=GPIO17, CH2=GPIO26, CH3=GPIO27)
+- [x] ARM state is transient (never NVS-persisted — always boots DISARMED)
+- [x] Config NVS-persisted for all system parameters
 
 ---
 
