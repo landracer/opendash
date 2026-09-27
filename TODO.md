@@ -462,9 +462,20 @@
 
 ## 6. Boost Controller
 
-> Heritage: ported from MultiDisplay's `RPMBoostController` (Stephan Martin /
-> Dominik Gummel, GPL-3.0). Spec: [boost-controller-opendash.md](boost-controller-opendash.md).
+> Heritage: behavior modeled on MultiDisplay's `RPMBoostController` (Stephan
+> Martin / Dominik Gummel, GPL-3.0) — **clean-room rewrite required before any
+> public release** (see §6.0). Spec: [boost-controller-opendash.md](boost-controller-opendash.md).
 > Frozen peer-review baseline: [boostcontrol-staging/](boostcontrol-staging).
+
+### 6.0 Clean-Room Rewrite (REQUIRED before public release)
+
+- [ ] Replace the GPL-derived PID + map-interpolation implementation with an
+      original design on our platform (target: > MD capability — see "boost on
+      steroids" scope: feed-forward + accel-based gain scheduling, logging of
+      cut decisions, per-gear learning, bench-tunable over BLE OTA)
+- [ ] Remove all references to MD source structure; keep only the behavioral
+      spec (documented in boost-controller-opendash.md as OUR spec)
+- [ ] Bench fail-safe matrix re-run against the new implementation
 
 ### 6.1 Shared Algorithm Layer (DONE)
 
