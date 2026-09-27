@@ -9,12 +9,48 @@
       "path": "center"
     },
     {
-      "name": "⭕ Left/Right Gauges (2.8\" Round)",
-      "path": "left-right"
+      "name": "⭕ Left Gauge Pod (2.8\" Round)",
+      "path": "left"
+    },
+    {
+      "name": "⭕ Right Gauge Pod (2.8\" Round)",
+      "path": "right"
     },
     {
       "name": "🛰️ GPS / Telemetry (1.75\" AMOLED)",
       "path": "gps"
+    },
+    {
+      "name": "🎛️ Pod 1 / Pod 2 (AMOLED)",
+      "path": "pod1"
+    },
+    {
+      "name": "🎛️ Pod 2",
+      "path": "pod2"
+    },
+    {
+      "name": "🔌 MOS-4CH-A / B",
+      "path": "mos-4ch-a"
+    },
+    {
+      "name": "🔌 MOS-4CH-B",
+      "path": "mos-4ch-b"
+    },
+    {
+      "name": "🔌 Relay-4CH-HD",
+      "path": "relay-4ch-hd"
+    },
+    {
+      "name": "🔌 Relay-8CH-A",
+      "path": "relay-8ch-a"
+    },
+    {
+      "name": "🔌 Relay-8CH-B",
+      "path": "relay-8ch-b"
+    },
+    {
+      "name": "💻 openDstream (UART bridge)",
+      "path": "openDstream"
     }
   ],
   "settings": {

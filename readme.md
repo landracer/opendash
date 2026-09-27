@@ -2,7 +2,7 @@
   <h1 align="center">🏁 OpenDash — Universal Racecar Dashboard</h1>
   <p align="center">
     A modular, bleeding-edge digital dashboard system for race cars.<br>
-    Built on <strong>ESP-IDF v6.1</strong> + <strong>LVGL 9</strong> + <strong>ESP-NOW</strong> for three ESP32-S3 display units.<br>
+    Built on <strong>ESP-IDF v6.1</strong> + <strong>LVGL 9</strong> + <strong>ESP-NOW</strong> across a fleet of ESP32-S3 display and controller nodes.<br>
     <em>Licensed under Sovereign Individual License v1.0 — see LICENSE file</em>
   </p>
 </p>
@@ -16,7 +16,14 @@
 | **Center** (Main Dash) | [ESP32-S3-Touch-LCD-4.3](https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4.3) | 800×480 IPS | [`center/`](./center/) |
 | **Left Gauge** | [ESP32-S3-LCD-2.8C](https://www.waveshare.com/wiki/ESP32-S3-LCD-2.8C) | 480×480 Round | [`left/`](./left/) |
 | **Right Gauge** | [ESP32-S3-LCD-2.8C](https://www.waveshare.com/wiki/ESP32-S3-LCD-2.8C) | 480×480 Round | [`right/`](./right/) |
+| **Pod 1** | [ESP32-S3-Touch-AMOLED-1.75](https://www.waveshare.com/wiki/ESP32-S3-Touch-AMOLED-1.75) | 466×466 Round | [`pod1/`](./pod1/) |
+| **Pod 2** | [ESP32-S3-Touch-AMOLED-1.75](https://www.waveshare.com/wiki/ESP32-S3-Touch-AMOLED-1.75) | 466×466 Round | [`pod2/`](./pod2/) |
 | **GPS / Telemetry** | [ESP32-S3-Touch-AMOLED-1.75](https://www.waveshare.com/wiki/ESP32-S3-Touch-AMOLED-1.75) | 466×466 AMOLED | [`gps/`](./gps/) |
+| **MOS-4CH-A** | ESP32-WROOM-32E | N/A | [`mos-4ch-a/`](./mos-4ch-a/) |
+| **MOS-4CH-B** | ESP32-WROOM-32E | N/A | [`mos-4ch-b/`](./mos-4ch-b/) |
+| **Relay-4CH-HD** | ESP32-WROOM-32E | N/A | [`relay-4ch-hd/`](./relay-4ch-hd/) |
+| **Relay-8CH-A** | ESP32-WROOM-32E | N/A | [`relay-8ch-a/`](./relay-8ch-a/) |
+| **Relay-8CH-B** | ESP32-WROOM-32E | N/A | [`relay-8ch-b/`](./relay-8ch-b/) |
 | **BMS Logger** *(ext)* | ESP32-DOIT-DevKit-V1 | SSD1306 128×64 OLED | External: `rAtTrax_BMS_Logger/` |
 
 > **Shared code** lives in [`common/`](./common/) — ESP-NOW protocol, data models, OBD2 PIDs, display configuration, and the pre-flight checklist system.
@@ -78,6 +85,28 @@ opendash/
 │   ├── sdkconfig.defaults
 │   └── README.md
 │
+├── pod1/                        ← Pod 1 display unit (ESP32-S3-Touch-AMOLED-1.75)
+│   ├── main/
+│   │   ├── main.c               — Entry point, I2C slave (addr 0x13)
+│   │   ├── display_init.c/h     — CO5300 AMOLED init
+│   │   ├── ui_manager.c/h       — Display UI
+│   │   ├── imu_handler.c/h      — QMI8658 IMU driver
+│   │   └── assets/              — Converted images (C arrays)
+│   ├── CMakeLists.txt
+│   ├── sdkconfig.defaults
+│   └── README.md
+│
+├── pod2/                        ← Pod 2 display unit (ESP32-S3-Touch-AMOLED-1.75)
+│   ├── main/
+│   │   ├── main.c               — Entry point, I2C slave (addr 0x14)
+│   │   ├── display_init.c/h     — CO5300 AMOLED init
+│   │   ├── ui_manager.c/h       — Display UI
+│   │   ├── imu_handler.c/h      — QMI8658 IMU driver
+│   │   └── assets/              — Converted images (C arrays)
+│   ├── CMakeLists.txt
+│   ├── sdkconfig.defaults
+│   └── README.md
+│
 ├── gps/                         ← ESP32-S3-Touch-AMOLED-1.75 project
     ├── main/
     │   ├── main.c
@@ -112,13 +141,24 @@ opendash/
 - **Outlined text rendering** — 4-shadow technique for readable text over any background
 
 ### 📡 Communication
-- **ESP-NOW wireless bus** — All three displays communicate wirelessly using ESP-NOW (WiFi peer-to-peer) instead of I2C due to hardware limitations and GPIO conflicts
+- **ESP-NOW wireless bus** — All nodes communicate wirelessly using ESP-NOW (WiFi peer-to-peer) instead of I2C due to hardware limitations and GPIO conflicts
 - **BMS integration** — ESP-NOW node for rAtTrax BMS data (cell voltages, temps, SOC)
-- **OBD2 support** — Read any standard OBD2 PID (RPM, speed, coolant temp, boost, AFR, etc.)
-- **CAN bus ready** — Center unit has onboard CAN for direct ECU communication
+- **OBD2 support** — Standard OBD2 PIDs delivered today as decoded values inside the MultiDisplay ECU serial stream; direct ELM327 path planned
+- **CAN integration (planned)** — TWAI/CAN ingest on the roadmap: onboard CAN header on the Center unit **and** a dedicated standalone CAN node, decoding VESC STATUS 1–6 + ECU frames into data points
+
+### 🔧 Hardware Control Nodes
+- **MOS-4CH-A/B** — Headless MOS FET controllers with boost control and relay switching
+- **Relay-4CH-HD, Relay-8CH-A/B** — Headless relay controllers for fan, pump, and light control
+- **openDstream** — ESP32-WROOM-32 bridge node: listens on the OpenDash ESP-NOW channel and re-emits each received data point as a `DP:0x…:v.vv` line over UART0 (onboard USB-UART bridge to the host PC, multidisplay-app Qt application). See [`openDstream/README.md`](./openDstream/README.md)
+- **Channel conflict safeguards** — Runtime protections for shared GPIO channels between boost, relay, and parachute systems
 
 ### ⚠️ Important Note
 The original design intended to use I2C for inter-node communication, but due to hardware limitations and GPIO conflicts, the system was re-implemented to use ESP-NOW (WiFi peer-to-peer) for communication between nodes. This provides zero-wire communication with no GPIO conflicts and better reliability.
+
+### 🔥 Safety Deployment System
+- **Parachute deployment** — Gyro-triggered safety system with configurable thresholds (deploy=45°, warning=25°, sustain=200ms, rate=300°/s)
+- **Distributed voting** — Multiple nodes participate in deployment decision with rollover detection
+- **Channel conflict safeguards** — Shared GPIO channels (CH0=GPIO16, CH1=GPIO17, CH2=GPIO26, CH3=GPIO27) protected from conflicts between boost, relay, and parachute systems
 
 ### 🛰️ GPS & Telemetry (GPS Unit)
 - **LC76G GNSS** — Multi-constellation (GPS, GLONASS, BeiDou, Galileo) positioning
@@ -160,7 +200,7 @@ The original design intended to use I2C for inter-node communication, but due to
 
 ### Prerequisites
 
-1. **ESP-IDF v5.3** — [Installation Guide](https://docs.espressif.com/projects/esp-idf/en/release-v5.3/esp32s3/get-started/index.html)
+1. **ESP-IDF v6.1** — [Installation Guide](https://docs.espressif.com/projects/esp-idf/en/release-v6.1/esp32s3/get-started/index.html)
 2. **Node.js + npm** — For font conversion (required)
 3. **Python 3 + Pillow + ImageMagick** — For image conversion (required)
 4. **Visual Studio Code** with the [ESP-IDF Extension](https://marketplace.visualstudio.com/items?itemName=espressif.esp-idf-extension) (recommended) — See [VS Code Setup Guide](docs/vscode-setup.md)
@@ -213,9 +253,20 @@ idf.py -p /dev/ttyUSB0 flash monitor
 | [`center/README.md`](center/README.md) | **Center display project guide** — Display mode system, customization |
 | [`left/README.md`](left/README.md) | Left gauge pod guide |
 | [`right/README.md`](right/README.md) | Right gauge pod guide |
+| [`pod1/README.md`](pod1/README.md) | Pod 1 display and safety deployment unit |
+| [`pod2/README.md`](pod2/README.md) | Pod 2 display and safety deployment unit |
 | [`gps/README.md`](gps/README.md) | GPS/Telemetry unit guide |
+| [`mos-4ch-a/README.md`](mos-4ch-a/README.md) | MOS-4CH-A headless controller documentation |
+| [`mos-4ch-b/README.md`](mos-4ch-b/README.md) | MOS-4CH-B headless controller documentation |
+| [`relay-4ch-hd/README.md`](relay-4ch-hd/README.md) | Relay-4CH-HD headless relay controller documentation |
+| [`relay-8ch-a/README.md`](relay-8ch-a/README.md) | Relay-8CH-A headless relay controller documentation |
+| [`relay-8ch-b/README.md`](relay-8ch-b/README.md) | Relay-8CH-B headless relay controller documentation |
 | [`wiki/`](wiki/) | **Wiki documentation** — Additional project documentation and integration guides |
 | [`wiki/system-overview.md`](wiki/system-overview.md) | **★ End-user system guide — start here for usage** |
+| [`wiki/relay-mos-controllers.md`](wiki/relay-mos-controllers.md) | **Relay & MOS FET controller documentation** |
+| [`wiki/boost-controller.md`](wiki/boost-controller.md) | **Boost controller implementation details** |
+| [`wiki/pod1-pod2.md`](wiki/pod1-pod2.md) | **Pod 1 and Pod 2 documentation** |
+| [`wiki/safety-deployment-system.md`](wiki/safety-deployment-system.md) | **Safety deployment system documentation** |
 | [`wiki/ota-bluetooth.md`](wiki/ota-bluetooth.md) | **★ BLE OTA step-by-step guide (Linux desktop)** |
 | [`wiki/ota-android-plan.md`](wiki/ota-android-plan.md) | Roadmap & options for Android-based OTA |
 | [`BLE_OTA.md`](BLE_OTA.md) | BLE OTA architecture & root-cause reference |
@@ -226,7 +277,7 @@ idf.py -p /dev/ttyUSB0 flash monitor
 
 ## 🔗 Reference Links
 
-- **ESP-IDF API Reference** — https://docs.espressif.com/projects/esp-idf/en/release-v5.3/esp32s3/api-reference/index.html
+- **ESP-IDF API Reference** — https://docs.espressif.com/projects/esp-idf/en/release-v6.1/esp32s3/api-reference/index.html
 - **LVGL Documentation** — https://docs.lvgl.io/master/
 - **LVGL Examples** — https://docs.lvgl.io/master/examples.html
   https://github.com/lvgl/lvgl/tree/master/examples **LVGL E

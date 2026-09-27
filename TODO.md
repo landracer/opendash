@@ -34,7 +34,7 @@
 |---|---|
 | Active node families | 12: center, left, right, gps, pod1, pod2, mos-4ch-a, mos-4ch-b, relay-4ch-hd, relay-8ch-a, relay-8ch-b, openDstream (+ external BMS Logger) |
 | Total node slots | `OPENDASH_NODE_COUNT = 18` ([common/include/opendash_common.h](common/include/opendash_common.h)) |
-| ESP-NOW protocol | 31 opcodes (12 master + 8 slave + 11 boost), batched (DATA_BATCH 0x88 / SET_DATA_BATCH 0x0C), 4 priority channels, polling eliminated |
+| ESP-NOW protocol | 39 opcodes defined in `opendash_i2c_protocol.h` (master + slave + boost families), batched (DATA_BATCH 0x88 / SET_DATA_BATCH 0x0C), 4 priority channels, polling eliminated |
 | Sensor source | MultiDisplay (HC-05/HC-06 BT @ 115200, 95-byte SERIALOUT_BINARY @ ~100 Hz, consumed at 5 Hz) |
 | Working displays | center (4.3" RGB), left/right (2.8C round RGB), gps + pod1/pod2 (1.75" AMOLED) |
 | BLE OTA | Working: pod1, pod2, left, right. **Fragile:** gps, pod1, pod2 still missing the full sdkconfig recipe + slave-side suspend sequence — see §1.2 |
@@ -249,7 +249,30 @@
 - [x] Hardware identified, `opendash_bt_ota.h` included
 - [~] **GPIO assignments TBD** (source comment requires multimeter verification)
 
-### 2.8 BMS Logger (external, ESP32-DOIT-DevKit-V1 + SSD1306)
+### 2.8 openDstream — ESP-NOW to USB Bridge Node (ESP32-VROOM-32)
+
+> **Created:** 2026-06-10. Headless bridge node that receives ESP-NOW data from
+> the OpenDash network and forwards parsed data over USB CDC-ACM to the host PC
+> running the multidisplay-app Qt application.
+
+- [x] Project scaffold: `CMakeLists.txt`, `main/CMakeLists.txt`, `sdkconfig.defaults`
+- [x] ESP-IDF v6.1 target: ESP32 (original WROOM-32)
+- [x] USB CDC-ACM bridge: UART1 @ 115200 baud, DP:hex_id:value\n text protocol
+- [x] ESP-NOW slave: receives DATA_BATCH (0x88) and SET_DATA_POINT frames
+- [x] Delta tracking: only forwards changed data point values to USB
+- [x] Boot notification: CFG:BOOT:v1.0.0 sent on USB connect
+- [x] Heartbeat task: periodic HB messages over USB
+- [ ] **Build verified** — compilation succeeds, binary size 0xb1fd0 (30% of app partition)
+- [ ] **Flash test on physical ESP32-VROOM-32 hardware**
+- [ ] **USB serial communication test with multidisplay-app**
+- [ ] **Add OPENDASH_NODE_OPENSTREAM to opendash_common.h enum** (currently using OPENDASH_NODE_GPS as placeholder)
+- [ ] **Integrate with multidisplay-app Qt serial reader** — verify DP: message parsing
+- [ ] **ESP-NOW peer registration** — CENTER should discover and register openDstream node
+- [ ] **Error reporting over USB** — ERR: messages for ESP-NOW failures, buffer overflow, etc.
+- [ ] **Configuration messages** — CFG:LAYOUT, CFG:PARAM support
+- [ ] **OTA support** — optional BLE OTA for firmware updates
+
+### 2.9 BMS Logger (external, ESP32-DOIT-DevKit-V1 + SSD1306)
 
 - [x] Sends DATA_RESPONSE framed messages
 - [x] Center auto-discovers, BMS slot in `s_nodes[]`, `bms_online` tracked

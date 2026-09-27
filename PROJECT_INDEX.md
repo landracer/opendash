@@ -31,19 +31,20 @@
 
 ## What is OpenDash?
 
-OpenDash is an open-source, modular racecar dashboard system.  Four ESP32-S3
-display nodes communicate over a shared I2C bus to present real-time engine,
-GPS, IMU, and battery data to the driver.
+OpenDash is a modular racecar dashboard and vehicle-control system. Display
+nodes and headless controller nodes exchange real-time engine, GPS, IMU, and
+battery data over ESP-NOW (the I2C-era node IDs survive only as logical node
+types in the protocol).
 
 | Component | Role |
 |---|---|
-| **Center** | 4.3" main dash — I2C master, OBD2/CAN, data aggregator |
-| **Left** | 2.8" round gauge pod — I2C slave `0x10`, oil pressure/temp |
-| **Right** | 2.8" round gauge pod — I2C slave `0x11`, boost/AFR |
-| **GPS** | 1.75" AMOLED — I2C slave `0x12`, GNSS + IMU + parachute |
+| **Center** | 4.3" main dash — ESP-NOW master, data aggregator, layout/boost authoring |
+| **Left** | 2.8" round gauge pod — sole MD UART ingest, oil pressure/temp |
+| **Right** | 2.8" round gauge pod — boost/AFR, IMU rollover votes |
+| **GPS** | 1.75" AMOLED — GNSS + IMU + SD logging |
 
-All nodes run **ESP-IDF** (v5.3+ / v6.1-dev tested) with **LVGL 9.2** for
-display rendering.  Shared code lives in `common/`.
+All nodes run **ESP-IDF v6.1** with **LVGL 9.2** for display rendering.
+Shared code lives in `common/`.
 
 ---
 
@@ -125,7 +126,7 @@ opendash/
 │
 ├── left/                       ── Left Gauge Pod ────────────────────────
 │   ├── main/
-│   │   ├── main.c              Entry, I2C slave (0x10), odometer, main loop
+│   │   ├── main.c              Entry, ESP-NOW slave (node LEFT), odometer, main loop
 │   │   ├── display_init.c/h    ST7701S 3-wire SPI + RGB, TCA9554, boot button
 │   │   └── ui_manager.c/h      Round gauge UI (arc, primary, secondary, odo)
 │   ├── partitions.csv          Custom partition table (2MB app partitions)
@@ -136,12 +137,31 @@ opendash/
 ├── right/                      ── Right Gauge Pod ───────────────────────
 │   └── (same structure as left/, I2C addr 0x11 instead of 0x10)
 │
-├── left-right/                 ── Combined Left+Right (alternative) ─────
-│   └── (single project for both pods, deprecated in favor of separate)
+├── pod1/                       ── Pod 1 Display Unit ───────────────────
+│   ├── main/
+│   │   ├── main.c              Entry, ESP-NOW slave (node POD1), display, IMU
+│   │   ├── display_init.c/h    CO5300 AMOLED init
+│   │   ├── ui_manager.c/h      Display UI
+│   │   ├── imu_handler.c/h     QMI8658 IMU driver
+│   │   └── assets/             Converted images (C arrays)
+│   ├── CMakeLists.txt
+│   ├── sdkconfig.defaults
+│   └── README.md               Pod 1 documentation
+│
+├── pod2/                       ── Pod 2 Display Unit ───────────────────
+│   ├── main/
+│   │   ├── main.c              Entry, ESP-NOW slave (node POD2), display, IMU
+│   │   ├── display_init.c/h    CO5300 AMOLED init
+│   │   ├── ui_manager.c/h      Display UI
+│   │   ├── imu_handler.c/h     QMI8658 IMU driver
+│   │   └── assets/             Converted images (C arrays)
+│   ├── CMakeLists.txt
+│   ├── sdkconfig.defaults
+│   └── README.md               Pod 2 documentation
 │
 ├── gps/                        ── GPS / Telemetry Unit ──────────────────
 │   ├── main/
-│   │   ├── main.c              Entry, I2C slave (0x12)
+│   │   ├── main.c              Entry, ESP-NOW slave (node GPS)
 │   │   ├── display_init.c/h    CO5300 AMOLED init
 │   │   ├── ui_manager.c/h      AMOLED gauge UI
 │   │   ├── gps_handler.c/h     LC76G GPS I2C driver (v15L2 PRODUCTION)
@@ -195,6 +215,8 @@ Every documentation file in the project, grouped by purpose.
 | [**center/README.md**](center/README.md) | Center display: multi-screen UI, display modes, CAN |
 | [**left/README.md**](left/README.md) | Left gauge: pin map, init sequence, build, UI layout |
 | [**right/README.md**](right/README.md) | Right gauge: same as left but I2C `0x11` |
+| [**pod1/README.md**](pod1/README.md) | Pod 1 display and safety deployment unit |
+| [**pod2/README.md**](pod2/README.md) | Pod 2 display and safety deployment unit |
 | [**gps/README.md**](gps/README.md) | GPS unit: LC76G I2C CASIC, IMU, AMOLED |
 | [**gps/INTENSIVE_TODO.md**](gps/INTENSIVE_TODO.md) | Phased build plan for GPS firmware (partially archived) |
 
@@ -227,6 +249,7 @@ Every documentation file in the project, grouped by purpose.
 | [**docs/archived/IMPLEMENTATION_COMPLETE.md**](docs/archived/IMPLEMENTATION_COMPLETE.md) | Status: center alignment + auto font conversion |
 | [**docs/archived/IMPLEMENTATION_SUMMARY.md**](docs/archived/IMPLEMENTATION_SUMMARY.md) | All implementation work summary |
 | [**CHANGELOG.md**](CHANGELOG.md) | Version history |
+| [**wiki/pod1-pod2.md**](wiki/pod1-pod2.md) | Pod 1 and Pod 2 documentation |
 
 ---
 

@@ -81,6 +81,44 @@ of intermittent disconnects under high CPU load. Hardening tracked in TODO §1.2
   causing an unpredictable state. A 10 s per-node lockout is needed in
   `center/main/espnow_master.c`.
 
+### Added — Boost Controller Implementation
+
+Closed-loop boost control implemented on MOS-4CH-A/B nodes with:
+
+- **32-point RPM maps × 6 gears × 3 modes** (OFF/NORMAL/RACE)
+- **Dual-gain PID** (aggressive/conservative) for responsive control
+- **NORMAL defaults**: 14 psi, RACE defaults: 36 psi
+- **NVS persistence** with schema version 2
+- **Safety flags** (8 bits) for monitoring system health
+- **Paginated 2×16 cell editor** in Center UI for map configuration
+- **Mode toggle** in Center UI for switching between OFF/NORMAL/RACE
+- **MOS-4CH-A/B integration** with BLE OTA support
+
+### Added — Parachute Deployment System
+
+Distributed parachute deployment system added to MOS-4CH-A/B nodes with:
+
+- **Thresholds**: deploy=45°, warning=25°, sustain=200ms, rate=300°/s
+- **LATCH (default) or PULSE mode** via `OPENDASH_PARACHUTE_FLAG_FIRE_PULSE`
+- **Distributed voting** with rollover detector
+- **Channel conflict safeguards** for shared GPIO channels (CH0=GPIO16, CH1=GPIO17, CH2=GPIO26, CH3=GPIO27)
+- **ARM state** is transient (never NVS-persisted — always boots DISARMED)
+- **Config NVS-persisted** for all system parameters
+
+### Added — Channel Conflict Safeguards
+
+Runtime safeguards implemented to prevent conflicts between:
+- Boost PWM output (MOS_BOOST_PWM_CHANNEL=3 = CH3)
+- Relay SET_RELAY commands
+- Parachute fire commands
+- All sharing the same 4 GPIO channels (CH0=GPIO16, CH1=GPIO17, CH2=GPIO26, CH3=GPIO27)
+
+- **Boost compute task** releases channels it no longer owns via `prev_mask & ~mask` pattern
+- **BLE OTA handler** kills all PWM+FETs before entry to prevent conflicts
+- **Parachute fire** is idempotent (no effect if already fired)
+- **ARM state** is never NVS-persisted (always boots DISARMED)
+- **Center MAC discovery filter** excludes SYSTEM command to prevent GPS TIME_SYNC from hijacking relay/parachute unicast routing
+
 ---
 
 ## [v0.4.0-beta] - 2026-05 — BLE OTA on Round Pods (LEFT/RIGHT)
@@ -243,8 +281,9 @@ expected to match the ~4-5 min figure on next OTA.
 - "STX+TAG detected" log level: `ESP_LOGI` → `ESP_LOGD`.
 - EGT max calculation: was `max(egt[0], egt[1])`, now scans all 8 channels.
 - `forward_md_data_to_center()`: expanded from 2 EGTs to all 8.
-- Center demo data: engine demo auto-halts when real MD sensor data arrives
-  via ESP-NOW (GPS demo already had this pattern for GPS node).
+- Center demo data: engine demo does NOT auto-halt when real MD data arrives —
+  data-source switch stays manual via the UI (earlier note claimed auto-halt;
+  not implemented — see TODO §2.1)
 
 ### Fixed
 - **Left display flicker/blanking** — Caused by `ESP_LOGI` on every parsed

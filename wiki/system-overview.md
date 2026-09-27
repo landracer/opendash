@@ -7,7 +7,7 @@
 
 This is **not** a "plop and play" system. It is a network of up to 18 small
 embedded computers cooperating over an ESP-NOW wireless bus, fed by sensor
-data from a MultiDisplay engine-management ECU. There are 11 active node
+data from a MultiDisplay engine-management ECU. There are 12 active node
 families, multiple control surfaces (the BOOT button on each display pod,
 the CENTER touch screen, and the CENTER USB console), and three update paths
 (USB-wired, BLE-OTA wireless, and — planned — WiFi/HTTP).
@@ -23,8 +23,9 @@ the CENTER touch screen, and the CENTER USB console), and three update paths
 | **CENTER** | Waveshare ESP32-S3-Touch-LCD-4.3 | 800×480 IPS touch | Main dash. ESP-NOW master. Hosts the touch UI, layout editor, boost config, and USB console. |
 | **LEFT** | Waveshare ESP32-S3-LCD-2.8C (round) | 480×480 round RGB | Configurable gauges. **Sole MD UART ingest** (HC-05 BT-serial). Batches sensor data to ESP-NOW. |
 | **RIGHT** | Waveshare ESP32-S3-LCD-2.8C (round) | 480×480 round RGB | Configurable gauges. ESP-NOW only — receives MD data relayed from CENTER. |
+| **POD1** | Waveshare ESP32-S3-Touch-AMOLED-1.75 | 466×466 AMOLED | Auxiliary gauge display. Same hardware as GPS but no GNSS/SD. IMU broadcast for parachute vote system. |
+| **POD2** | Waveshare ESP32-S3-Touch-AMOLED-1.75 | 466×466 AMOLED | Auxiliary gauge display. Same hardware as GPS but no GNSS/SD. IMU broadcast for parachute vote system. |
 | **GPS** | Waveshare ESP32-S3-Touch-AMOLED-1.75 | 466×466 AMOLED | LC76G GNSS + QMI8658 IMU @ 100 Hz. SD-card data logger. |
-| **POD1 / POD2** | Waveshare ESP32-S3-Touch-AMOLED-1.75 | 466×466 AMOLED | Auxiliary gauge displays. Same hardware as GPS but no GNSS/SD. IMU broadcast for parachute vote system. |
 | **BMS** *(external)* | ESP32-DOIT-DevKit-V1 + SSD1306 OLED | 128×64 | rAtTrax BMS logger. Broadcasts cell voltages, SOC, temperatures over ESP-NOW. |
 
 ### Headless control nodes
@@ -36,6 +37,12 @@ the CENTER touch screen, and the CENTER USB console), and three update paths
 | **Relay-4CH-HD** | LCTech 4-CH HD relay board | 4-channel relay output. Controlled by CENTER via `SET_RELAY` (0x08). |
 | **Relay-8CH-A** | LCTech 8-CH relay board | 8-channel relay, GPIO-verified. Self-test mode on BOOT-hold. |
 | **Relay-8CH-B** | LCTech 8-CH relay board | 8-channel relay. Parity target with -A; GPIO mapping TBD. |
+
+### USB Bridge Nodes
+
+| Node | Hardware | Role |
+|---|---|---|
+| **openDstream** | ESP32-WROOM-32 | **ESP-NOW → UART bridge.** Listens on channel 1 (same as the BMS Logger), decodes OpenDash frames, and prints each DP as a `DP:0x…:v.vv` line over UART0 → onboard USB-UART bridge → host PC (multidisplay-app Qt application). Headless, no display. See [`openDstream/README.md`](../opendash/openDstream/README.md) |
 
 All nodes share `common/` for: ESP-NOW protocol, data model, BLE-OTA service,
 node health state machine, NVS persistence, and layout system. Node-specific
@@ -160,7 +167,7 @@ Exit `idf.py monitor` with `Ctrl-]`. The CENTER keeps running.
 
 ## 5. Reading the pod displays
 
-### LEFT and RIGHT (round 480×480)
+### LEFT, RIGHT, POD1, and POD2 (round 480×466)
 
 Each pod runs a multi-page gauge UI. Pages are configured at build time
 in `common/src/opendash_display_config.c` and currently include:
@@ -180,6 +187,14 @@ Each gauge has:
 - **Min/Max overlay** — small chips showing session high/low
 - **Shift-light** — full-arc flash when RPM is above 90 % of redline
 - **Warning overlay** — full-screen colored flash for fault states
+
+### POD1 and POD2 Safety Deployment System
+
+Pod 1 and Pod 2 also serve as safety deployment detectors in the rollover parachute system:
+- Each unit contains a QMI8658 IMU for detecting vehicle rollover
+- They participate in the distributed safety architecture by voting on rollover detection
+- They are part of the quorum required for autonomous parachute deployment
+- They support both automatic rollover detection and manual override capabilities
   (e.g. coolant >115 °C, oil pressure <0.5 bar at >2 k RPM)
 
 #### Switching pages

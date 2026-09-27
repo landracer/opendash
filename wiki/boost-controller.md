@@ -223,6 +223,36 @@ fallback path).
 | Overboost flag latching               | Hardware sticking solenoid / map too hot | Drop Setpoint row, inspect mechanical wastegate, lower base duty    |
 | Page 2 cells look empty               | Editor still on Page 1                    | Tap the **Page 1 / Page 2** toggle above the cell grid              |
 
+## 10. Channel Conflict & Interlock
+
+The boost controller shares GPIO channels with relay and parachute systems on MOS-4CH-A/B nodes. All three systems use the same 4 GPIO channels (CH0=GPIO16, CH1=GPIO17, CH2=GPIO26, CH3=GPIO27).
+
+### Channel Ownership
+
+- **Boost PWM output** is on `MOS_BOOST_PWM_CHANNEL=3` (GPIO27, CH3)
+- **Relay SET_RELAY** commands control all 4 channels
+- **Parachute fire** commands control all 4 channels via `channel_mask`
+
+### Conflict Resolution
+
+The system implements several safeguards to prevent conflicts:
+
+1. **Boost compute task** releases channels it no longer owns via `prev_mask & ~mask` pattern
+2. **BLE OTA handler** kills all PWM+FETs before entry to prevent conflicts
+3. **Parachute fire** is idempotent (no effect if already fired)
+4. **ARM state** is never NVS-persisted (always boots DISARMED)
+5. **Center MAC discovery filter** excludes SYSTEM command to prevent GPS TIME_SYNC from hijacking relay/parachute unicast routing
+
+### Safety Sequence
+
+When entering OTA mode, the `ENTER_BT_OTA` handler:
+1. Kills all PWM outputs (`relay_set_pwm(c, 0)` for all c)
+2. Turns off all relays (`relay_all_off()`)
+3. Deinitializes ESP-NOW (`espnow_deinit()`)
+4. Starts BLE OTA (`bt_ota_start()`)
+
+This ensures no conflicts occur during the OTA process.
+
 ## 12. Source Map
 
 | File                                          | Role                                             |

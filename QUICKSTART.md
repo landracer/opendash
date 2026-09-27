@@ -13,7 +13,7 @@ Get up and running with OpenDash in 5 minutes!
 
 ### Software
 - **Visual Studio Code** — [Download](https://code.visualstudio.com/)
-- **ESP-IDF v5.3** — [Installation Guide](https://docs.espressif.com/projects/esp-idf/en/release-v5.3/esp32s3/get-started/index.html)
+- **ESP-IDF v6.1** — [Installation Guide](https://docs.espressif.com/projects/esp-idf/en/release-v6.1/esp32s3/get-started/index.html)
 - **Node.js + npm** — For font conversion
 - **Python 3 + Pillow + ImageMagick** — For image conversion
 
@@ -72,7 +72,7 @@ idf.py -p /dev/ttyUSB0 flash monitor
 
 **Left/Right Gauge:**
 ```bash
-cd left-right/
+cd left/          # or right/
 idf.py set-target esp32s3
 idf.py build
 idf.py -p /dev/ttyUSB0 flash monitor
@@ -119,10 +119,15 @@ Or use the status bar buttons: 🔧 Build | ⚡ Flash | 📺 Monitor
 
 ```
 opendash/
-├── center/           ← Center display (4.3" LCD)
-├── left-right/       ← Left/Right gauges (2.8" round)
+├── center/           ← Center display (4.3" LCD) — ESP-NOW master
+├── left/             ← Left gauge pod (2.8" round) — MD UART ingest
+├── right/            ← Right gauge pod (2.8" round)
+├── pod1/ pod2/       ← Auxiliary AMOLED gauge pods (IMU voters)
 ├── gps/              ← GPS/Telemetry (1.75" AMOLED)
-├── common/           ← Shared code (I2C, data models, etc.)
+├── mos-4ch-a/ mos-4ch-b/         ← MOSFET controllers (boost actuator)
+├── relay-4ch-hd/ relay-8ch-a/ relay-8ch-b/  ← Relay controllers
+├── openDstream/      ← ESP-NOW → UART bridge to host PC
+├── common/           ← Shared code (protocol, data models, OTA, etc.)
 └── docs/             ← Documentation
 ```
 
@@ -153,24 +158,24 @@ Each display shows configurable data points. Default layouts:
 
 ### Connect Multiple Displays
 
-1. Build and flash all three displays
-2. Wire I2C bus between units:
-   - SDA: Connect all SDA pins together
-   - SCL: Connect all SCL pins together
-   - GND: Common ground
-3. Center unit acts as I2C master
-4. Data is shared across all displays
+1. Build and flash CENTER first, then the pods (they auto-join at boot)
+2. Power all units — **no bus wiring needed**: ESP-NOW is wireless
+3. Center unit acts as ESP-NOW master; pods announce themselves and are
+   auto-registered into its peer table
+4. Data is shared across all displays over ESP-NOW
 
 See [`docs/hardware.md`](docs/hardware.md) for wiring details.
 
-### Add OBD2 Data
+### Add Engine Data (MultiDisplay)
 
-Connect an OBD2 adapter to the Center unit's CAN bus:
-- CAN-H → Center display CAN-H pin
-- CAN-L → Center display CAN-L pin
-- Power and ground
+Engine data already flows: the **MultiDisplay** ECU board streams its decoded
+values (RPM, boost, EGT×8, lambda, battery, …) to the **LEFT** pod over the
+HC-05 Bluetooth-serial link at ~5 frames/s, which batches them onto ESP-NOW.
+No extra wiring beyond powering the MD board.
 
-See [`docs/hardware.md`](docs/hardware.md) for pin mappings.
+Direct CAN (ECU / VESC / OBD2-ELM327) is **planned**: onboard CAN on Center
+plus a standalone CAN node — see `wiki/vesc-integration.md` for the planned
+frame→DP mapping.
 
 ---
 
@@ -210,7 +215,10 @@ idf.py build
 | [`docs/hardware.md`](docs/hardware.md) | Hardware specs and wiring |
 | [`docs/data-points.md`](docs/data-points.md) | Available data points |
 | [`center/README.md`](center/README.md) | Center display guide |
-| [`left-right/README.md`](left-right/README.md) | Gauge pods guide |
+| [`left/README.md`](left/README.md) | Left gauge pod guide |
+| [`right/README.md`](right/README.md) | Right gauge pod guide |
+| [`pod1/README.md`](pod1/README.md) | Pod 1 display and safety deployment unit |
+| [`pod2/README.md`](pod2/README.md) | Pod 2 display and safety deployment unit |
 | [`gps/README.md`](gps/README.md) | GPS/telemetry guide |
 
 ---
@@ -220,7 +228,7 @@ idf.py build
 - **Documentation:** Check the `docs/` folder
 - **Issues:** [GitHub Issues](https://github.com/landracer/opendash/issues)
 - **Hardware:** [Waveshare Wiki](https://www.waveshare.com/)
-- **ESP-IDF:** [Espressif Docs](https://docs.espressif.com/projects/esp-idf/en/release-v5.3/)
+- **ESP-IDF:** [Espressif Docs](https://docs.espressif.com/projects/esp-idf/en/release-v6.1/)
 
 ---
 
