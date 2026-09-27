@@ -33,6 +33,7 @@
 #include "ui_manager.h"
 #include "espnow_master.h"
 #include "opendash_common.h"
+#include "opendash_perf.h"
 #include "opendash_display_config.h"
 #include "opendash_identity.h"
 #include "opendash_uart.h"
@@ -126,7 +127,7 @@ static void ota_serial_cmd_task(void *arg)
 
     char line[96];
     ESP_LOGI(TAG,
-             "Serial command task ready. Use: ota <left|right|gps|pod1|pod2|relay4|relay8a|relay8b|mosa|mosb>");
+             "Serial command task ready. Use: ota <left|right|gps|pod1|pod2|relay4|relay8a|relay8b|mosa|mosb> | perf");
 
     while (1) {
         if (fgets(line, sizeof(line), stdin) == NULL) {
@@ -145,9 +146,14 @@ static void ota_serial_cmd_task(void *arg)
 
         if (strcmp(line, "help") == 0 || strcmp(line, "?") == 0) {
             ESP_LOGI(TAG,
-                     "Commands: ota <node>, nodes, help");
+                     "Commands: ota <node>, nodes, perf, help");
             ESP_LOGI(TAG,
                      "Nodes: left right gps pod1 pod2 relay4 relay8a relay8b mosa mosb");
+            continue;
+        }
+
+        if (strcmp(line, "perf") == 0) {
+            opendash_perf_log();
             continue;
         }
 
@@ -354,6 +360,14 @@ void app_main(void)
     ESP_LOGI(TAG, "Starting ESP-NOW master polling task...");
     ESP_ERROR_CHECK(espnow_master_start());
     ESP_LOGI(TAG, "ESP-NOW master polling active");
+
+    /* ────────────────────────────────────────────────────────────────────────
+     * Step 6b: Perf telemetry sampler (idle% / render cost / rx drops).
+     * Console: type 'perf' to print the latest snapshot.
+     * ──────────────────────────────────────────────────────────────────────── */
+    if (opendash_perf_init() != ESP_OK) {
+        ESP_LOGW(TAG, "Perf telemetry inactive (run-time stats disabled)");
+    }
 
     /* ────────────────────────────────────────────────────────────────────────
      * Step 7: System Config + Boost Controller client

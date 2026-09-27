@@ -42,6 +42,9 @@ static uint8_t       s_self_mac[6] = {0};
 static bool          s_initialized = false;
 static opendash_espnow_send_status_cb_t s_send_status_cb = NULL;
 
+/** Frames dropped because the transport rx queue was full (ISR-written). */
+static volatile uint32_t s_rx_drops = 0;
+
 /* ────────────────────────────────────────────────────────────────────────────
  * ESP-NOW Callbacks (run in WiFi task context — keep fast!)
  * ──────────────────────────────────────────────────────────────────────────── */
@@ -63,10 +66,12 @@ static void espnow_recv_cb(const esp_now_recv_info_t *info,
     evt.rssi = (info->rx_ctrl) ? info->rx_ctrl->rssi : 0;
 
     /* Non-blocking enqueue from WiFi context.
-     * If the queue is full, this message is silently dropped.
-     * The application should drain the queue fast enough.          */
+     * If the queue is full, this message is dropped AND counted —
+     * rx_drops is the ground truth for "radio outran the app".      */
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    xQueueSendFromISR(s_recv_queue, &evt, &xHigherPriorityTaskWoken);
+    if (xQueueSendFromISR(s_recv_queue, &evt, &xHigherPriorityTaskWoken) != pdTRUE) {
+        s_rx_drops++;
+    }
     if (xHigherPriorityTaskWoken) {
         portYIELD_FROM_ISR();
     }
@@ -272,4 +277,9 @@ void opendash_espnow_get_mac(uint8_t *mac_out)
 void opendash_espnow_set_send_status_cb(opendash_espnow_send_status_cb_t cb)
 {
     s_send_status_cb = cb;
+}
+
+uint32_t opendash_espnow_get_rx_drops(void)
+{
+    return s_rx_drops;
 }

@@ -183,6 +183,12 @@ typedef void (*opendash_espnow_send_status_cb_t)(const uint8_t *mac, bool succes
  */
 void opendash_espnow_set_send_status_cb(opendash_espnow_send_status_cb_t cb);
 
+/**
+ * @brief Total number of inbound frames dropped because the transport rx
+ *        queue was full since boot. Nonzero = the radio outran the app.
+ */
+uint32_t opendash_espnow_get_rx_drops(void);
+
 #ifdef __cplusplus
 }
 #endif

@@ -128,6 +128,7 @@ idf_component_register(
         "src/opendash_parachute_actuator.c"
         "src/opendash_parachute.c"
         "src/opendash_rollover_detector.c"
+        "src/opendash_perf.c"
         ${FONT_SOURCES}
         ${IMAGE_SOURCES}
     INCLUDE_DIRS

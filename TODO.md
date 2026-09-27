@@ -39,7 +39,7 @@
 | Working displays | center (4.3" RGB), left/right (2.8C round RGB), gps + pod1/pod2 (1.75" AMOLED) |
 | BLE OTA | Working: pod1, pod2, left, right. **Fragile:** gps, pod1, pod2 still missing the full sdkconfig recipe + slave-side suspend sequence — see §1.2 |
 | Active investigations | center RGB tearing (TEARING.md), GPS/POD OTA hardening, boost-controller wire-up |
-| Git state | 224 files uncommitted; HEAD = `Initial base for GPS` (museum). All current work is local. |
+| Git state | Clean tree; Phase-0 baseline committed on main (parachute restored, docs truth pass, junk archived). Push pending boost clean-room (§6.0). |
 
 ---
 
@@ -57,15 +57,27 @@
 - [ ] Stress test: rapid button pressing for 60+ seconds (verify no WDT)
 - [ ] Consider dropping 4-shadow outlined text to 1 shadow for lighter render cost
 
-### 1.2 MD Data Point Counter Not Incrementing on BATCH — NEEDS FIX
+### 1.2 MD Data Point Counter Not Incrementing on BATCH — RESOLVED
 
-- [ ] The `dp/s` counter in `channel_mgr` logs (e.g. `CH1 flow: dp/s=0 rx=...`) 
-      is only incremented for `DATA_RESPONSE` frames, not `SET_DATA_BATCH`.
-      This is a cosmetic issue but may mask actual data flow problems.
-      The batch parser in `espnow_master.c` should increment the counter
-      for each DP in the batch.
+- [x] Verified in restored `channel_medium_task`: the `DATA_BATCH` branch now
+      does `ch1_dp_processed += count;` (espnow_master.c), so the `CH1 flow:
+      dp/s=` log counts batch DPs too. Item predates the restore; closed.
 
-### 1.2 BLE OTA Fragility on GPS / POD1 / POD2
+### 1.3 Perf Telemetry (Measure Phase)
+
+- [x] `common/src/opendash_perf.c`: 1 Hz sampler — per-core idle % (FreeRTOS
+      run-time stats), `lv_timer_handler()` render cost EMA/max, rx-drop counter
+- [x] Transport rx-queue overflows counted (`opendash_espnow_get_rx_drops()`)
+- [x] Center console: `perf` command prints the snapshot
+- [x] `CONFIG_FREERTOS_USE_TRACE_FACILITY` + `GENERATE_RUN_TIME_STATS` on (center)
+- [x] All 12 projects rebuild green (perf module compiles on nodes without
+      the Kconfig knobs via compile-time stub path)
+- [ ] Field-run: capture `perf` output during visible tearing → evidence for
+      TEARING.md hypotheses (H3/H4/H7 vs. simple CPU saturation)
+- [ ] Roll the same two Kconfig knobs into the other nodes' sdkconfig.defaults
+      when their telemetry is needed
+
+### 1.4 BLE OTA Fragility on GPS / POD1 / POD2
 
 > **Found during 2026-05-31 audit.** LEFT and RIGHT have the full BLE OTA
 > hardening recipe applied; GPS / POD1 / POD2 do **not**. They've worked in

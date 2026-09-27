@@ -41,10 +41,12 @@
 #include "node_definitions.h"
 #include "esp_log.h"
 #include "esp_task_wdt.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "lvgl.h"
 #include "opendash_common.h"
+#include "opendash_perf.h"
 #include "opendash_data_model.h"
 #include "opendash_fonts.h"
 #include "opendash_ui_styles.h"
@@ -3778,7 +3780,9 @@ static void ui_task(void *pvParameters)
          * be serialised with the same mutex used by espnow_master
          * and any other task that touches LVGL objects.            */
         if (display_lvgl_lock(100)) {
+            int64_t t0 = esp_timer_get_time();
             lv_timer_handler();
+            opendash_perf_render_us((uint64_t)(esp_timer_get_time() - t0));
             display_lvgl_unlock();
         }
         esp_task_wdt_reset();
