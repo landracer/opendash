@@ -18,10 +18,15 @@
  *
  * Heritage
  * ========
- * Ported from Stephan Martin / Dominik Gummel's MultiDisplay
- * RPMBoostController (GPL-3.0). The wire format mirrors MD's per-gear
- * per-mode map upload pattern so the same maps can be authored in
+ * Behavior modeled on the MultiDisplay project's RPMBoostController
+ * (Stephan Martin / Dominik Gummel, GPL-3.0). The wire format mirrors MD's
+ * per-gear per-mode map upload pattern so the same maps can be authored in
  * either ecosystem.
+ *
+ * ⚠ NOTICE: this module derives from that GPL-3.0 lineage. A true clean-room
+ * reimplementation on our own platform design (our "boost on steroids") is
+ * scheduled before any public release — see TODO. Until then this code is
+ * not publishable as-is.
  *
  * Wire transport
  * ==============
