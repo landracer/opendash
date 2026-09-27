@@ -3,10 +3,10 @@
 
 ## Overview
 
-OpenDash is a four-node racecar dashboard and telemetry system (Left, Center, Right,
-and GPS/Telemetry). Each node is an ESP32-S3 device running ESP-IDF v5.3 with LVGL
-for display rendering. The nodes communicate over a shared I2C bus, with each node
-having a unique address.
+OpenDash is a modular racecar dashboard and vehicle-control system. Twelve node
+families (displays, gauge pods, relay/MOS controllers, a GPS/telemetry unit and
+a PC bridge) exchange real-time engine, GPS, IMU, and battery data over an
+ESP-NOW mesh, with CENTER as master.
 
 ## Node Roles
 
