@@ -1,130 +1,204 @@
 /* Licensed under Sovereign Individual License v1.0 — see LICENSE file */
 /**
  * @file main.c
- * @brief openDstream — ESP-NOW to UART Relay Node
+ * @brief openDstream — ESP-NOW to UART Bridge for rAtTrax BMS
  *
- * Hardware: ESP32-WROOM-32 (classic) with USB-to-UART bridge
- * Role: Pure relay — receives ESP-NOW frames, pipes them to UART @ 115200 baud
+ * Receives ESP-NOW packets from rAtTrax BMS and outputs DP:0xXXXX:XX.XX lines.
  *
- * Headless device — no display, no LVGL. Just:
- *   1. ESP-NOW slave listening on channel 6
- *   2. Pipes every frame to UART0
- *   3. Done.
+ * Protocol (from BMS):
+ *   SYNC(0xAA) + CMD + LEN + PAYLOAD + CHECKSUM
+ *   Payload: [dp_id_hi][dp_id_lo][float:4B] repeated N times
+ *
+ * Output: DP:0xXXXX:%.2f\n via UART at 921600 baud
  */
 
 #include <stdio.h>
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "esp_system.h"
+#include "freertos/queue.h"
+
 #include "esp_log.h"
-#include "nvs_flash.h"
+#include "esp_system.h"
 #include "esp_wifi.h"
-#include "esp_event.h"
 #include "esp_now.h"
+#include "nvs_flash.h"
+
 #include "driver/uart.h"
 #include "driver/gpio.h"
 
-static const char *TAG = "opendstream";
+/* OpenDash protocol constants (matching BMS source) */
+#define OD_MSG_SYNC        0xAA
+#define OD_CMD_DATA_RESPONSE 0x81   // Sensor data response
 
-/* UART Config */
-#define UART_NUM            UART_NUM_0
-#define UART_BAUD           115200
-#define UART_TX             GPIO_NUM_1
-#define UART_RX             GPIO_NUM_3
+/* UART configuration for USB-to-UART bridge (CP2102/CH340) */
+#define UART_PORT_NUM    (UART_NUM_0)
+#define UART_BAUD_RATE   (921600)
+#define UART_TX_PIN      (GPIO_NUM_1)
 
-/* ESP-NOW */
-#define ESPNOW_CHANNEL      6
+/**
+ * @brief Calculate checksum (XOR of all bytes)
+ */
+static uint8_t calc_checksum(const uint8_t *data, int len) {
+    uint8_t chk = 0;
+    for (int i = 0; i < len; i++) {
+        chk ^= data[i];
+    }
+    return chk;
+}
 
-/* Status LED (GPIO2, active-low on most boards) */
-#define LED_GPIO            GPIO_NUM_2
-
-/* ════════════════════════════════════════════════════════════════════════════
- * UART — Standard driver
- * ════════════════════════════════════════════════════════════════════════════ */
-
-static void uart_init(void)
-{
-    uart_config_t uc = {
-        .baud_rate = UART_BAUD,
+/**
+ * @brief Initialize UART for high-speed output to USB-to-UART bridge
+ */
+static void uart_init_high_speed(void) {
+    uart_config_t uart_config = {
+        .baud_rate = UART_BAUD_RATE,
         .data_bits = UART_DATA_8_BITS,
         .parity    = UART_PARITY_DISABLE,
         .stop_bits = UART_STOP_BITS_1,
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        #ifdef CONFIG_UART_CLKSRC_DEFAULT
+        .source_clk = UART_SCLK_DEFAULT,
+        #else
+        .source_clk = UART_SCLK_APB,
+        #endif
     };
 
-    uart_driver_install(UART_NUM, 4096, 4096, 0, NULL, 0);
-    uart_param_config(UART_NUM, &uc);
-    uart_set_pin(UART_NUM, UART_TX, UART_RX, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+    // Install driver with large buffer
+    uart_driver_install(UART_PORT_NUM, 4096, 0, 0, NULL, 0);
+    uart_param_config(UART_PORT_NUM, &uart_config);
+    uart_set_pin(UART_PORT_NUM, UART_TX_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
 
-    ESP_LOGI(TAG, "UART0 @ %d baud (TX:GPIO%d)", UART_BAUD, UART_TX);
+    // Flush the port
+    uart_flush(UART_PORT_NUM);
+
+    ESP_LOGI("uart", "Initialized @ %d baud (TX=%d)", UART_BAUD_RATE, UART_TX_PIN);
 }
 
-static void uart_send(const uint8_t *data, size_t len)
-{
-    if (data && len > 0) {
-        uart_write_bytes(UART_NUM, data, len);
+/**
+ * @brief Send formatted data point via UART
+ */
+static void uart_send_dp(uint16_t dp_id, float value) {
+    char buf[32];
+    int len = snprintf(buf, sizeof(buf), "DP:0x%04X:%.2f\n", dp_id, value);
+    uart_write_bytes(UART_PORT_NUM, buf, len);
+}
+
+/**
+ * @brief Parse a single OpenDash frame and extract data points
+ *
+ * Frame format:
+ *   [0] = SYNC (0xAA)
+ *   [1] = CMD
+ *   [2] = LEN
+ *   [3..3+LEN-1] = PAYLOAD
+ *   [3+LEN] = CHECKSUM
+ *
+ * Payload: repeated [dp_id_hi][dp_id_lo][float:4B]
+ *   Total payload per DP = 6 bytes
+ */
+static void parse_opendash_frame(const uint8_t *data, int len) {
+    // Minimum frame: SYNC + CMD + LEN + CHK = 4 bytes
+    if (len < 4) return;
+
+    // Validate sync byte
+    if (data[0] != OD_MSG_SYNC) return;
+
+    // Get payload length
+    uint8_t payload_len = data[2];
+
+    // Validate total frame length: 3 header + payload + 1 checksum
+    int expected_len = 3 + payload_len + 1;
+    if (expected_len > len) return;
+
+    // Verify checksum
+    if (calc_checksum(data, expected_len - 1) != data[expected_len - 1]) {
+        ESP_LOGW("parse", "Checksum mismatch");
+        return;
+    }
+
+    // Parse payload - each DP is 6 bytes: [id_hi][id_lo][float:4B]
+    const uint8_t *payload = &data[3];
+    int dp_count = payload_len / 6;  // Each data point is 6 bytes
+
+    for (int i = 0; i < dp_count; i++) {
+        uint16_t dp_id = ((uint16_t)payload[0] << 8) | payload[1];
+        float value;
+        memcpy(&value, &payload[2], sizeof(float));
+
+        // Send via UART
+        uart_send_dp(dp_id, value);
+
+        payload += 6;  // Move to next data point
     }
 }
 
-/* ════════════════════════════════════════════════════════════════════════════
- * ESP-NOW Receive Callback — pipe everything to UART
- * ════════════════════════════════════════════════════════════════════════════ */
+/**
+ * @brief ESP-NOW receive callback
+ */
+static void espnow_recv_callback(const esp_now_recv_info_t *recv_info,
+                                  const uint8_t *data, int len) {
+    if (!data || len <= 0) return;
 
-static void espnow_recv_cb(const esp_now_recv_info_t *info,
-                           const uint8_t *data, int len)
-{
-    uart_send(data, len);
+    // Parse and output all data points in the frame
+    parse_opendash_frame(data, len);
 }
 
-/* ════════════════════════════════════════════════════════════════════════════
- * Init
- * ════════════════════════════════════════════════════════════════════════════ */
+/**
+ * @brief Application entry point
+ */
+void app_main(void) {
+    ESP_LOGI("opendstream", "rAtTrax BMS to OpenDash Bridge v1.1");
+    ESP_LOGI("opendstream", "Listening for ESPNOW packets from rAtTrax BMS");
 
-static void espnow_init(void)
-{
-    esp_now_init();
+    /* Initialize UART first (for early boot messages) */
+    uart_init_high_speed();
+
+    /* Send boot message */
+    const char *boot_msg = "CFG:BOOT:rAtTrax-BMS-v1.1\n";
+    uart_write_bytes(UART_PORT_NUM, boot_msg, strlen(boot_msg));
+
+    /* Initialize NVS */
+    esp_err_t ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        nvs_flash_erase();
+        nvs_flash_init();
+    }
+
+    /* Initialize WiFi in STA mode for ESP-NOW */
+    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+    esp_wifi_init(&cfg);
+
+    // Lock to channel 1 (matching BMS)
+    esp_wifi_set_channel(1, WIFI_SECOND_CHAN_NONE);
     esp_wifi_set_mode(WIFI_MODE_STA);
+
     esp_wifi_start();
-    esp_now_register_recv_cb(espnow_recv_cb);
-    ESP_LOGI(TAG, "ESP-NOW recv cb registered (ch %d)", ESPNOW_CHANNEL);
-}
 
-/* ════════════════════════════════════════════════════════════════════════════
- * Status LED — double-blink alive
- * ════════════════════════════════════════════════════════════════════════════ */
-
-static void led_task(void *arg)
-{
-    gpio_set_direction(LED_GPIO, GPIO_MODE_OUTPUT);
-
-    while (1) {
-        gpio_set_level(LED_GPIO, 0); vTaskDelay(pdMS_TO_TICKS(80));
-        gpio_set_level(LED_GPIO, 1); vTaskDelay(pdMS_TO_TICKS(80));
-        gpio_set_level(LED_GPIO, 0); vTaskDelay(pdMS_TO_TICKS(80));
-        gpio_set_level(LED_GPIO, 1); vTaskDelay(pdMS_TO_TICKS(2000));
+    /* Initialize ESP-NOW */
+    ret = esp_now_init();
+    if (ret != ESP_OK) {
+        ESP_LOGE("opendstream", "ESP-NOW init failed: %s", esp_err_to_name(ret));
+        return;
     }
-}
 
-/* ════════════════════════════════════════════════════════════════════════════
- * Entry
- * ════════════════════════════════════════════════════════════════════════════ */
+    /* Register receive callback */
+    esp_now_register_recv_cb(espnow_recv_callback);
 
-void app_main(void)
-{
-    ESP_LOGI(TAG, "openDstream relay starting");
+    /* Create broadcast peer (FF:FF:FF:FF:FF:FF) */
+    esp_now_peer_info_t peer = {
+        .peer_addr = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF},
+        .channel = 1,
+        .ifidx = WIFI_IF_STA,
+        .encrypt = false,
+    };
 
-    /* NVS */
-    nvs_flash_init();
-
-    uart_init();
-    espnow_init();
-
-    xTaskCreate(led_task, "led", 1024, NULL, 3, NULL);
-
-    ESP_LOGI(TAG, "Relay ready — piping ESP-NOW to UART0");
-
-    while (1) {
-        vTaskDelay(pdMS_TO_TICKS(1000));
+    ret = esp_now_add_peer(&peer);
+    if (ret != ESP_OK) {
+        ESP_LOGE("opendstream", "Failed to add peer: %s", esp_err_to_name(ret));
+        return;
     }
+
+    ESP_LOGI("opendstream", "Ready - listening on channel 1");
+    ESP_LOGI("opendstream", "Output format: DP:0xXXXX:XX.XX at %d baud", UART_BAUD_RATE);
 }
