@@ -70,7 +70,7 @@ opendash/
 │
 ├── left/                        ← Left gauge pod (ESP32-S3-LCD-2.8C)
 │   ├── main/
-│   │   ├── main.c               — Entry point, I2C slave (addr 0x10)
+│   │   ├── main.c               — Entry point; sole MD UART/HC-05 ingest (node 0x10)
 │   │   ├── display_init.c/h     — ST7701S 3-wire SPI + RGB init
 │   │   └── ui_manager.c/h       — Round gauge UI
 │   ├── display.ini              — Hardware pin reference
@@ -79,7 +79,7 @@ opendash/
 │   └── README.md
 │
 ├── right/                       ← Right gauge pod (same hardware)
-│   ├── main/                    — Same code as left/, uses addr 0x11
+│   ├── main/                    — Mirrors left's gauge pages (node 0x11); no UART — all data via Center's ESP-NOW relay
 │   ├── display.ini
 │   ├── CMakeLists.txt
 │   ├── sdkconfig.defaults
@@ -87,7 +87,7 @@ opendash/
 │
 ├── pod1/                        ← Pod 1 display unit (ESP32-S3-Touch-AMOLED-1.75)
 │   ├── main/
-│   │   ├── main.c               — Entry point, I2C slave (addr 0x13)
+│   │   ├── main.c               — Entry point, ESP-NOW slave (node 0x30)
 │   │   ├── display_init.c/h     — CO5300 AMOLED init
 │   │   ├── ui_manager.c/h       — Display UI
 │   │   ├── imu_handler.c/h      — QMI8658 IMU driver
@@ -98,7 +98,7 @@ opendash/
 │
 ├── pod2/                        ← Pod 2 display unit (ESP32-S3-Touch-AMOLED-1.75)
 │   ├── main/
-│   │   ├── main.c               — Entry point, I2C slave (addr 0x14)
+│   │   ├── main.c               — Entry point, ESP-NOW slave (node 0x31)
 │   │   ├── display_init.c/h     — CO5300 AMOLED init
 │   │   ├── ui_manager.c/h       — Display UI
 │   │   ├── imu_handler.c/h      — QMI8658 IMU driver
@@ -130,7 +130,8 @@ opendash/
 
 ### 🖥️ Display & UI
 - **LVGL-based UI** — Gauges, arcs, bar charts, and numeric readouts with minimal CPU overhead
-- **Multi-page gauge system** — Left/Right pods: up to 8 configurable gauge pages (oil, water, RPM, etc.) cycled via boot button. Same layout, different data per page.
+- **Multi-page gauge system** — Left/Right pods: fixed gauge-page table (`s_gauge_pages[]` — oil, water, RPM pages + odometer screen) cycled via boot button. Same layout, different data per page.
+- **Domain-separated datapoints** — MD-native sensor channels travel under dedicated `MD_*` ids (0x0800 block + `MD_RPM`); vehicle-ECU/OBD2 values keep the shared engine ids. Screens bind ids, so a value can never cross-feed another domain's widgets. `obd2_present` is a UI/config capability flag, never a wire-gate.
 - **Min/max tracking** — Session high/low displayed per gauge page
 - **Shift-light blink** — Arc flashes red/blue when RPM exceeds configurable threshold
 - **Configurable data views** — Choose which data points appear in each screen section

@@ -92,7 +92,15 @@ static esp_err_t gt911_read_reg(uint16_t reg, uint8_t *data, size_t len);
 /* LCD RGB Interface GPIO pins for Waveshare ESP32-S3-Touch-LCD-4.3 */
 /* ST7262 Datasheet (Page 52): DCLK Frequency = 23-25-27 MHz */
 /* Waveshare official library uses 16 MHz for stability */
-#define LCD_PIXEL_CLOCK_HZ      (16 * 1000 * 1000)  /* 16 MHz (Waveshare official) */
+/* ST7262 datasheet spec is 23-27 MHz (~60 Hz at these timings), but the
+ * ESP32-S3 PSRAM subsystem cannot sustain the resulting ~50 MB/s scan
+ * bandwidth — at 25 MHz the bounce buffer starves and the whole image
+ * jumps/tears wildly (measured 2026-09-28). 16 MHz (~40 Hz refresh) is
+ * the stable ceiling for 800×480×16-bit out of PSRAM on this chip; the
+ * ~40 Hz refresh shimmer is a physical limit of this board, not a bug.
+ * Runtime-adjustable via the 'pclk <MHz>' console command — sweep it and
+ * pick the eye-comfort/stability trade you prefer. */
+#define LCD_PIXEL_CLOCK_HZ      (16 * 1000 * 1000)  /* ~40 Hz refresh — stable ceiling */
 
 /* Bounce buffer for PSRAM stability - prevents visual noise/artifacts */
 /* ESP-IDF recommends 10-20 lines when framebuffer is in PSRAM */
@@ -248,12 +256,18 @@ static void lvgl_flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px
      * take below waits for the genuine NEXT vsync. */
     xSemaphoreTake(s_vsync_sem, 0);
 
-    /* Schedule the framebuffer swap — effective on next vsync. */
+    /* Fix C (2026-09-27): wait for the frame boundary BEFORE the swap.
+     * The bounce-buffer refill samples cur_fb_index at refill time (see
+     * esp_lcd_panel_rgb.c rgb_panel_draw_bitmap): calling draw_bitmap at an
+     * arbitrary scanline stitches old-FB-above / new-FB-below at that row —
+     * the "values flickering" artifact. Gating at vsync makes the whole
+     * frame switch consistently. */
+    xSemaphoreTake(s_vsync_sem, pdMS_TO_TICKS(100));
+
+    /* Frame-boundary swap: the scan starts reading px_map from the next
+     * bounce refill. */
     esp_lcd_panel_draw_bitmap(panel, area->x1, area->y1,
                               area->x2 + 1, area->y2 + 1, px_map);
-
-    /* Block until the panel actually switched to px_map. */
-    xSemaphoreTake(s_vsync_sem, pdMS_TO_TICKS(100));
 
     /* Fix B: mirror the dirty rectangle into the OTHER framebuffer so the
      * next LVGL render cycle — which will draw into that buffer — sees an
@@ -272,6 +286,15 @@ static void lvgl_flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px
     }
 
     lv_display_flush_ready(disp);
+}
+
+/* Live pixel-clock change (console 'pclk <MHz>'). Higher = smoother scan
+ * but more PSRAM bandwidth; above ~18 MHz the bounce buffer starves and
+ * the picture breaks up. Returns ESP_ERR_NOT_SUPPORTED if unsupported. */
+esp_err_t display_init_set_pclk(uint32_t freq_hz)
+{
+    if (!panel_handle) return ESP_ERR_INVALID_STATE;
+    return esp_lcd_rgb_panel_set_pclk(panel_handle, freq_hz);
 }
 
 /**

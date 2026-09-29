@@ -22,6 +22,7 @@
 
 #include <stdio.h>
 #include <ctype.h>
+#include <stdlib.h>
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -146,7 +147,7 @@ static void ota_serial_cmd_task(void *arg)
 
         if (strcmp(line, "help") == 0 || strcmp(line, "?") == 0) {
             ESP_LOGI(TAG,
-                     "Commands: ota <node>, nodes, perf, help");
+                     "Commands: ota <node>, nodes, perf, pclk <MHz>, help");
             ESP_LOGI(TAG,
                      "Nodes: left right gps pod1 pod2 relay4 relay8a relay8b mosa mosb");
             continue;
@@ -154,6 +155,18 @@ static void ota_serial_cmd_task(void *arg)
 
         if (strcmp(line, "perf") == 0) {
             opendash_perf_log();
+            continue;
+        }
+
+        if (strncmp(line, "pclk", 4) == 0) {
+            int mhz = atoi(line + 4);
+            if (mhz >= 8 && mhz <= 27) {
+                esp_err_t e = display_init_set_pclk((uint32_t)mhz * 1000000U);
+                ESP_LOGI(TAG, "pclk -> %d Hz-equivalent %d MHz (%s)",
+                         mhz * 1000000, mhz, e == ESP_OK ? "ok" : esp_err_to_name(e));
+            } else {
+                ESP_LOGW(TAG, "Usage: pclk <MHz> (8-27; >18 starves PSRAM bandwidth)");
+            }
             continue;
         }
 

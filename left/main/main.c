@@ -121,16 +121,26 @@ static void send_data_point_to_center(uint16_t dp_id, float value)
  * @brief Forward multidisplay UART data to Center via ESP-NOW.
  *
  * Called when new UART frames arrive (~every 200ms). Packs all 15 MD
- * data points into ONE OPENDASH_CMD_SET_DATA_BATCH frame instead of 15
+ * data points into ONE OPENDASH_CMD_DATA_BATCH frame instead of 15
  * separate sends — drops the LEFT→CENTER frame rate from ~75 pkts/s to
  * ~5 pkts/s and eliminates the channel_mgr quarantine cycle for RIGHT
  * (which used to back up behind center's 1:1 forwards). See DATAFLOW_FIX.md.
+ * NOTE: slave→master batches MUST use DATA_BATCH (0x88). SET_DATA_BATCH
+ * (0x0C) is master→slave only — center's handlers ignore it and the data
+ * would be silently dropped (regression found 2026-09-27).
  */
 static void forward_md_data_to_center(const opendash_md_data_t *md)
 {
     if (!s_center_mac_known) return;
 
-    /* Batch payload: [count:1][dp_id:2][value:4]×N — 1 + 15*6 = 91 bytes. */
+    /* Batch payload: [count:1][dp_id:2][value:4]×N — 1 + 15*6 = 91 bytes.
+     * MD-domain only: every channel the multidisplay hardware measures
+     * directly ships under an MD_* id so it can NEVER populate an
+     * OBD-bound widget. OBD2-derived values travel separately under the
+     * plain engine ids via forward_obd2_to_center() below.
+     * NOTE: slave→master batches MUST use DATA_BATCH (0x88). SET_DATA_BATCH
+     * (0x0C) is master→slave only — center's handlers ignore it and the data
+     * would be silently dropped (regression found 2026-09-27). */
     enum { MD_BATCH_COUNT = 15 };
     uint8_t payload[1 + MD_BATCH_COUNT * 6];
     uint16_t off = 0;
@@ -153,17 +163,72 @@ static void forward_md_data_to_center(const opendash_md_data_t *md)
     PUT(OPENDASH_DP_EGT6,             md->egt[5]);
     PUT(OPENDASH_DP_EGT7,             md->egt[6]);
     PUT(OPENDASH_DP_EGT8,             md->egt[7]);
-    PUT(OPENDASH_DP_O2_LAMBDA,        md->lambda);
-    PUT(OPENDASH_DP_MAF_RATE,         md->lmm);
+    PUT(OPENDASH_DP_MD_LAMBDA,        md->lambda);
+    PUT(OPENDASH_DP_MD_MAF,           md->lmm);
     PUT(OPENDASH_DP_MD_RPM,           md->rpm);
-    PUT(OPENDASH_DP_BOOST_PRESSURE,   md->boost);
-    PUT(OPENDASH_DP_BATTERY_VOLTAGE,  md->bat_volt);
-    PUT(OPENDASH_DP_OIL_PRESSURE,     md->vdo_pres1);
-    PUT(OPENDASH_DP_OIL_TEMP,         md->vdo_temp1);
+    PUT(OPENDASH_DP_MD_BOOST,         md->boost);
+    PUT(OPENDASH_DP_MD_BAT,           md->bat_volt);
+    PUT(OPENDASH_DP_MD_OIL_PRESS,     md->vdo_pres1);
+    PUT(OPENDASH_DP_MD_OIL_TEMP,      md->vdo_temp1);
     #undef PUT
 
     opendash_i2c_msg_t msg;
-    opendash_i2c_build_msg(&msg, OPENDASH_CMD_SET_DATA_BATCH, payload, off);
+    opendash_i2c_build_msg(&msg, OPENDASH_CMD_DATA_BATCH, payload, off);
+    send_response_to_center(&msg);
+}
+
+/**
+ * @brief Forward the OBD-II domain of the MD frame to center as a second batch.
+ *
+ * The MD hardware's OBD reader (frame bytes 58-92) carries the *vehicle ECU*
+ * domain values. These ship under the plain shared engine ids so each value
+ * is addressable by domain: OBD-bound widgets light from these ids only, and
+ * MD-native channels (MD_* ids) never touch them.
+ *
+ * NOTE: NOT gated on obd2_present — this bench's MD prototype is the OBD
+ * data transport, and the flags byte that backed that gate is not populated
+ * here. Field-level validity stays honest because the parser zeroes/keeps
+ * what the AVR actually sends; a hard gate silently killed the whole ECU
+ * channel set when flags==0 (regression found 2026-09-28 — the flag is a
+ * UI/config capability concern, not a wire-gate).
+ */
+static void forward_obd2_to_center(const opendash_md_data_t *md)
+{
+    if (!s_center_mac_known) return;
+
+    enum { OBD_BATCH_COUNT = 15 };
+    uint8_t payload[1 + OBD_BATCH_COUNT * 6];
+    uint16_t off = 0;
+    payload[off++] = OBD_BATCH_COUNT;
+
+    #define PUT(dp_const, val) do {                                       \
+        uint16_t _dp = (dp_const);                                        \
+        payload[off++] = (uint8_t)((_dp >> 8) & 0xFF);                    \
+        payload[off++] = (uint8_t)(_dp & 0xFF);                           \
+        float _v = (val);                                                 \
+        memcpy(&payload[off], &_v, sizeof(float));                        \
+        off += 4;                                                         \
+    } while (0)
+
+    PUT(OPENDASH_DP_RPM,             md->obd2_rpm);
+    PUT(OPENDASH_DP_VEHICLE_SPEED,   md->obd2_speed);
+    PUT(OPENDASH_DP_COOLANT_TEMP,    md->obd2_coolant_temp);
+    PUT(OPENDASH_DP_INTAKE_TEMP,     md->obd2_intake_temp);
+    PUT(OPENDASH_DP_ENGINE_LOAD,     md->obd2_engine_load);
+    PUT(OPENDASH_DP_THROTTLE_POS,    md->obd2_throttle);
+    PUT(OPENDASH_DP_BOOST_PRESSURE,  md->obd2_intake_map);
+    PUT(OPENDASH_DP_OIL_TEMP,        md->obd2_oil_temp);
+    PUT(OPENDASH_DP_FUEL_PRESSURE,   md->obd2_fuel_press);
+    PUT(OPENDASH_DP_MAF_RATE,        md->obd2_maf_rate);
+    PUT(OPENDASH_DP_TIMING_ADVANCE,  md->obd2_timing_adv);
+    PUT(OPENDASH_DP_STFT_B1,         md->obd2_stft_b1);
+    PUT(OPENDASH_DP_LTFT_B1,         md->obd2_ltft_b1);
+    PUT(OPENDASH_DP_BARO_PRESSURE,   md->obd2_baro_press);
+    PUT(OPENDASH_DP_DTC_COUNT,       (float)md->mil_dtc_count);
+    #undef PUT
+
+    opendash_i2c_msg_t msg;
+    opendash_i2c_build_msg(&msg, OPENDASH_CMD_DATA_BATCH, payload, off);
     send_response_to_center(&msg);
 }
 
@@ -193,6 +258,7 @@ static void dispatch_message(const opendash_espnow_event_t *evt,
 
     switch (msg->cmd) {
         /* ── Data Point Update ─────────────────────────────────── */
+        /* ── Data Point (single) ───────────────────────────────── */
         case OPENDASH_CMD_SET_DATA_POINT: {
             if (msg->length >= 6) {
                 uint16_t dp_id = (msg->payload[0] << 8) | msg->payload[1];
@@ -211,6 +277,32 @@ static void dispatch_message(const opendash_espnow_event_t *evt,
                     display_lvgl_unlock();
                 }
                 ESP_LOGD(TAG, "SET_DATA dp=0x%04X val=%.2f", dp_id, value);
+            }
+            break;
+        }
+
+        /* ── Data Point Batch (center relay of MD/OBD frames) ────
+         * Payload: [count:1][dp_id:2][float32]×N — the exact frame LEFT
+         * originates; CENTER re-batches and relays it here so this pod's
+         * OBD-domain widgets (e.g. the WATER page) update too. */
+        case OPENDASH_CMD_SET_DATA_BATCH: {
+            if (msg->length < 7) break;
+            uint8_t count = msg->payload[0];
+            uint16_t expected = (uint16_t)(1 + (uint16_t)count * 6);
+            if (msg->length < expected || count == 0) break;
+
+            const uint8_t *e = &msg->payload[1];
+            if (display_lvgl_lock(10)) {
+                for (uint8_t i = 0; i < count; i++) {
+                    uint16_t dp_id = ((uint16_t)e[0] << 8) | e[1];
+                    float value;
+                    memcpy(&value, &e[2], sizeof(float));
+                    if (dp_id == OPENDASH_DP_GPS_SPEED) s_last_gps_speed_kmh = value;
+                    if (dp_id == OPENDASH_DP_GPS_FIX)   s_gps_fix_valid = (value > 0.5f);
+                    ui_manager_update_value(dp_id, value);
+                    e += 6;
+                }
+                display_lvgl_unlock();
             }
             break;
         }
@@ -579,17 +671,25 @@ void app_main(void)
                 display_lvgl_unlock();
             }
 
-            /* Push latest parsed values to the UI when new data arrives */
+            /* Push latest parsed values to the UI when new data arrives.
+             * MD-native channels are fed under MD-domain ids (0x0800 block)
+             * so they populate only the widgets bound to them — the same
+             * separation Center enforces. OBD-domain widgets on this pod
+             * (WATER page) are fed by Center's SET_DATA_BATCH relay. */
             opendash_md_data_t md;
             if (opendash_uart_get_data(&md) && md.frame_count != md_last_frame_count) {
                 md_last_frame_count = md.frame_count;
                 if (display_lvgl_lock(10)) {
-                    ui_manager_update_value(OPENDASH_DP_RPM,             md.rpm);
-                    ui_manager_update_value(OPENDASH_DP_BOOST_PRESSURE,  md.boost);
-                    ui_manager_update_value(OPENDASH_DP_THROTTLE_POS,    md.throttle);
-                    ui_manager_update_value(OPENDASH_DP_LAMBDA,          md.lambda);
-                    ui_manager_update_value(OPENDASH_DP_BATTERY_VOLTAGE, md.bat_volt);
-                    /* Individual EGTs (all 8 channels) */
+                    ui_manager_update_value(OPENDASH_DP_MD_RPM,        md.rpm);
+                    ui_manager_update_value(OPENDASH_DP_MD_BOOST,      md.boost);
+                    ui_manager_update_value(OPENDASH_DP_MD_THROTTLE,   md.throttle);
+                    ui_manager_update_value(OPENDASH_DP_MD_LAMBDA,     md.lambda);
+                    ui_manager_update_value(OPENDASH_DP_MD_MAF,        md.lmm);
+                    ui_manager_update_value(OPENDASH_DP_MD_BAT,        md.bat_volt);
+                    ui_manager_update_value(OPENDASH_DP_MD_OIL_PRESS,  md.vdo_pres1);
+                    ui_manager_update_value(OPENDASH_DP_MD_OIL_TEMP,   md.vdo_temp1);
+                    /* Individual EGT channels (MD-measured, shared ids by
+                     * design — EGT has no OBD-domain counterpart) */
                     ui_manager_update_value(OPENDASH_DP_EGT1, md.egt[0]);
                     ui_manager_update_value(OPENDASH_DP_EGT2, md.egt[1]);
                     ui_manager_update_value(OPENDASH_DP_EGT3, md.egt[2]);
@@ -598,21 +698,6 @@ void app_main(void)
                     ui_manager_update_value(OPENDASH_DP_EGT6, md.egt[5]);
                     ui_manager_update_value(OPENDASH_DP_EGT7, md.egt[6]);
                     ui_manager_update_value(OPENDASH_DP_EGT8, md.egt[7]);
-                    /* EGT: max across all 8 channels */
-                    float egt = md.egt[0];
-                    for (int i = 1; i < 8; i++) {
-                        if (md.egt[i] > egt) egt = md.egt[i];
-                    }
-                    ui_manager_update_value(OPENDASH_DP_EGT, egt);
-                    /* O2 / Lambda */
-                    ui_manager_update_value(OPENDASH_DP_O2_LAMBDA, md.lambda);
-                    /* Mass Air / LMM */
-                    ui_manager_update_value(OPENDASH_DP_MAF_RATE, md.lmm);
-                    /* VDO sensors mapped to oil pressure/temp */
-                    ui_manager_update_value(OPENDASH_DP_OIL_PRESSURE, md.vdo_pres1);
-                    ui_manager_update_value(OPENDASH_DP_OIL_TEMP,     md.vdo_temp1);
-                    /* Multidisplay RPM (separate data point for dual-source tracking) */
-                    ui_manager_update_value(OPENDASH_DP_MD_RPM, md.rpm);
                     display_lvgl_unlock();
                 }
 
@@ -620,6 +705,7 @@ void app_main(void)
                  * display on the MD screen and log to SD card.     */
 #if ENABLE_ESPNOW
                 forward_md_data_to_center(&md);
+                forward_obd2_to_center(&md);   /* OBD-domain batch (only if present) */
 #endif
             }
         }

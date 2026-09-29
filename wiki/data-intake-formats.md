@@ -5,19 +5,20 @@ This document describes the data intake formats and callouts for interfacing wit
 
 ## Overview
 
-OpenDash supports multiple data sources through a unified data point system. Data points are identified by 16-bit IDs and can be provided via UART from Multidisplay, ESP-NOW from other nodes, or I2C from sensors.
+OpenDash supports multiple data sources through a unified data point system. Data points are identified by 16-bit IDs and can be provided via UART from the MultiDisplay ECU (ingested by the LEFT pod, the sole MD UART node) or via ESP-NOW from other nodes (GPS, BMS, MOS/relay controllers). There is no sensor I2C bus between nodes — the "I2C protocol" framing is only the wire format riding on ESP-NOW.
 
 ## Data Point System
 
 ### Data Point ID Structure
 
 All data points are identified by 16-bit IDs in the format:
-- **0x0100-0x01FF**: Engine/OBD2 data
+- **0x0100-0x01FF**: Engine/OBD2 data (vehicle-ECU domain — shared engine ids)
 - **0x0200-0x02FF**: GPS/Navigation data  
 - **0x0300-0x03FF**: IMU/Motion data
 - **0x0400-0x04FF**: Battery/BMS data
 - **0x0500-0x05FF**: System data
 - **0x0600-0x06FF**: VESC data
+- **0x0800-0x08FF**: MultiDisplay-native channels (MD domain — see MD table below)
 
 ### Data Point Format
 
@@ -47,7 +48,31 @@ Each data point consists of:
 #### Data Point IDs (UART)
 - **0x0100-0x011B**: Engine data points (RPM, speed, temp, pressure, etc.)
 - **0x0112-0x011B**: EGT channels (8 channels)
+- **0x0117**: `MD_RPM` — MD-measured RPM (MD domain; pods' RPM gauges bind this)
 - **0x011C-0x01FF**: Reserved for future engine data
+
+### Multidisplay-Native Channels (MD domain — 0x0800 block)
+
+MD-measured values travel under dedicated ids so they can never cross-feed
+ECU-bound widgets. LEFT's UART parser emits them; CENTER fans them out to
+both pods.
+
+| ID | Name | Unit | Source |
+|----|------|------|--------|
+| 0x0800 | MD Lambda | ratio | MD wideband channel |
+| 0x0801 | MD MAF | g/s | MD mass-air channel |
+| 0x0802 | MD Boost | kPa | MD MAP channel |
+| 0x0803 | MD Battery | V | MD-measured pack voltage |
+| 0x0804 | MD Oil Temp | °C | VDO temp sender 1 |
+| 0x0805 | MD Oil Press | kPa | VDO pressure sender 1 |
+| 0x0806/0x0807 | MD VDO P2/P3 | raw | spare pressure senders |
+| 0x0808/0x0809 | MD VDO T2/T3 | raw | spare temp senders |
+| 0x080A | MD Speed | km/h | MD wheel/VSS channel |
+| 0x080B | MD Case Temp | °C | power-case temp |
+| 0x080C | MD EFR Speed | rpm | turbo shaft |
+| 0x080D | MD Knock | dB | knock sensor |
+| 0x080E | MD Throttle | % | MD throttle channel |
+| 0x080F | MD Gear | — | gear position (0=N) |
 
 ### 2. ESP-NOW (Inter-Node Communication)
 

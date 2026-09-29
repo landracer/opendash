@@ -96,6 +96,25 @@ static TimerHandle_t s_timeout_timer = NULL;
 
 static espnow_master_rx_cb_t s_aux_rx_cb = NULL;
 
+/* ── Central dp-delivery funnel ─────────────────────────────────────
+ * Center is a LOGGER first: every datapoint received from any slave is
+ * written to the SD logger at line rate regardless of which screen is
+ * currently displayed; only THEN does it render into whichever widget
+ * (if any) binds that dp id. Data-domain separation is enforced by the
+ * ids themselves: MD-native channels arrive as MD_* ids (0x0800+/0x0117)
+ * and can never populate OBD-bound widgets; OBD2-derived values arrive
+ * under the shared engine ids (0x0100 range) only from the OBD reader.
+ * Defined before the channel tasks; the lock primitives live in
+ * display_init.c (single-owner lock discipline). */
+static void master_dp_deliver(uint16_t dp_id, float value)
+{
+    sd_logger_log_datapoint(dp_id, value);
+    if (display_lvgl_lock(5)) {
+        ui_manager_update_value(dp_id, value);
+        display_lvgl_unlock();
+    }
+}
+
 /* Last parachute STATUS echo per node (written by dispatcher, read by UI). */
 static opendash_parachute_status_t s_para_status[OPENDASH_NODE_COUNT];
 static bool                        s_para_status_valid[OPENDASH_NODE_COUNT];
@@ -491,12 +510,9 @@ static void channel_critical_task(void *pvParameters)
                 float value;
                 memcpy(&value, &msg.payload[2], sizeof(float));
 
-                /* ALWAYS push to UI — this is real-time safety-critical data.
+                /* Log to SD + render — real-time safety-critical data.
                  * Never filter/deduplicate on the display path. */
-                if (display_lvgl_lock(5)) {
-                    ui_manager_update_value(dp_id, value);
-                    display_lvgl_unlock();
-                }
+                master_dp_deliver(dp_id, value);
 
                 /* Forward ONLY data that gauge pods actually need.
                  * LEFT has its own MD UART — it only needs GPS data from center.
@@ -554,14 +570,11 @@ static void channel_medium_task(void *pvParameters)
                 float value;
                 memcpy(&value, &msg.payload[2], sizeof(float));
 
-                /* ALWAYS push to UI immediately — real-time, no filtering */
-                if (display_lvgl_lock(5)) {
-                    ui_manager_update_value(dp_id, value);
-                    display_lvgl_unlock();
-                }
+                /* Log + render immediately — real-time, no filtering */
+                master_dp_deliver(dp_id, value);
                 ch1_dp_processed++;
 
-                /* Forward single datapoint to RIGHT (fail-fast if offline) */
+                /* Forward single datapoint to both pods (fail-fast if offline) */
                 uint8_t fwd_payload[6];
                 fwd_payload[0] = (dp_id >> 8) & 0xFF;
                 fwd_payload[1] = dp_id & 0xFF;
@@ -572,6 +585,7 @@ static void channel_medium_task(void *pvParameters)
                 uint8_t tx_buf[OPENDASH_ESPNOW_MAX_DATA];
                 uint16_t tx_len = 0;
                 if (opendash_i2c_serialize(&fwd, tx_buf, &tx_len) == OPENDASH_OK) {
+                    channel_mgr_send_to_node(OPENDASH_NODE_LEFT, tx_buf, tx_len);
                     channel_mgr_send_to_node(OPENDASH_NODE_RIGHT, tx_buf, tx_len);
                 }
             }
@@ -584,27 +598,34 @@ static void channel_medium_task(void *pvParameters)
                     continue;
                 }
 
-                /* Fan out every entry to local UI */
-                if (display_lvgl_lock(5)) {
+                /* Fan out every entry: master_dp_deliver takes the LVGL lock
+                 * itself per datapoint — do NOT wrap this loop in another
+                 * display_lvgl_lock(): lvgl_mux is a non-recursive binary
+                 * semaphore, so a nested take always times out and silently
+                 * dropped every batched value (regression found 2026-09-28). */
+                {
                     const uint8_t *e = &msg.payload[1];
                     for (uint8_t i = 0; i < count; i++) {
                         uint16_t dp_id = ((uint16_t)e[0] << 8) | e[1];
                         float value;
                         memcpy(&value, &e[2], sizeof(float));
-                        ui_manager_update_value(dp_id, value);
+                        master_dp_deliver(dp_id, value);
                         e += 6;
                     }
-                    display_lvgl_unlock();
                 }
                 ch1_dp_processed += count;
 
-                /* Re-batch and forward to RIGHT in ONE packet (fail-fast if offline) */
+                /* Re-batch and forward to BOTH pods in ONE packet each.
+                 * LEFT needs the relay too: its fixed page set binds
+                 * ECU-domain ids (e.g. COOLANT on the WATER page) which
+                 * only ever arrive through this relay. */
                 opendash_i2c_msg_t fwd;
                 opendash_i2c_build_msg(&fwd, OPENDASH_CMD_SET_DATA_BATCH,
                                         msg.payload, msg.length);
                 uint8_t tx_buf[OPENDASH_ESPNOW_MAX_DATA];
                 uint16_t tx_len = 0;
                 if (opendash_i2c_serialize(&fwd, tx_buf, &tx_len) == OPENDASH_OK) {
+                    channel_mgr_send_to_node(OPENDASH_NODE_LEFT, tx_buf, tx_len);
                     channel_mgr_send_to_node(OPENDASH_NODE_RIGHT, tx_buf, tx_len);
                 }
             }
@@ -659,10 +680,7 @@ static void channel_low_task(void *pvParameters)
                 float value;
                 memcpy(&value, &msg.payload[2], sizeof(float));
 
-                if (display_lvgl_lock(10)) {
-                    ui_manager_update_value(dp_id, value);
-                    display_lvgl_unlock();
-                }
+                master_dp_deliver(dp_id, value);
             }
 
             /* Handle relay state feedback (relay confirms ON/OFF) */

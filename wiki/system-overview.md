@@ -58,8 +58,8 @@ code is limited to the display driver, input handler, and identity constants.
        │ MD ECU   │                               ↓
        └──────────┘                          ┌─────────┐
                                              │  LEFT   │ ◄──┐  ← MD ingest + batch
-       ESP-NOW (all links, WiFi PHY P2P)     └─────────┘    │
-       ┌──────────┐                                          │
+       ESP-NOW (all links, WiFi PHY P2P)     └─────────┘    │  + CENTER's
+       ┌──────────┐                                          │  SET_DATA_BATCH
        │ CENTER   │ ◄────────────────────────────────────────┘  ┌─────────┐
        │ master   │ ─────────────────────────────────────────►  │  RIGHT  │
        └──────────┘                               │             └─────────┘
@@ -87,12 +87,20 @@ code is limited to the display driver, input handler, and identity constants.
   frames at boot). Node IDs: LEFT=0x10, RIGHT=0x11, GPS=0x12, BMS=0x20,
   POD1=0x30, POD2=0x31, MOS_4CH_A=0x40, MOS_4CH_B=0x41,
   RELAY_8CH_A=0x50, RELAY_8CH_B=0x51, RELAY_4CH_HD=0x52.
-- **Data batching**: LEFT batches MD sensor frames into a single `DATA_BATCH`
-  (0x88) packet at ~5 pps instead of one packet per data point.
+- **Data batching**: LEFT batches each MD UART frame into **two** `DATA_BATCH`
+  (0x88) packets — one for MD-native channels (MD-domain ids: `MD_RPM`,
+  `MD_BOOST`, `MD_LAMBDA`, `MD_OIL_PRESS`, EGT1–8…) and one for the ECU's
+  OBD2 PID values (shared engine ids, 0x0100 range) — at ~5 pps instead of
+  one packet per data point.
+- **Domain separation**: a value's source domain determines its id, and widget
+  bindings are id-based — so MD data can never populate an ECU-bound widget
+  and vice versa. CENTER re-relays every batch as `SET_DATA_BATCH` (0x0C) to
+  **both** pods.
 - **MultiDisplay (MD) feed**: only LEFT has the UART link to the MD's HC-05
   Bluetooth-serial bridge. LEFT parses the 95-byte binary frames and
   re-broadcasts all fields over ESP-NOW so RIGHT, GPS, POD1/2, and CENTER
-  all receive them without ever touching the MD directly.
+  all receive them without ever touching the MD directly. RIGHT is a pure
+  consumer — it renders whatever CENTER relays.
 - **GPS broadcasts** position, velocity, heading, IMU accel/gyro, and
   satellite count on its own ESP-NOW cycle.
 - **BMS broadcasts** cell voltages, pack current, SOC, and temperatures.
@@ -167,19 +175,16 @@ Exit `idf.py monitor` with `Ctrl-]`. The CENTER keeps running.
 
 ## 5. Reading the pod displays
 
-### LEFT, RIGHT, POD1, and POD2 (round 480×466)
+### LEFT, RIGHT, POD1, and POD2 (round 480×480)
 
-Each pod runs a multi-page gauge UI. Pages are configured at build time
-in `common/src/opendash_display_config.c` and currently include:
+Each pod runs a multi-page gauge UI. Pages are configured at build time in
+the pod's own `main/ui_manager.c` (`s_gauge_pages[]` table — edit, rebuild,
+flash) and currently include:
 
-1. RPM + Boost
-2. Coolant Temp + Oil Temp
-3. AFR + Lambda
-4. EGT + Intake Air Temp
-5. Battery V + Alternator
-6. (Reserved)
-7. ODO (trip + total)
-8. Diagnostic (rates, RSSI, errors)
+1. OIL PRESS (arc) + BOOST — MD-domain senders (`MD_OIL_PRESS`, `MD_BOOST`)
+2. WATER (`COOLANT_TEMP`, ECU-domain) + GPS SPEED
+3. RPM (arc, `MD_RPM`, shift-light enabled) + LAM (`MD_LAMBDA`)
+4. ODO (trip + total)
 
 Each gauge has:
 - **Primary arc** with min/max ticks and a colored fill that tracks value

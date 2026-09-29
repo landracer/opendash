@@ -62,6 +62,13 @@
 - [x] Verified in restored `channel_medium_task`: the `DATA_BATCH` branch now
       does `ch1_dp_processed += count;` (espnow_master.c), so the `CH1 flow:
       dp/s=` log counts batch DPs too. Item predates the restore; closed.
+- [x] **True root cause of "no MD data on center" (2026-09-27):** the batching
+      refactor in `left/main/main.c` forwarded MD frames with
+      `OPENDASH_CMD_SET_DATA_BATCH` (0x0C, master→slave opcode). Center's
+      handlers only act on `DATA_RESPONSE` (0x81) / `DATA_BATCH` (0x88) and
+      silently dropped every 0x0C batch — packets counted as `rx`, UI never
+      updated. Fixed: LEFT now sends `OPENDASH_CMD_DATA_BATCH` (0x88);
+      verified live, center `dp/s` 30 → 90–105 during bench MD stream.
 
 ### 1.3 Perf Telemetry (Measure Phase)
 
@@ -72,8 +79,9 @@
 - [x] `CONFIG_FREERTOS_USE_TRACE_FACILITY` + `GENERATE_RUN_TIME_STATS` on (center)
 - [x] All 12 projects rebuild green (perf module compiles on nodes without
       the Kconfig knobs via compile-time stub path)
-- [ ] Field-run: capture `perf` output during visible tearing → evidence for
-      TEARING.md hypotheses (H3/H4/H7 vs. simple CPU saturation)
+- [x] Field-run: captured during visible tearing — core0 idle min 90.3% /
+      core1 min 46.2% across 268 samples ⇒ **not CPU-bound**; see TEARING.md §5.
+      Residual flicker root-caused to non-boundary-gated FB swap (Fix C applied).
 - [ ] Roll the same two Kconfig knobs into the other nodes' sdkconfig.defaults
       when their telemetry is needed
 
@@ -95,12 +103,15 @@
 - [ ] **POD2:** mirror POD1 fixes
 - [ ] Re-measure POD1/POD2 OTA throughput after recipe applied (LEFT/RIGHT hit ~9.1 KB/s post-fix)
 
-### 1.3 Center RGB Display Tearing — ACTIVE INVESTIGATION
+### 1.3 Center RGB Display Tearing — CLOSED (residual shimmer is physical)
 
 > Canonical log: [TEARING.md](TEARING.md). Long-run capture script at
 > [scripts/tearing_capture.sh](scripts/tearing_capture.sh).
-> Acceptance: 10+ min continuous use with page switches, MIL flashes, BMS/OBD2
-> bursts, BLE-OTA banner, zero tear events.
+> **Final verdict (2026-09-28):** flicker stack = bursty relay + raw signal jitter
+> + unconditional label repaints — ALL patched (DATA_BATCH relay, EMA damping,
+> `set_label_text_if_changed()` guard). Residual random micro-line pop is the
+> ~40 Hz RGB-from-PSRAM refresh ceiling; user verdict: "very very small, almost
+> not noticeable" → accepted, no software fix possible.
 
 - [x] Vsync ISR → semaphore gate in `lvgl_flush_cb` ([center/main/display_init.c](center/main/display_init.c))
 - [x] Fix A: drain stale vsync token before scheduling DMA swap
@@ -111,7 +122,7 @@
 - [x] `pclk_active_neg = true`
 - [x] `LV_DISPLAY_RENDER_MODE_DIRECT` + `num_fbs = 2`
 - [ ] **Baseline capture** with current code (`scripts/tearing_capture.sh`, 10 min)
-- [ ] **H7:** toggle `CONFIG_LCD_RGB_RESTART_IN_VSYNC` off (single sdkconfig flip)
+- [x] **H7:** toggle `CONFIG_LCD_RGB_RESTART_IN_VSYNC` off (single sdkconfig flip) — done 2026-09-27, flashed; observation pending
 - [ ] **H6/H2:** drop pclk to 14 MHz (PSRAM bandwidth headroom)
 - [ ] **H5/H8:** pin `lvgl_task` to core 0 priority `MAX-2`, force touch + button to core 1
 - [ ] **H4:** replace per-rect Fix B mirror with full-frame copy on swap
@@ -185,6 +196,12 @@
 - [x] BLE OTA full recipe (sdkconfig + suspend + RGB teardown)
 - [x] PCF85063 RTC sync
 - [x] **No MD UART by design** — LEFT is sole MD ingest; `opendash_uart.c` compiled in via `common` REQUIRES but never initialized on RIGHT (no port configured). RIGHT receives MD data via ESP-NOW relay from CENTER.
+- [x] **2026-09-29 bring-up (domain-split compliance):** added the missing
+      `SET_DATA_BATCH (0x0C)` dispatch handler — before this RIGHT silently ignored
+      every relayed batch (it only handled single `SET_DATA_POINT`), and both pods'
+      page tables now bind MD-domain ids (`MD_OIL_PRESS`, `MD_BOOST`, `MD_RPM`,
+      `MD_LAMBDA`) with LEFT's and RIGHT's `s_gauge_pages[]` tables identical.
+      LEFT now also receives CENTER's batch relay (so its ECU-domain WATER page works).
 - [ ] Pages configurable via NVS
 - [ ] Listen for `SET_SCREEN_LAYOUT` (0x02)
 
@@ -307,6 +324,11 @@
 
 - [x] `gauge_page_t` struct with configurable primary/secondary data points
 - [x] `GAUGE_PAGE_MAX = 8`, currently 3 gauge + 1 odo on LEFT/RIGHT
+- [x] LEFT and RIGHT `s_gauge_pages[]` tables are identical by design (RIGHT is a
+      pure consumer — same UI, data arrives only via CENTER's relay)
+- [x] Teardown (2026-09-29): temporary tearing-debug telemetry removed everywhere —
+      `UI-DBG` 500 ms probe in center `ui_manager.c`, `display_init_dbg_flush()` and
+      the `s_dbg_flush_*` counters in center `display_init.c/h`
 - [x] Single LVGL widget set shared across pages (no create/destroy churn)
 - [x] Labels, units, arc range swapped on page switch
 - [x] Page cycling via boot button (short press)
@@ -408,6 +430,28 @@
 - [x] 5-second UART diagnostic heartbeat
 - [x] Toggleable per-frame debug logging (`OPENDASH_UART_DEBUG`, default 0)
 - [x] LEFT batches MD frames into single ESP-NOW packets at ~5 pps
+- [x] **MD-domain separation (2026-09-28):** LEFT now forwards MD-native channels
+      exclusively under MD-domain ids (`MD_RPM` 0x0117, new 0x0800 block:
+      `MD_LAMBDA/MD_MAF/MD_BOOST/MD_BAT/MD_OIL_T/MD_OIL_P/...`) so sim data can
+      NEVER populate OBD-bound widgets. The frame's OBD-II summary (bytes 58–92)
+      travels in a SECOND batch under the shared engine ids (0x0100 range) — see §4.4.
+      Center delivers every received dp via the
+      single `master_dp_deliver()` funnel: SD logger first (always), then
+      id-matched UI render. Center's `load_layouts_from_nvs()` one-time-migrates
+      NVS layouts saved before the split (O2_LAMBDA→MD_LAMBDA, MAF_RATE→MD_MAF,
+      arc RPM→MD_RPM on the MD screen) and persists the migrated layout.
+- [x] **Domain-split regression #1 (2026-09-28, RESOLVED):** OBD2 batch was gated
+      on `md->obd2_present` (flags byte ≠ 0). The bench proto's flags byte is 0,
+      so the entire ECU channel set was silently suppressed and both screens went
+      dead. Gate removed — the flag is a UI/config capability concern, not a
+      wire-gate; the parser stays honest to what the AVR actually sends.
+- [x] **Domain-split regression #2 (2026-09-28, RESOLVED):** the medium-channel
+      batch fan-out still had its original `if (display_lvgl_lock(5)) { loop }`
+      wrapper while `master_dp_deliver()` inside the loop takes the same
+      non-recursive `lvgl_mux` again → nested take always timed out and dropped
+      every batched dp (GPS single-value path was unaffected, which is why only
+      GPS data showed). Outer lock removed; `master_dp_deliver()` is the single
+      lock owner on that path. Verified live: UI update rate back to ~250 dp/s.
 - [x] Comprehensive docs: [UART_CONNECTION.md](UART_CONNECTION.md), [SERIAL_PROTOCOL.md](../multidisplay-firmware/multidisplay/SERIAL_PROTOCOL.md)
 - [ ] Frame timing validation (§1.5)
 - [ ] HC-05 AT-command auto-connect (currently relies on pre-paired modules)
@@ -417,13 +461,18 @@
 - [x] `opendash_obd_config.c/h` — threshold + enable/MIL config with NVS
 - [x] Warning thresholds: coolant, oil temp, oil pressure, battery V, boost PSI
       (AFR disabled by default)
+- [x] **OBD2 domain live via MultiDisplay frame (2026-09-28):** `opendash_md_data_t`
+      carries `obd2_rpm/obd2_speed/obd2_coolant_temp/obd2_engine_load/obd2_intake_map/
+      obd2_throttle/obd2_intake_temp/obd2_maf/obd2_timing/obd2_stft/obd2_ltft/
+      obd2_fuel_press/obd2_baro/obd2_oil_temp/...` + flags/DTC/MIL/VIN. LEFT
+      forwards them under plain engine ids in a separate batch (unconditional —
+      see §4.3 regression #1). MD data and OBD data are separate namespaces
+      end-to-end: widgets only light for the domain they are bound to.
 - [ ] CAN transceiver integration on center
 - [ ] OBD2 PID dispatch (RPM, MAP, AFR, coolant, etc.) over CAN
 - [ ] DTC reading + clearing via `OBD_COMMAND` (0x0A) and `DTC_REPORT` (0x86)
 - [ ] Custom CAN for aftermarket ECUs (Haltech, MegaSquirt, etc.)
 - [ ] Configurable baud rate and filter masks
-- [ ] **OBDII/ELM327 via MultiDisplay** — when MD firmware adds ELM327, extend
-      `parse_binary_frame()` for new fields
 
 ### 4.5 VESC Integration
 

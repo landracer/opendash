@@ -37,6 +37,28 @@ const opendash_dp_info_t opendash_dp_catalog[] = {
     {0x011C, "OBD2 Flags", "", 0, 3, OPENDASH_DP_CAT_ENGINE, 0},
     {0x011D, "MIL On", "", 0, 1, OPENDASH_DP_CAT_ENGINE, 0},
     {0x011E, "DTC Count", "", 0, 1000, OPENDASH_DP_CAT_ENGINE, 0},
+    {0x011F, "STFT B1", "%", -100, 100, OPENDASH_DP_CAT_OBD, 1},
+    {0x0120, "LTFT B1", "%", -100, 100, OPENDASH_DP_CAT_OBD, 1},
+    {0x0121, "Baro", "kPa", 0, 120, OPENDASH_DP_CAT_OBD, 1},
+
+    // Multidisplay-native channels: 0x0800 – 0x08FF (MD hardware sensors;
+    // never populated from OBD data, and never feed OBD-bound widgets)
+    {0x0800, "MD Lambda", "λ", 0, 2, OPENDASH_DP_CAT_MD, 2},
+    {0x0801, "MD MAF", "g/s", 0, 500, OPENDASH_DP_CAT_MD, 1},
+    {0x0802, "MD Boost", "kPa", -100, 200, OPENDASH_DP_CAT_MD, 1},
+    {0x0803, "MD Batt", "V", 0, 20, OPENDASH_DP_CAT_MD, 2},
+    {0x0804, "MD Oil T", "°C", -40, 200, OPENDASH_DP_CAT_MD, 0},
+    {0x0805, "MD Oil P", "kPa", 0, 100, OPENDASH_DP_CAT_MD, 0},
+    {0x0806, "MD VDO P2", "", 0, 5, OPENDASH_DP_CAT_MD, 2},
+    {0x0807, "MD VDO P3", "", 0, 5, OPENDASH_DP_CAT_MD, 2},
+    {0x0808, "MD VDO T2", "", 0, 5, OPENDASH_DP_CAT_MD, 2},
+    {0x0809, "MD VDO T3", "", 0, 5, OPENDASH_DP_CAT_MD, 2},
+    {0x080A, "MD Speed", "km/h", 0, 300, OPENDASH_DP_CAT_MD, 0},
+    {0x080B, "MD Case T", "°C", -40, 200, OPENDASH_DP_CAT_MD, 0},
+    {0x080C, "MD EFR", "rpm", 0, 300000, OPENDASH_DP_CAT_MD, 0},
+    {0x080D, "MD Knock", "dB", -100, 0, OPENDASH_DP_CAT_MD, 0},
+    {0x080E, "MD Thrtl", "%", 0, 100, OPENDASH_DP_CAT_MD, 0},
+    {0x080F, "MD Gear", "", 0, 8, OPENDASH_DP_CAT_MD, 0},
     
     // GPS / Navigation data points: 0x0200 – 0x02FF
     {0x0200, "GPS Speed", "km/h", 0, 200, OPENDASH_DP_CAT_GPS, 0},

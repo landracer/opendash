@@ -14,6 +14,7 @@ idf_component_register(
         "boost_client.c"
         "boost_config_ui.c"
         "lv_mem_psram.c"
+        "sd_logger.c"
     # opendash_obd_config.c is already provided by the common component
     INCLUDE_DIRS
         "."

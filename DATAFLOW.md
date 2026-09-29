@@ -35,23 +35,21 @@ This document describes how a single sensor reading travels from the engine harn
                   │  espnow_dispatcher_task  │  Node 0x01
                   │   → channel queues       │
                   │  channel_medium_task     │
-                  │   → ui_manager_update    │
-                  │   → re-batch to RIGHT    │
+                  │   → master_dp_deliver()  │
+                  │     (per-dp: SD log +    │
+                  │      LVGL lock + UI)     │
                   └─────┬──────────────┬─────┘
                         │              │ ESP-NOW · CH1
                         │              │ OPENDASH_CMD_SET_DATA_BATCH (0x0C)
-                        │              ▼
-                        │   ┌──────────────────────┐
-                        │   │   RIGHT  (slave)     │
-                        │   │   ui_manager_update  │  Node 0x11
-                        │   └──────────────────────┘
-                        │
-                        ▼
-              ┌───────────────────┐
-              │  LVGL render task │  (display_lvgl_lock + lv_timer_handler)
-              │  lvgl_flush_cb    │  → ESP-LCD RGB → ST7262 800×480 panel
-              └───────────────────┘
+                        ▼              ▼
+                  ┌──────────┐   ┌──────────────────────┐
+                  │  LEFT    │   │   RIGHT  (slave)     │  Node 0x11
+                  │  fan-out │   │   fan-out → per-dp   │  (no UART of its own —
+                  │ → UI     │   │   ui_manager_update  │   everything is
+                  └──────────┘   └──────────────────────┘   relayed)
 ```
+
+Note both arrows out of CENTER: **every** telemetry frame CENTER consumes it re-batches and relays `SET_DATA_BATCH` to **both** pods. LEFT is not "special" on the receive side anymore — its fixed page set binds ECU-domain ids (e.g. `COOLANT_TEMP` on the WATER page) that only ever reach it through that relay.
 
 Other slaves (GPS 0x12, BMS 0x20, RELAY/MOS pods) feed CENTER on the same channel architecture but with their own producers.
 
@@ -120,13 +118,36 @@ Sizes (hard-tuned after the batching rewrite):
 
 ## 4. Producer side — LEFT pod (`left/main/main.c`)
 
+### Domain separation (id scheme)
+
+Two data domains travel side by side and NEVER share an id:
+
+| Domain | Ids | Fed by |
+|--------|-----|--------|
+| MD-native sensors | `MD_*` block: `MD_RPM` 0x0117, `MD_LAMBDA` 0x0800, `MD_MAF` 0x0801, `MD_BOOST` 0x0802, `MD_BAT` 0x0803, `MD_OIL_TEMP` 0x0804, `MD_OIL_PRESS` 0x0805; EGT1–8 keep their 0x01xx ids (no ECU counterpart exists) | LEFT's UART parser from the MD binary frame |
+| Vehicle ECU / OBD-II | shared engine ids (0x0100 range: `RPM`, `COOLANT_TEMP`, `INTAKE_TEMP`, `ENGINE_LOAD`, `THROTTLE_POS`, `BOOST_PRESSURE`, `OIL_TEMP`, `FUEL_PRESS`, `MAF_RATE`, `AFR`…) | the MD frame's OBD2 payload bytes (ELM327-decoded PIDs) |
+
+A value's domain determines its id, and the id determines which screens may
+render it. MD-measured RPM is `MD_RPM`, full stop — it can never leak into an
+ECU-bound widget because it travels under a different id. Center's
+`load_layouts_from_nvs()` performs a one-time auto-migration that remaps
+pre-split NVS layouts (old shared-id bindings → MD-domain ids) and
+re-persists, so user layouts survive the split without a factory reset.
+
 ### UART parsing
 
 * `uart_parser_task` reads MultiDisplay frames at 115200 8N1.
-* For each frame it dispatches each PID into `forward_md_data_to_center()` via a `BATCH_ADD(dp_id, value)` macro.
-* When the frame is complete, the macro flushes the accumulated batch as a **single** `OPENDASH_CMD_DATA_BATCH`.
+* For each frame LEFT emits **two batches**: `forward_md_data_to_center()`
+  (MD-domain ids: `MD_RPM`, `MD_BOOST`, `MD_LAMBDA`, `MD_MAF`, `MD_BAT`,
+  `MD_OIL_PRESS`, `MD_OIL_TEMP`, EGT1–8) and `forward_obd2_to_center()`
+  (the 15 shared engine ids from the ELM327 payload).
+* Each is flushed as **one** `OPENDASH_CMD_DATA_BATCH` (0x88).
+* `obd2_present` is a **capability flag for the UI/config layer only**. It is
+  NOT a wire-gate: the parser forwards the OBD batch unconditionally — what
+  the AVR sends is what flows. (Gating the wire on this flag was a
+  regression: with no ECU on the bench the whole shared-id space went dark.)
 
-### Sending
+### Sending / receiving
 
 `send_response_to_center(buf, len)`:
 
@@ -135,9 +156,7 @@ Sizes (hard-tuned after the batching rewrite):
 
 The broadcast fallback exists because LEFT may boot before CENTER. Without it, LEFT silently buffers data and the screen looks like the system is dead. A broadcast is "wasteful" (every node hears it), but the early-boot window is short and the cost is invisible at full operational rate.
 
-### Receiving
-
-LEFT also receives `OPENDASH_CMD_SET_DATA_BATCH` from CENTER (used when CENTER fans out fused data — e.g., GPS speed merged with MD RPM). The handler iterates and updates LEFT's local widgets the same way CENTER does.
+Both pods also **receive** `OPENDASH_CMD_SET_DATA_BATCH` (0x0C) from CENTER and fan it out entry-by-entry into their own `ui_manager_update_value()` — that is how ECU-domain pages on a pod ever light up.
 
 ---
 
@@ -156,10 +175,17 @@ Four tasks: `channel_critical_task`, `channel_medium_task`, `channel_low_task`, 
 1. Dequeues from its own queue (no cross-channel head-of-line blocking).
 2. Calls `opendash_i2c_deserialize()` to validate SYNC/LEN/CHECKSUM.
 3. Switches on `cmd`:
-   * `DATA_RESPONSE` → take LVGL lock, push one value to UI, release lock, forward as `SET_DATA_POINT` to RIGHT.
-   * `DATA_BATCH` → take LVGL lock **once**, iterate all `count` entries pushing each to UI, release lock, **re-pack** the same payload as `SET_DATA_BATCH` and forward to RIGHT in one packet.
+   * `DATA_RESPONSE` (single) → `master_dp_deliver(dp_id, value)` → forward the same point as `SET_DATA_POINT` to **both** pods.
+   * `DATA_BATCH` → parse `[count][dp_id:2][float32]×count`, call `master_dp_deliver()` per entry, **re-pack** the same payload as `SET_DATA_BATCH` and forward to **both** pods in one packet each.
 
-The single-lock-per-batch pattern is critical: `display_lvgl_lock(5)` competes with the LVGL render task, so the fewer acquisitions per second, the smoother the rendering.
+**Lock ownership (hard invariant):** `master_dp_deliver()` is the SINGLE owner
+of the LVGL mutex — it takes `display_lvgl_lock(5)` around
+`ui_manager_update_value()` per datapoint. Callers must NOT wrap the fan-out
+loop in another `display_lvgl_lock()`: `lvgl_mux` is a **non-recursive binary
+semaphore**, so a nested take always times out and the inner update silently
+drops (this exact recursive-lock bug was the 2026-09-28 "all batched data
+silently dropped" regression — GPS kept working only because the critical
+path had different code structure).
 
 ### Stage C: telemetry
 
@@ -262,5 +288,5 @@ The MD UART frame rate dominates. Anything faster requires moving sensors direct
 
 1. **GPS / BMS not yet batched.** They still send per-DP `DATA_RESPONSE`. Their rates are low enough that this is fine today, but for symmetry the same batch handler should be added on those producers.
 2. **No back-pressure signal.** If a worker ever falls behind, the queue silently drops oldest. We log `qHW` so this is observable, but there's no producer-side rate limit. Fine while `qHW=0`, worth revisiting if it ever climbs.
-3. **One UI lock for the whole batch.** Holding the LVGL lock through 25 widget updates means renders can stall by ~5 ms. We could split a batch in half if this ever shows up as visible jank, but right now the render loop is comfortably ahead.
+3. **Lock granularity.** Resolved 2026-09-28 in the opposite direction from the old idea: the per-batch outer lock is gone entirely. `master_dp_deliver()` owns the LVGL mutex per datapoint; a recursive outer lock was the silent-drop regression. Do not reintroduce an outer lock "for efficiency" — `lvgl_mux` is non-recursive and will deadlock-timeout instead of nest.
 4. **Device Mgmt screen does not yet drive per-node PID assignment.** It is a status view only. The data path is ready (`SET_SCREEN_LAYOUT = 0x02` is reserved); the UI to author and persist a layout is the missing piece.

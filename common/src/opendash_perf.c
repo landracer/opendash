@@ -70,8 +70,9 @@ static void perf_sample_cb(void *arg)
     uint64_t idle_now[2] = {0, 0};
     bool     idle_found[2] = {false, false};
     for (UBaseType_t i = 0; i < n; i++) {
-        /* Both idle tasks are literally named "IDLE"; xCoreID tells them apart */
-        if (strcmp(tasks[i].pcTaskName, "IDLE") == 0) {
+        /* IDF's SMP kernel names the idle tasks "IDLE0"/"IDLE1"
+         * (configIDLE_TASK_NAME "IDLE" + core-index suffix). */
+        if (strncmp(tasks[i].pcTaskName, "IDLE", 4) == 0) {
             BaseType_t core = tasks[i].xCoreID;
             if (core == 0 || core == 1) {
                 idle_now[core] = (uint64_t)tasks[i].ulRunTimeCounter;
@@ -84,6 +85,10 @@ static void perf_sample_cb(void *arg)
     int64_t window = now - s_last_sample_us;
     s_last_sample_us = now;
     if (window <= 0) return;
+
+    /* U32 µs counter wraps every ~71 min of cumulative idle — skip that one sample */
+    if (!idle_found[0] || !idle_found[1] ||
+        idle_now[0] < s_idle_last[0] || idle_now[1] < s_idle_last[1]) return;
 
     s_snap.core0_idle_pct = idle_found[0]
         ? (float)((uint32_t)(idle_now[0] - s_idle_last[0])) * 100.0f / (float)window
@@ -99,6 +104,15 @@ static void perf_sample_cb(void *arg)
     s_snap.rx_drops      = opendash_espnow_get_rx_drops();
     s_snap.task_count    = (uint32_t)n;
     s_snap.valid         = true;
+
+    /* Auto-print every 5th sample (5 s). The center's USB serial is
+     * effectively read-only from the host, so we cannot rely on typing
+     * 'perf' — the snapshot must stream on its own for field capture. */
+    static uint32_t s_div;
+    if (++s_div >= 5) {
+        s_div = 0;
+        opendash_perf_log();
+    }
 }
 
 #endif /* run-time stats config guard */

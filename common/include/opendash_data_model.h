@@ -62,6 +62,9 @@ extern "C" {
 #define OPENDASH_DP_OBD2_FLAGS       0x011C  /**< OBD2 status flags (bit0=ready, bit1=DTCs, bit2=MIL) */
 #define OPENDASH_DP_MIL_ON           0x011D  /**< MIL lamp on (1.0=on, 0.0=off) */
 #define OPENDASH_DP_DTC_COUNT        0x011E  /**< Number of stored DTCs */
+#define OPENDASH_DP_STFT_B1          0x011F  /**< OBD short-term fuel trim bank 1 (%) */
+#define OPENDASH_DP_LTFT_B1          0x0120  /**< OBD long-term fuel trim bank 1 (%) */
+#define OPENDASH_DP_BARO_PRESSURE    0x0121  /**< OBD barometric pressure (kPa) */
 
 /* ── RPM source preference ────────────────────────────────────────────────
  * Which RPM source to display on center arc when both OBD/demo and
@@ -210,6 +213,29 @@ extern "C" {
 #define OPENDASH_DP_MOS4B_CH2        0x0741  /**< MOS 4B ch2 state */
 #define OPENDASH_DP_MOS4B_CH3        0x0742  /**< MOS 4B ch3 state */
 #define OPENDASH_DP_MOS4B_CH4        0x0743  /**< MOS 4B ch4 state */
+
+/* ─── Multidisplay (MD) native sensor channels: 0x0800 – 0x08FF ────────
+ * Signals measured DIRECTLY by multidisplay logger hardware (EGT therm-
+ * ocouple inputs, wideband, LMM, VDO sender sensors on the MD board).
+ * Kept in their own namespace so MD-native data can never silently
+ * populate OBD-derived widgets — MD data is addressed only by MD_* ids.
+ * NOTE: MD_RPM (0x0117) predates this range but is MD-domain.       */
+#define OPENDASH_DP_MD_LAMBDA        0x0800  /**< MD wideband lambda channel (ratio) */
+#define OPENDASH_DP_MD_MAF           0x0801  /**< MD mass air flow channel (g/s) */
+#define OPENDASH_DP_MD_BOOST       0x0802  /**< MD boost/MAP sensor channel (kPa) */
+#define OPENDASH_DP_MD_BAT         0x0803  /**< MD-measured battery voltage (V) */
+#define OPENDASH_DP_MD_OIL_TEMP    0x0804  /**< MD oil temperature sender (VDO temp 1) */
+#define OPENDASH_DP_MD_OIL_PRESS   0x0805  /**< MD oil pressure sender (VDO pres 1) */
+#define OPENDASH_DP_MD_VDO_P2      0x0806  /**< MD VDO pressure sensor 2 (raw) */
+#define OPENDASH_DP_MD_VDO_P3      0x0807  /**< MD VDO pressure sensor 3 (raw) */
+#define OPENDASH_DP_MD_VDO_T2      0x0808  /**< MD VDO temperature sensor 2 (raw) */
+#define OPENDASH_DP_MD_VDO_T3      0x0809  /**< MD VDO temperature sensor 3 (raw) */
+#define OPENDASH_DP_MD_SPEED       0x080A  /**< MD wheel/VSS speed channel (km/h) */
+#define OPENDASH_DP_MD_CASE_TEMP   0x080B  /**< MD power-case temp channel (°C) */
+#define OPENDASH_DP_MD_EFR_SPEED   0x080C  /**< MD EFR turbo shaft speed (rpm) */
+#define OPENDASH_DP_MD_KNOCK       0x080D  /**< MD knock sensor channel (dB) */
+#define OPENDASH_DP_MD_THROTTLE    0x080E  /**< MD throttle position channel (%) */
+#define OPENDASH_DP_MD_GEAR        0x080F  /**< MD gear position channel (0=N..) */
 
 /* ────────────────────────────────────────────────────────────────────────────
  * Data Point Entry

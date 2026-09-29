@@ -17,7 +17,7 @@ ESP-IDF project for the Left gauge pod in the OpenDash racecar dashboard system.
 | **MCU** | ESP32-S3 dual-core @ 240 MHz |
 | **Flash** | 16 MB (QIO 80 MHz) — custom partition table (2 MB app partitions) |
 | **PSRAM** | 8 MB Octal SPI (required for LVGL frame buffer) |
-| **Role** | I2C Slave — receives data from Center unit |
+| **Role** | ESP-NOW receiver — renders datapoints relayed by the Center unit (wireless; no inter-node wires) |
 
 ## Pin Mapping
 

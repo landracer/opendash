@@ -41,8 +41,9 @@
 | H4 | Fix B (post-vsync mirror memcpy) runs while panel is already scanning the just-swapped FB; if memcpy crosses the active scan line we corrupt the displayed buffer | Medium-High | Mirror writes into `other` (the buffer NOT being scanned) so this *should* be safe. But verify: are FB pointers stable, or does ESP-IDF rotate them? |
 | H5 | LVGL flush is called from `lv_timer_handler` on a task whose stack/priority drops it briefly below the vsync window | Medium | `lvgl_task` priority should be ≥ refresh task. Need to log priorities. |
 | H6 | `pclk_active_neg = true` combined with ST7262 typical timings is marginal at our pclk; tear is a sampling artifact, not a buffer swap artifact | Low | Other ESP32-S3 RGB designs use neg pclk fine. Tear pattern doesn't match (sampling-edge tear would be vertical column noise, not horizontal bottom-bleed). |
-| H7 | `CONFIG_LCD_RGB_RESTART_IN_VSYNC=y` is interacting badly with `num_fbs=2` (the option is designed for single-FB rebound) | Medium | Worth toggling. Documented as "use when you see tearing in single-buffer" — possibly counterproductive here. |
+| H7 | `CONFIG_LCD_RGB_RESTART_IN_VSYNC=y` is interacting badly with `num_fbs=2` (the option is designed for single-FB rebound) | **Testing** | Flipped OFF 2026-09-27, awaiting user observation. Was "use when you see tearing in single-buffer" — possibly counterproductive with 2 FBs. |
 | H8 | UI thread does a slow operation (BLE log, SD card write, ESP-NOW queue flush) on the same core as the LCD DMA / cache, starving the refresh task | High | `center` runs more concurrent subsystems than any other node. |
+| H9 | **Confirmed root cause of residual flicker:** bounce-mode `draw_bitmap` switches `cur_fb_index` immediately (no frame sync) — our old flush_cb swapped at an arbitrary scanline. Fixed by vsync-gating the swap (Fix C, 2026-09-27). | **Confirmed** | Verified in `esp_lcd_panel_rgb.c::rgb_panel_draw_bitmap`. Explains "values flicker" post-H7: old/new stitched at swap row. |
 
 ---
 
@@ -98,6 +99,28 @@ The script:
 ## 5. Attempts log
 
 > Append-only. Newest at top. When an attempt is superseded, link forward instead of deleting.
+
+### 2026-09-27 — Fix C: vsync-gate the FB swap (draw_bitmap AFTER the vsync wait)
+
+- **Trigger:** H7 flip landed → "tearing much better, but data values now *flicker* on the affected screen."
+- **Root cause found in driver source (`esp_lcd_panel_rgb.c::rgb_panel_draw_bitmap`):** with a bounce buffer, passing an FB pointer switches `cur_fb_index` **immediately**; the bounce refill starts sourcing the new FB at the next refill (~≤20 lines later). There is no frame-synchronized swap. Our old `flush_cb` order was drain → draw_bitmap → wait-vsync, i.e. the swap landed at an **arbitrary scanline** → displayed frame = old FB above that row, new FB below → update regions alternate old/new at swap point = flicker. (left/right avoid this only because their non-drained take happens to land near boundaries.)
+- **Change (`center/main/display_init.c`):** order is now drain → **wait vsync** → `draw_bitmap` (boundary-aligned swap) → Fix B mirror → `flush_ready`. Mirror now strictly operates on the off-scan buffer.
+- **Result:** _pending user observation._
+
+### 2026-09-27 — Phase-1 perf telemetry field capture (CPU hypothesis retired)
+
+- **Hypothesis tested:** "tearing is CPU saturation" (implicit in H2/H8 framing).
+- **Method:** `opendash_perf` streaming snapshots (fixed: idle tasks are named `IDLE0`/`IDLE1` on the SMP kernel — matcher was pinning idle at a false 0.0%); user cycled all screens via gesture swipes (modes 0/1/2/5/6 observed in log).
+- **Result:** core0 idle min 90.3% (median 94.8%), core1 idle min 46.2% (median 93.5%) across 268 samples — **during visible horrible tearing**. Render EMA 0.5–15 ms, single 265 ms max at boot first-paint only. `rx_drops` stayed flat at 5.
+- **Conclusion:** **Not CPU-bound and not RX-queue-bound.** The tear is in the scan-out path (PSRAM/bounce DMA bandwidth, FB swap logic, or the restart-in-vsync policy). H2/H8 (bus contention family) remain the live hypotheses.
+- **Next:** plan step 2 — H7 flip (below).
+
+### 2026-09-27 — H7: `CONFIG_LCD_RGB_RESTART_IN_VSYNC` flipped OFF
+
+- **Hypothesis:** H7 — the restart-in-vsync policy is designed for single-FB rebound and may be counterproductive with `num_fbs = 2`.
+- **Change:** `center/sdkconfig.defaults` + `center/sdkconfig`: option → not set. Rebuilt + reflashed.
+- **Result:** _pending user observation._
+- **Next:** if tear unchanged → plan step 3 (pclk 14 MHz, H6/H2).
 
 ### 2026-05-31 — TODO #14 trial: `bounce_buffer_size_px = 0`
 

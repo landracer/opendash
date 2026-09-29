@@ -118,12 +118,15 @@ This matches the SAE J1979 decoded result after the firmware applies the formula
 7. parse_binary_frame() extracts OBD2 fields from offsets 58-92
    └─ Stores in s_latest_data (opendash_md_data_t struct)
    └─ Sets obd2_present = true if flags byte ≠ 0
+      (capability flag for UI/config only — NOT a wire-gate)
 
 8. left/main/main.c reads s_latest_data every 200ms
-   └─ If obd2_present: maps 13 PID values → OpenDash data point IDs
-   └─ ui_manager_update_value(OPENDASH_DP_xxx, value)
+   └─ ALWAYS maps the 15 PID values → shared engine data point IDs (0x0100
+      range) — whatever the AVR sends is forwarded, unconditionally
+   └─ MD-native channels go out separately under MD-domain IDs
 
-9. ESP-NOW DATA_RESPONSE forwards data points to CENTER and RIGHT pods
+9. ESP-NOW DATA_BATCH (0x88) carries both batches to CENTER; CENTER renders
+   them on its OBD screen and relays SET_DATA_BATCH (0x0C) to LEFT + RIGHT
 ```
 
 ---
@@ -259,10 +262,13 @@ static inline int16_t rd_s16(const uint8_t *p) {
 
 ## 7. Data Point Mapping
 
-When `obd2_present` is `true`, the left pod maps OBD2 values to OpenDash
-data point IDs.  These are the same IDs used by the native MD analog
-sensors where applicable — OBD2 values **augment or replace** the analog
-sensor readings.
+The left pod ALWAYS maps the decoded PID values to OpenDash data point IDs —
+`obd2_present` never gates the wire (it only informs the UI/config layer
+whether an ECU is wired). ECU values map onto the **shared engine ids**
+(0x0100 range). These ids are now the ECU domain's exclusive property: the
+MD-native analog channels have their own MD-domain ids (`MD_RPM` 0x0117,
+`MD_LAMBDA`/`MD_MAF`/`MD_BOOST`/… in the 0x0800 block), so ECU and MD values
+can never cross-feed each other's widgets.
 
 | OBD2 Field          | OpenDash Data Point        | ID     | Unit    |
 |---------------------|----------------------------|--------|---------|
@@ -335,9 +341,11 @@ s_latest_data.obd2_present = (obd2_flags != 0);
 
 - **Non-OBD2 MD builds:** Bytes 58–92 are either all zeros (VR6) or Digifant
   K-line data. The flags byte at offset 58 will be 0x00, so `obd2_present`
-  stays `false` and no OBD2 data points are pushed.
+  stays `false`. The shared-id values still forward (they carry whatever the
+  frame contains — typically zeros); the flag only tells the UI/config layer
+  that no ECU is connected.
 - **OBD2 MD builds:** Flags byte has bit 0 set (ELM ready), so
-  `obd2_present = true` and all 13 PID values are mapped.
+  `obd2_present = true` and the center's OBD dashboard is meaningful.
 
 This means OpenDash is **backward compatible** — it works with both OBD2 and
 non-OBD2 MultiDisplay firmware without any configuration changes.
@@ -349,13 +357,13 @@ non-OBD2 MultiDisplay firmware without any configuration changes.
 OBD2 data follows the same path as all other MD sensor data:
 
 1. **Left pod** receives binary frame via UART and extracts OBD2 fields
-2. Left pod calls `ui_manager_update_value()` for each mapped data point
-3. `forward_md_data_to_center()` packages data points into ESP-NOW
-   `DATA_RESPONSE` messages and broadcasts to Center
-4. Center's `espnow_master.c` dispatches incoming data points to
-   `ui_manager_update_value()` — which automatically updates any gauge
-   bound to that data point ID
-5. Center forwards selected data points to Right pod via ESP-NOW
+2. Left pod updates its own widgets (`ui_manager_update_value`) and packages
+   the 15 ECU-domain values into a batch via `forward_obd2_to_center()`
+3. The batch ships as **one** ESP-NOW `DATA_BATCH` (0x88) frame — MD-native
+   channels go in a separate batch under `MD_*` ids
+4. Center's `espnow_master.c` fans each entry through `master_dp_deliver()`
+   → `ui_manager_update_value()` — which updates any gauge bound to that id
+5. Center re-batches and relays `SET_DATA_BATCH` (0x0C) to LEFT and RIGHT
 
 > **No OBD2-specific forwarding code is needed.** The data follows the
 > standard data point pipeline. Any new OBD2 data points added will
@@ -367,9 +375,11 @@ OBD2 data follows the same path as all other MD sensor data:
 
 ### Gauge Page Configuration
 
-OBD2 data points use the same IDs as their analog sensor equivalents.
-Any gauge page configured to show `OPENDASH_DP_RPM`, `OPENDASH_DP_COOLANT_TEMP`,
-etc. will automatically display OBD2 values when `obd2_present` is true.
+OBD2 values arrive under the shared engine ids. On CENTER they render on the
+dedicated OBD dashboard screen; on the pods only pages whose fixed binding
+references the shared id update (e.g. the WATER page binds `COOLANT_TEMP` —
+it lights up only from ECU data, never from an MD channel). MD-sourced pages
+bind `MD_*` ids and are immune to ECU traffic.
 
 ### Recommended OBD2-Focused Gauge Pages
 

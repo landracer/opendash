@@ -180,16 +180,16 @@ static const char *TAG = "ui_manager";
  * ====================================================================== */
 
 static const gauge_page_t s_gauge_pages[] = {
-    /* Page 0 — Oil Pressure + Boost */
+    /* Page 0 — Oil Pressure + Boost (MD-native senders, MD-domain ids) */
     {
         .primary_label      = "OIL PRESS",
-        .primary_dp         = OPENDASH_DP_OIL_PRESSURE,
+        .primary_dp         = OPENDASH_DP_MD_OIL_PRESS,
         .arc_min            = 0.0f,
         .arc_max            = 700.0f,   /* 0-700 kPa (~0-100 PSI) */
         .is_primary_temp    = false,
         .is_primary_pressure = true,
         .secondary_label    = "BOOST",
-        .secondary_dp       = OPENDASH_DP_BOOST_PRESSURE,
+        .secondary_dp       = OPENDASH_DP_MD_BOOST,
         .is_secondary_temp  = false,
         .is_secondary_pressure = true,
         .is_secondary_speed = false,
@@ -210,16 +210,16 @@ static const gauge_page_t s_gauge_pages[] = {
         .is_secondary_speed = true,
         .shift_light        = false,
     },
-    /* Page 2 — RPM + AFR  (shift-light enabled) */
+    /* Page 2 — RPM (MD) + LAM  (shift-light enabled) */
     {
         .primary_label      = "RPM",
-        .primary_dp         = OPENDASH_DP_RPM,
+        .primary_dp         = OPENDASH_DP_MD_RPM,
         .arc_min            = 0.0f,
         .arc_max            = 8000.0f,  /* 0-8000 RPM full scale */
         .is_primary_temp    = false,
         .is_primary_pressure = false,
-        .secondary_label    = "AFR",
-        .secondary_dp       = OPENDASH_DP_AFR,
+        .secondary_label    = "LAM",
+        .secondary_dp       = OPENDASH_DP_MD_LAMBDA,
         .is_secondary_temp  = false,
         .is_secondary_pressure = false,
         .is_secondary_speed = false,
@@ -302,7 +302,7 @@ static const char* get_primary_suffix(uint8_t page)
     if (p->is_primary_temp)     return opendash_get_temp_suffix(current_layout.temp_unit);
     if (p->is_primary_pressure) return opendash_get_pressure_suffix(current_layout.pressure_unit);
     /* RPM, ratio, etc. — no unit suffix or use the DP's own */
-    if (p->primary_dp == OPENDASH_DP_RPM) return "rpm";
+    if (p->primary_dp == OPENDASH_DP_RPM || p->primary_dp == OPENDASH_DP_MD_RPM) return "rpm";
     return "";
 }
 
@@ -313,7 +313,7 @@ static const char* get_secondary_suffix(uint8_t page)
     if (p->is_secondary_temp)     return opendash_get_temp_suffix(current_layout.temp_unit);
     if (p->is_secondary_pressure) return opendash_get_pressure_suffix(current_layout.pressure_unit);
     if (p->is_secondary_speed)    return opendash_get_speed_suffix(current_layout.speed_unit);
-    if (p->secondary_dp == OPENDASH_DP_AFR) return ":1";
+    if (p->secondary_dp == OPENDASH_DP_MD_LAMBDA) return ":1";
     return "";
 }
 
@@ -856,7 +856,8 @@ void ui_manager_update_value(uint16_t data_point_id, float value)
         float display_val = convert_primary(current_page, value);
 
         /* Format: temperature = no decimals, pressure = 1 decimal, RPM = no decimals */
-        if (gp->is_primary_temp || gp->primary_dp == OPENDASH_DP_RPM) {
+        if (gp->is_primary_temp || gp->primary_dp == OPENDASH_DP_RPM ||
+            gp->primary_dp == OPENDASH_DP_MD_RPM) {
             snprintf(buf, sizeof(buf), "%.0f", display_val);
         } else {
             snprintf(buf, sizeof(buf), "%.1f", display_val);
@@ -894,9 +895,10 @@ void ui_manager_update_value(uint16_t data_point_id, float value)
     /* --- Secondary (box) value --- */
     if (data_point_id == gp->secondary_dp) {
         float display_val = convert_secondary(current_page, value);
-        if (gp->is_secondary_speed || gp->secondary_dp == OPENDASH_DP_RPM) {
+        if (gp->is_secondary_speed || gp->secondary_dp == OPENDASH_DP_RPM ||
+            gp->secondary_dp == OPENDASH_DP_MD_RPM) {
             snprintf(buf, sizeof(buf), "%.0f", display_val);
-        } else if (gp->secondary_dp == OPENDASH_DP_AFR) {
+        } else if (gp->secondary_dp == OPENDASH_DP_MD_LAMBDA) {
             snprintf(buf, sizeof(buf), "%.1f", display_val);
         } else {
             snprintf(buf, sizeof(buf), "%.1f", display_val);

@@ -1,6 +1,47 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # OpenDash Changelog
 
+## [v0.9.0-beta] - 2026-09 — MD/OBD Domain Separation & RIGHT Pod Compliance
+
+### Added — domain-separated datapoints (see DATAFLOW.md §4)
+
+- MD-native channels now travel under dedicated MD-domain ids (`MD_RPM` 0x0117;
+  0x0800 block: `MD_LAMBDA`, `MD_MAF`, `MD_BOOST`, `MD_BAT`, `MD_OIL_TEMP`,
+  `MD_OIL_PRESS`, VDO spares, `MD_SPEED`, `MD_CASE_TEMP`, `MD_EFR_SPEED`,
+  `MD_KNOCK`, `MD_THROTTLE`, `MD_GEAR`). ECU/OBD2 values keep the shared
+  engine ids (0x0100 range). Id-based widget binding makes cross-domain
+  feed structurally impossible.
+- LEFT forwards two independent `DATA_BATCH (0x88)` frames per UART frame.
+  `obd2_present` is a UI/config capability flag — **never** a wire-gate
+  (gating on it was regression #1: bench flags byte = 0 → whole ECU space dark).
+- Center `load_layouts_from_nvs()` one-time-migrates pre-split NVS layouts
+  and re-persists.
+
+### Fixed — silent batch drop (regression #2)
+
+Medium-channel batch fan-out wrapped the fan-out loop in an outer
+`display_lvgl_lock()` while `master_dp_deliver()` takes the same
+**non-recursive** `lvgl_mux` per datapoint → nested take timed out and
+silently dropped every batched value. Outer lock removed;
+`master_dp_deliver()` is the single lock owner on that path.
+
+### Fixed / changed — RIGHT pod brought up to current architecture
+
+- RIGHT's dispatcher only handled single `SET_DATA_POINT`; every relayed
+  `SET_DATA_BATCH (0x0C)` fell into `default: unhandled` → the pod displayed
+  nothing. Batch handler added (parse `[count][id:2][f32]×N` → fan-out).
+- LEFT also receives the relay now (its WATER page binds ECU-domain
+  `COOLANT_TEMP`, which only ever arrives via the relay).
+- LEFT + RIGHT `s_gauge_pages[]` now identical: OIL PRESS(`MD_OIL_PRESS`)+
+  BOOST(`MD_BOOST`) / WATER(`COOLANT`)+SPEED(`GPS`) / RPM(`MD_RPM`)+
+  LAM(`MD_LAMBDA`, shift-light) / ODO.
+
+### Removed — tearing-debug telemetry
+
+`UI-DBG` 500 ms probe (center ui_manager.c), `display_init_dbg_flush()` and
+`s_dbg_flush_*` counters (center display_init.c/h). Display shimmer on the
+4.3" panel is an accepted hardware limitation (QSPI/RGB + PSRAM bandwidth).
+
 ## [v0.4.1-beta] - 2026-06 — OTA Hardening, Full-Fleet Coverage & Protocol Polish
 
 ### Fixed — LEFT sdkconfig: wrong PPCP symbol prefix (silent throughput regression)

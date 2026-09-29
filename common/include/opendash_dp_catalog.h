@@ -36,6 +36,7 @@ typedef enum {
     OPENDASH_DP_CAT_VESC,          /**< motor temp, FET temp, duty, current */
     OPENDASH_DP_CAT_OBD,           /**< OBD-II PIDs not covered above */
     OPENDASH_DP_CAT_SYSTEM,        /**< battery V, ambient T, free heap, relays */
+    OPENDASH_DP_CAT_MD,            /**< Multidisplay-native sensor channels (0x0800+, MD_*) */
     OPENDASH_DP_CAT_COUNT
 } opendash_dp_category_t;
 

@@ -84,6 +84,10 @@ uint8_t display_get_brightness(void);
  */
 i2c_master_bus_handle_t display_get_i2c_bus(void);
 
+/* Live pixel-clock change in Hz (console 'pclk <MHz>'); see the refresh
+ * bandwidth note in display_init.c before raising above ~18 MHz. */
+esp_err_t display_init_set_pclk(uint32_t freq_hz);
+
 #ifdef __cplusplus
 }
 #endif

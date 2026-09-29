@@ -568,6 +568,25 @@ static lv_obj_t* create_outlined_label(lv_obj_t *parent, const char *text,
 }
 
 /**
+ * @brief Update a label's text only when the rendered string actually
+ *        changed — and repaint only then.
+ *
+ * lv_label_set_text() unconditionally calls lv_obj_invalidate() even when
+ * the new text is byte-identical to the old (lv_label.c line 140). Without
+ * this guard every incoming dp packet forces a repaint of its value box —
+ * the visible "pop/flash inside the value box" on every burst. With the
+ * guard, a label repaints only when its rounded display text changes.
+ */
+static void set_label_text_if_changed(lv_obj_t *label, const char *new_text)
+{
+    if (label == NULL || new_text == NULL) return;
+    if (!lv_obj_check_type(label, &lv_label_class)) return;
+    const char *cur = lv_label_get_text(label);
+    if (cur && strcmp(cur, new_text) == 0) return;
+    lv_label_set_text(label, new_text);
+}
+
+/**
  * @brief Update outlined label text — atomic single invalidation.
  *
  * Backward-compatible wrapper: existing call sites pass the value
@@ -579,6 +598,8 @@ static void update_outlined_label_text(lv_obj_t *label, const char *new_text)
 {
     if (label == NULL || new_text == NULL) return;
     if (lv_obj_check_type(label, &lv_label_class)) {
+        const char *cur = lv_label_get_text(label);
+        if (cur && strcmp(cur, new_text) == 0) return;
         lv_label_set_text(label, new_text);
     }
 }
@@ -3896,10 +3917,10 @@ static mode_dp_map_t mode_dp_maps[DISPLAY_MODE_COUNT] = {
         .section_dp = {
             OPENDASH_DP_EGT1,            /* [0] EGT 1       */
             OPENDASH_DP_EGT2,            /* [1] EGT 2       */
-            OPENDASH_DP_O2_LAMBDA,       /* [2] O2 / Lambda */
+            OPENDASH_DP_MD_LAMBDA,       /* [2] MD Lambda   */
             OPENDASH_DP_EGT3,            /* [3] EGT 3       */
             OPENDASH_DP_EGT4,            /* [4] EGT 4       */
-            OPENDASH_DP_MAF_RATE,        /* [5] MAS (LMM)   */
+            OPENDASH_DP_MD_MAF,          /* [5] MD MAF      */
         },
         .arc_dp  = OPENDASH_DP_MD_RPM,
         .arc_min = 0.0f,
@@ -3976,16 +3997,51 @@ static void layout_to_mode_map(const screen_layout_v1_t *in, mode_dp_map_t *m)
 
 /* Load the on-disk layout for every mode and write it into mode_dp_maps[].
  * Modes with no NVS entry keep their compiled defaults. Called once
- * from ui_manager_init() after capture_mode_defaults().                  */
+ * from ui_manager_init() after capture_mode_defaults().
+ *
+ * One-time auto-migration for the 2026-09-28 MD/OBD domain split: layouts
+ * saved before that change bind the shared ids (O2_LAMBDA/MAF_RATE) for the
+ * MD screen's lambda/MAF cells, and bound plain RPM as the MD arc. The relay
+ * now ships those channels under MD_* domain ids, so remap the stale bindings
+ * in place — then persist the migrated layout back to NVS so this runs once. */
 static void load_layouts_from_nvs(void)
 {
     for (uint8_t mode = 0; mode < DISPLAY_MODE_COUNT; mode++) {
         screen_layout_v1_t layout;
         screen_layout_v1_t fallback;
         mode_map_to_layout(mode, &s_mode_dp_defaults[mode], &fallback);
-        if (opendash_layout_load_or_default(mode, &fallback, &layout) == ESP_OK) {
-            layout_to_mode_map(&layout, &mode_dp_maps[mode]);
+        if (opendash_layout_load_or_default(mode, &fallback, &layout) != ESP_OK) {
+            continue;
         }
+
+        /* ── domain-split migration ── */
+        bool migrated = false;
+        if (mode == DISPLAY_MODE_MD) {
+            for (int i = 0; i < 6; i++) {
+                if (layout.slot_dp_ids[i] == OPENDASH_DP_O2_LAMBDA) {
+                    layout.slot_dp_ids[i] = OPENDASH_DP_MD_LAMBDA;
+                    migrated = true;
+                }
+                if (layout.slot_dp_ids[i] == OPENDASH_DP_MAF_RATE) {
+                    layout.slot_dp_ids[i] = OPENDASH_DP_MD_MAF;
+                    migrated = true;
+                }
+            }
+            if (layout.arc_dp_id == OPENDASH_DP_RPM) {
+                layout.arc_dp_id = OPENDASH_DP_MD_RPM;
+                migrated = true;
+            }
+        }
+        if (migrated) {
+            layout_to_mode_map(&layout, &mode_dp_maps[mode]);
+            if (opendash_layout_save(mode, &layout) == ESP_OK) {
+                ESP_LOGI(TAG, "layout mode %u: migrated legacy ids to MD domain",
+                         (unsigned)mode);
+            }
+            continue;
+        }
+
+        layout_to_mode_map(&layout, &mode_dp_maps[mode]);
     }
     ESP_LOGI(TAG, "mode_dp_maps initialized from NVS (with compiled fallbacks)");
 }
@@ -4019,6 +4075,14 @@ esp_err_t ui_manager_get_layout(uint8_t mode, screen_layout_v1_t *out)
 /* Track max values per section for the "Max:" label */
 static float s_section_max[DISPLAY_MODE_COUNT][6];
 static bool  s_section_has_data[DISPLAY_MODE_COUNT][6];
+
+/* ── Gauge smoothing (display-side EMA) ────────────────────────────────
+ * ECU idle wobble is tens of RPM at packet rate; a raw gauge digit pops
+ * on every packet. Damping the arc value like a real tach needle makes
+ * the reading steady. Raise toward 1.0 for snappier, lower for calmer. */
+#define ARC_EMA_ALPHA 0.25f
+static float s_arc_smooth[DISPLAY_MODE_COUNT];
+static bool  s_arc_smooth_init[DISPLAY_MODE_COUNT];
 
 /* ── Data-point value cache ────────────────────────────────────────────
  * Stores the last-received value for every data point so that switching
@@ -4091,6 +4155,16 @@ void ui_manager_update_value(uint16_t data_point_id, float value)
 
     /* ── Check center arc ──────────────────────────────────── */
     if (data_point_id == map->arc_dp) {
+        /* Damping filter (see ARC_EMA_ALPHA): the gauge shows the
+         * smoothed reading; raw jitter is discarded here. */
+        if (!s_arc_smooth_init[current_mode]) {
+            s_arc_smooth[current_mode] = value;
+            s_arc_smooth_init[current_mode] = true;
+        } else {
+            s_arc_smooth[current_mode] += (value - s_arc_smooth[current_mode]) * ARC_EMA_ALPHA;
+            value = s_arc_smooth[current_mode];
+        }
+
         /* Arc value (integer for RPM, 1 decimal for speed) */
         if (map->arc_dp == OPENDASH_DP_RPM) {
             snprintf(buf, sizeof(buf), "%d", (int)value);
@@ -4220,7 +4294,7 @@ void ui_manager_update_value(uint16_t data_point_id, float value)
         } else {
             snprintf(buf, sizeof(buf), "%.0f", display_val);
         }
-        lv_label_set_text(screen_layout.sections[i].value, buf);
+        set_label_text_if_changed(screen_layout.sections[i].value, buf);
 
         /* Track and display max value (in display units) */
         if (!s_section_has_data[current_mode][i]) {
@@ -4230,7 +4304,7 @@ void ui_manager_update_value(uint16_t data_point_id, float value)
             s_section_max[current_mode][i] = display_val;
         }
         snprintf(buf, sizeof(buf), "Max: %.0f", s_section_max[current_mode][i]);
-        lv_label_set_text(screen_layout.sections[i].max_val, buf);
+        set_label_text_if_changed(screen_layout.sections[i].max_val, buf);
 
         return;
     }
@@ -4257,7 +4331,7 @@ void ui_manager_update_value(uint16_t data_point_id, float value)
                 case 3:  snprintf(fmt_buf, sizeof(fmt_buf), "%.3f", display_val); break;
                 default: snprintf(fmt_buf, sizeof(fmt_buf), "%.0f", display_val); break;
             }
-            lv_label_set_text(bms_boxes[i].value, fmt_buf);
+            set_label_text_if_changed(bms_boxes[i].value, fmt_buf);
             return;
         }
     }
@@ -4289,7 +4363,7 @@ void ui_manager_update_value(uint16_t data_point_id, float value)
                 case 2:  snprintf(fmt_buf, sizeof(fmt_buf), "%.2f", display_val); break;
                 default: snprintf(fmt_buf, sizeof(fmt_buf), "%.0f", display_val); break;
             }
-            lv_label_set_text(obd_boxes[i].value, fmt_buf);
+            set_label_text_if_changed(obd_boxes[i].value, fmt_buf);
 
             /* Update RPM arc gauge if this is RPM data */
             if (data_point_id == OPENDASH_DP_RPM && obd_rpm_arc) {

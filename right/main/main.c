@@ -153,6 +153,32 @@ static void dispatch_message(const opendash_espnow_event_t *evt,
             break;
         }
 
+        /* ── Data Point Batch ─────────────────────────────────────
+         * Payload: [count:1][dp_id:2][float32]×N — Center re-batches the
+         * MD-native frame (MD_* ids) and the vehicle ECU frame (shared
+         * engine ids) and relays both here. This pod has no UART of its
+         * own: everything it displays arrives via these relays. */
+        case OPENDASH_CMD_SET_DATA_BATCH: {
+            if (msg->length < 7) break;
+            uint8_t count = msg->payload[0];
+            uint16_t expected = (uint16_t)(1 + (uint16_t)count * 6);
+            if (msg->length < expected || count == 0) break;
+
+            const uint8_t *e = &msg->payload[1];
+            if (display_lvgl_lock(10)) {
+                for (uint8_t i = 0; i < count; i++) {
+                    uint16_t dp_id = ((uint16_t)e[0] << 8) | e[1];
+                    float value;
+                    memcpy(&value, &e[2], sizeof(float));
+                    if (dp_id == OPENDASH_DP_GPS_SPEED) s_last_gps_speed_kmh = value;
+                    ui_manager_update_value(dp_id, value);
+                    e += 6;
+                }
+                display_lvgl_unlock();
+            }
+            break;
+        }
+
         /* ── Brightness ────────────────────────────────────────── */
         case OPENDASH_CMD_SET_BRIGHTNESS: {
             if (msg->length >= 1) {
