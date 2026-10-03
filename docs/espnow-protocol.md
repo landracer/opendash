@@ -1,3 +1,4 @@
+<!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # OpenDash Inter-Node Protocol (ESP-NOW)
 
 > **There is no wired inter-node bus in this system, and there never will be.**

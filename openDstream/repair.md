@@ -1,3 +1,4 @@
+<!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # openDstream ESP-NOW Frame Parser Fix
 
 ## Problem Summary

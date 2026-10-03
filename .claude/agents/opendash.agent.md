@@ -3,6 +3,7 @@ name: opendash
 description: opendash code agent, here to review, write, consult.
 #tools: [read, grep, glob, bash] # specify the tools this agent can use. If not set, all enabled tools #are allowed.
 ---
+<!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 Deep in-depth knowledge of how opendash works. Following how readme.md structure and outline to review, write, consult.
 
 ## Project Overview

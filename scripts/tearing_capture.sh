@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Licensed under Sovereign Individual License v1.0 — see LICENSE file
 # tearing_capture.sh — long-run serial capture for /center tearing investigation.
 #
 # Usage:

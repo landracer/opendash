@@ -43,12 +43,15 @@ DEFAULT_MARKER = "Sovereign Individual License"
 
 EXCLUDE_DIRS = {
     ".git", "build", "managed_components", "__pycache__", "node_modules",
-    ".venv", "venv", "env", ".env", ".tox", ".mypy_cache", ".pytest_cache",
+    ".venv", ".venv-ota", "venv", "env", ".env", ".tox", ".mypy_cache", ".pytest_cache",
     "dist", ".idea", ".vscode", ".claude", ".cline",
+    # Local-only content — never restamp (backups/closed-subsystem references,
+    # kept on disk but not tracked in git):
+    "archive", "tearing-logs",
 }
 
 C_EXT = {".c", ".h", ".cpp", ".hpp", ".cc", ".cxx", ".hh", ".ino"}
-HASH_EXT = {".py"}
+HASH_EXT = {".py", ".sh"}
 MD_EXT = {".md"}
 BUILD_NAMES = {"CMakeLists.txt", "Kconfig", "Kconfig.projbuild"}
 

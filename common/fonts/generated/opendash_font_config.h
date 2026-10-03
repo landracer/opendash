@@ -1,3 +1,4 @@
+/* Licensed under Sovereign Individual License v1.0 — see LICENSE file */
 /**
  * @file opendash_font_config.h
  * @brief Auto-generated font configuration for OpenDash
