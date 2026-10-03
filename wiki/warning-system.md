@@ -179,4 +179,4 @@ opendash_alarm_config_t default_alarms[OPENDASH_MAX_ALARMS] = {
 
 | Version | Date | Changes |
 |---|---|---|
-| v0.8.1 | 2025-01-12 | Initial warning system document. Comprehensive threshold catalog. |
+| v0.8.1 (internal beta codename — see CHANGELOG mapping) | 2025-01-12 (as originally logged) | Initial warning system document. Comprehensive threshold catalog. |

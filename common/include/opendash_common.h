@@ -36,8 +36,24 @@ extern "C" {
 /** @brief OpenDash firmware patch version. */
 #define OPENDASH_VERSION_PATCH  0
 
-/** @brief Version string for display and logging. */
-#define OPENDASH_VERSION_STR    "0.1.0"
+/* Stringification helpers: expand the numbers above, then stringify. */
+#define _OPENDASH_STR(x) #x
+#define OPENDASH_STR(x)  _OPENDASH_STR(x)
+
+/**
+ * @brief Version string for display and logging.
+ *
+ * DERIVED from MAJOR.MINOR.PATCH above — never hand-edit this string.
+ * This block in opendash_common.h is the single source of truth for the
+ * firmware version: boot banners, the center splash and the BLE OTA version
+ * response all read OPENDASH_VERSION_STR. Bump the three numbers above only.
+ *
+ * Versioning policy (see readme.md "Versioning"): v0.1.0 (2026-10-02) is the
+ * first public baseline; the pre-baseline "v0.2 … v0.9" labels were internal
+ * beta codenames. 0.x = public beta line; v1.0.0 gates on the boost clean-room
+ * rewrite (TODO §6.0) and full-fleet BLE OTA hardening (TODO §1.2).
+ */
+#define OPENDASH_VERSION_STR    OPENDASH_STR(OPENDASH_VERSION_MAJOR.OPENDASH_VERSION_MINOR.OPENDASH_VERSION_PATCH)
 
 /* ────────────────────────────────────────────────────────────────────────────
  * Node Identification

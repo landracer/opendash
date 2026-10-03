@@ -4,15 +4,16 @@
 > Comprehensive tracking of planned features, known issues, and shipped subsystems.
 > Organized by priority, then by subsystem and per-node.
 >
-> **Last cleanup pass:** 2026-05-31 — full code-vs-doc reconciliation against
-> the v0.8.x (batched ESP-NOW + channel manager) and v0.9.x (per-node layout,
-> boost controller staging) reality. Previous TODO reflected v0.4 era.
+> **Last cleanup pass:** 2026-10-02 — version scheme squared up at the **v0.1.0 baseline**
+> (first public version). The earlier "v0.2.0-beta … v0.9.0-beta" labels were *internal
+> beta codenames*, never publicly versioned — all folded into v0.1.0 (see CHANGELOG.md
+> mapping table). Firmware version lives solely in `opendash_common.h`.
 >
-> **Project Status: BETA → APPROACHING 0.9** — Sensor data flowing end-to-end,
-> 7 active node families (center, left, right, gps, pod1, pod2, mos-4ch-a/b,
-> relay-4ch-hd, relay-8ch-a/b, external BMS), per-node layout authoring,
-> boost-controller staging in progress, BLE OTA proven on round pods, active
-> tearing investigation on center.
+> **Project Status: v0.1.0 BASELINE (public beta line)** — sensor data flowing end-to-end,
+> 12 active node families (center, left, right, gps, pod1, pod2, mos-4ch-a/b,
+> relay-4ch-hd, relay-8ch-a/b, openDstream, + external BMS Logger), per-node layout
+> authoring, boost-controller staging in progress, BLE OTA proven on round pods,
+> center tearing CLOSED (residual shimmer is physical).
 
 ---
 
@@ -32,6 +33,7 @@
 
 | Area | State |
 |---|---|
+| Firmware version | **0.1.0** — single source of truth `OPENDASH_VERSION_*` in [common/include/opendash_common.h](common/include/opendash_common.h); future scheme: semver (see CHANGELOG.md header) |
 | Active node families | 12: center, left, right, gps, pod1, pod2, mos-4ch-a, mos-4ch-b, relay-4ch-hd, relay-8ch-a, relay-8ch-b, openDstream (+ external BMS Logger) |
 | Total node slots | `OPENDASH_NODE_COUNT = 18` ([common/include/opendash_common.h](common/include/opendash_common.h)) |
 | ESP-NOW protocol | 39 opcodes defined in `opendash_protocol.h` (master + slave + boost families), batched (DATA_BATCH 0x88 / SET_DATA_BATCH 0x0C), 4 priority channels, polling eliminated |

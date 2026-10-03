@@ -1,7 +1,7 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # OpenDash Dataflow Architecture
 
-**Status:** as-built, post-batching v0.8.x
+**Status:** as-built, v0.1.0 baseline — historical diagnosis in [`DATAFLOW_FIX.md`](DATAFLOW_FIX.md)
 **Audience:** peer reviewers, contributors, and the next agent who has to debug this
 **Last validated:** CENTER capture `dp/s = 81–135 err=0 qHW=0` after the LVGL flicker fix
 

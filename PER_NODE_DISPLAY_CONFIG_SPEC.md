@@ -3,8 +3,8 @@
 
 **Status:** Phase 1 integrated into `common/` + `center/` + all slaves; Phase 2 (UI editor + live apply) pending
 **Owner of spec:** prepared for jr-dev hand-off
-**Target version:** OpenDash v0.9.0
-**Depends on:** v0.8.x batched ESP-NOW (already in main)
+**Target version:** v0.1.0 baseline (Phase 1 shipped; internal codename was "v0.9.0")
+**Depends on:** batched ESP-NOW transport (baseline)
 
 ---
 
@@ -280,7 +280,7 @@ Entry point: from existing **Device Mgmt** screen, each node-status box becomes 
 
 ---
 
-## 8. Out of scope (for v0.9.0)
+## 8. Out of scope (Phase 2)
 
 * Drag-to-reorder slots — slots are positional; users edit the DP that sits in slot N.
 * Per-slot color theming — uses each node's existing palette.
@@ -309,7 +309,7 @@ Entry point: from existing **Device Mgmt** screen, each node-status box becomes 
 - [ ] Power-cycling the node restores the user's last-saved layout.
 - [ ] Factory reset returns every node to compiled defaults.
 - [ ] No regression in `dp/s` throughput or `qHW` on CH1 (validated by 30-second monitor capture).
-- [ ] DATAFLOW.md updated, CHANGELOG.md gets a v0.9.0 entry.
+- [x] DATAFLOW.md updated; CHANGELOG baseline entry documents this feature.
 
 ---
 

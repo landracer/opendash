@@ -1,6 +1,68 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # OpenDash Changelog
 
+>
+> **Versioning policy.** Public versioning starts at **v0.1.0 (2026-10-02)** — the first
+> true baseline. Every label below it (`v0.2.0-beta` … `v0.9.0-beta`, and the `v0.1.0`
+> bootstrap entry relabelled `0.0.1`) is pre-baseline history: the 0.x-beta labels were
+> *internal codenames*, never publicly versioned, all folded into the 0.1.0 baseline.
+> Going forward: **semver** — minor = features, patch = fixes; v1.0.0 gates on the boost
+> clean-room rewrite (TODO §6.0) + full-fleet BLE OTA hardening (TODO §1.2).
+> Firmware single source of truth: `OPENDASH_VERSION_*` in
+> [`common/include/opendash_common.h`](common/include/opendash_common.h).
+
+## [Unreleased]
+
+_No entries yet. Next release after baseline: **v0.2.0** (feature release). Format: Keep a_
+_Changelog + SemVer._
+
+## [0.1.0] — 2026-10-02 — BASELINE (first public version)
+
+> Squashes the entire 2026 beta era (internal codenames v0.2.0-beta → v0.9.0-beta; see
+> history below). Firmware version `0.1.0`, derived from the version defines in
+> `common/include/opendash_common.h` — single source of truth for boot banners, the
+> center splash, and the BLE OTA version response.
+
+### Added
+
+- 12 active node families: center, left, right, gps, pod1, pod2, mos-4ch-a/b,
+  relay-4ch-hd, relay-8ch-a/b, openDstream (+ external BMS logger).
+- Batched, channel-managed ESP-NOW: `DATA_BATCH (0x88)` / `SET_DATA_BATCH (0x0C)`,
+  4 priority channels, per-peer quarantine/backoff, 39 opcodes, polling eliminated
+  (event-driven push + data-absence offline detection) — see [`DATAFLOW.md`](DATAFLOW.md).
+- MD/OBD domain-separated datapoint ids (`MD_*` vs ECU/OBD2 ranges); id-based widget
+  binding makes cross-domain feed structurally impossible; one-time NVS layout migration.
+- Per-node display-configuration authoring (wire format + NVS + DP catalog) with layout
+  editor UI on center (Phase 2 live-apply pending — see PER_NODE_DISPLAY_CONFIG_SPEC.md).
+- BLE OTA proven on LEFT/RIGHT (+POD1/POD2 recipe pending): 2M PHY, PPCP 7.5–15 ms,
+  ~9.1 KB/s, auto-RESUME; `ble_ota.py` desktop client.
+- Boost controller shared algorithm layer + MOS-4CH-A integration (staging; GPL-lineage
+  heritage — clean-room rewrite required before public release, TODO §6.0).
+- Parachute/rollover safety-deployment subsystem (pod1/pod2 IMU votes, interlocks).
+- GPS/telemetry node (LC76G CASIC-over-I2C GNSS, IMU, SD logging) — subsystem CLOSED
+  2026-09-29 as read-only data pipe by design (wiki/GPS-LC76G-POSTMORTEM.md).
+- Audio subsystem (I2S WAV, priority queue), warning boxes, pre-flight checklist,
+  unit-conversion system, dynamic font/image pipeline.
+
+### Fixed
+
+- Center RGB tearing: full flicker stack fixed (vsync ISR gate, batch relay, EMA damping,
+  changed-only label repaints); residual micro-shimmer accepted as physical (TEARING.md).
+- Silent batch drop (nested non-recursive `lvgl_mux` take) — single lock owner on the
+  deliver path; wrong PPCP symbol prefix throughput bug; WDT screen-switch crash;
+  MD UART frame-loss handled by STX re-scan; GT911 reset/probe sequence.
+
+## Beta-era history (internal codenames — pre-baseline, folded into 0.1.0)
+
+| Internal label | Period | Status |
+|---|---|---|
+| `v0.1.0` entry below, relabelled `0.0.1` | 2026-02-21 | retroactive — bootstrap |
+| undated block below (GPS v15L2, pod UI) | 2026-02→04 | folded into 0.1.0 |
+| `v0.2.0-beta` … `v0.9.0-beta` below | 2026-03→09 | codenames, folded into 0.1.0 |
+
+_Sections below are retained verbatim as the development record. Dates are as originally
+_recorded; beta-era ordering is approximate (v0.3.0-beta was logged out of order)._
+
 ## [v0.9.0-beta] - 2026-09 — MD/OBD Domain Separation & RIGHT Pod Compliance
 
 ### Added — domain-separated datapoints (see DATAFLOW.md §4)
@@ -335,7 +397,7 @@ expected to match the ~4-5 min figure on next OTA.
 - **Missing EGT channels** — Only EGT[0] and EGT[1] were forwarded and
   displayed. Now all 8 channels forwarded, displayed, and logged.
 
-## [Unreleased]
+## [pre-baseline, date not recorded] — GPS I2C driver (v15L2) + early gauge-pod UI
 
 ### Added — GPS I2C Driver (v15L2 Production)
 - **LC76G GPS I2C driver** — Stable production code (`gps_handler.c` v15L2)
@@ -384,7 +446,7 @@ expected to match the ~4-5 min figure on next OTA.
 - Arc gauge now responds to data point values
 - UI layout now properly displays data point information
 
-## [v0.1.0] - 2026-02-21
+## [0.0.1] — 2026-02-21 (retroactive label) — Project bootstrap
 
 ### Added
 - Initial project structure and baseline implementations
