@@ -1,6 +1,7 @@
+<!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # Visual Studio Code Setup for OpenDash
 
-This guide provides detailed instructions for setting up Visual Studio Code to build and flash all three OpenDash display projects.
+This guide provides detailed instructions for setting up Visual Studio Code to build and flash all OpenDash display projects (center, left, right, gps, pod1, pod2).
 
 ## Quick Start
 
