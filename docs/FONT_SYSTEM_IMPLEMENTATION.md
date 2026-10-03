@@ -272,7 +272,7 @@ Possible future improvements:
 - **LVGL Documentation**: https://docs.lvgl.io/9.2/overview/font.html
 - **lv_font_conv**: https://github.com/lvgl/lv_font_conv
 - **FreeType**: https://freetype.org/
-- **ESP-IDF Build System**: https://docs.espressif.com/projects/esp-idf/en/v5.3/esp32s3/api-guides/build-system.html
+- **ESP-IDF Build System**: https://docs.espressif.com/projects/esp-idf/en/v6.1/esp32s3/api-guides/build-system.html
 
 ## Credits
 

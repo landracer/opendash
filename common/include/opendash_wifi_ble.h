@@ -14,9 +14,9 @@
  * resources. The mode can be changed via touch menu or I2C command.
  *
  * @see ESP-IDF WiFi API:
- *      https://docs.espressif.com/projects/esp-idf/en/release-v5.3/esp32s3/api-reference/network/esp_wifi.html
+ *      https://docs.espressif.com/projects/esp-idf/en/release-v6.1/esp32s3/api-reference/network/esp_wifi.html
  * @see ESP-IDF Bluetooth API:
- *      https://docs.espressif.com/projects/esp-idf/en/release-v5.3/esp32s3/api-reference/bluetooth/index.html
+ *      https://docs.espressif.com/projects/esp-idf/en/release-v6.1/esp32s3/api-reference/bluetooth/index.html
  */
 
 #ifndef OPENDASH_WIFI_BLE_H
@@ -97,7 +97,7 @@ typedef struct {
  * @return OPENDASH_OK on success.
  *
  * @note Internally calls esp_netif_init() and esp_event_loop_create_default().
- * @see https://docs.espressif.com/projects/esp-idf/en/release-v5.3/esp32s3/api-reference/network/esp_netif.html
+ * @see https://docs.espressif.com/projects/esp-idf/en/release-v6.1/esp32s3/api-reference/network/esp_netif.html
  */
 opendash_err_t opendash_wireless_init(opendash_node_t node);
 

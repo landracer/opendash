@@ -25,7 +25,7 @@ This is the Center Display project for OpenDash, running on the Waveshare ESP32-
 
 ### Prerequisites
 
-1. **ESP-IDF v5.3** installed
+1. **ESP-IDF v6.1** installed
 2. **Visual Studio Code** with ESP-IDF extension (recommended)
 3. **USB-C cable** for programming and power
 

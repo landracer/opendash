@@ -13,7 +13,7 @@
  * Standard PIDs are defined in SAE J1979. Common mode 01 PIDs are listed below.
  *
  * @see ESP-IDF TWAI (CAN) Driver:
- *      https://docs.espressif.com/projects/esp-idf/en/release-v5.3/esp32s3/api-reference/peripherals/twai.html
+ *      https://docs.espressif.com/projects/esp-idf/en/release-v6.1/esp32s3/api-reference/peripherals/twai.html
  */
 
 #ifndef OPENDASH_OBD2_H
@@ -102,7 +102,7 @@ typedef struct {
  * @return OPENDASH_OK on success, error code on failure.
  *
  * @note For CAN mode, this uses the ESP-IDF TWAI driver:
- *       https://docs.espressif.com/projects/esp-idf/en/release-v5.3/esp32s3/api-reference/peripherals/twai.html
+ *       https://docs.espressif.com/projects/esp-idf/en/release-v6.1/esp32s3/api-reference/peripherals/twai.html
  */
 opendash_err_t opendash_obd2_init(const obd2_config_t *config);
 

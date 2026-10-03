@@ -11,7 +11,7 @@
 #
 # @see ../DISPLAY_SYNCHRONIZATION.md for how this project stays synced with others
 # @see ESP-IDF Build System:
-#      https://docs.espressif.com/projects/esp-idf/en/release-v5.3/esp32s3/api-guides/build-system.html
+#      https://docs.espressif.com/projects/esp-idf/en/release-v6.1/esp32s3/api-guides/build-system.html
 # ─────────────────────────────────────────────────────────────────────────────
 
 cmake_minimum_required(VERSION 3.16)

@@ -17,7 +17,7 @@
  * Licensed under Sovereign Individual License v1.0 — see LICENSE file
  *
  * @see ESP-IDF API Reference:
- *      https://docs.espressif.com/projects/esp-idf/en/release-v5.3/esp32s3/api-reference/index.html
+ *      https://docs.espressif.com/projects/esp-idf/en/release-v6.1/esp32s3/api-reference/index.html
  */
 
 #include <stdio.h>

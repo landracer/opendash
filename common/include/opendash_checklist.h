@@ -19,7 +19,7 @@
  * - Fire suppression system checked
  *
  * @see ESP-IDF NVS API:
- *      https://docs.espressif.com/projects/esp-idf/en/release-v5.3/esp32s3/api-reference/storage/nvs_flash.html
+ *      https://docs.espressif.com/projects/esp-idf/en/release-v6.1/esp32s3/api-reference/storage/nvs_flash.html
  */
 
 #ifndef OPENDASH_CHECKLIST_H

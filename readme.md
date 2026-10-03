@@ -280,10 +280,27 @@ idf.py -p /dev/ttyUSB0 flash monitor
 - **ESP-IDF API Reference** — https://docs.espressif.com/projects/esp-idf/en/release-v6.1/esp32s3/api-reference/index.html
 - **LVGL Documentation** — https://docs.lvgl.io/master/
 - **LVGL Examples** — https://docs.lvgl.io/master/examples.html
-  https://github.com/lvgl/lvgl/tree/master/examples **LVGL E
+  https://github.com/lvgl/lvgl/tree/master/examples
 - **Waveshare ESP32-S3-Touch-LCD-4.3 Wiki** — https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-4.3
 - **Waveshare ESP32-S3-LCD-2.8C Wiki** — https://www.waveshare.com/wiki/ESP32-S3-LCD-2.8C
 - **Waveshare ESP32-S3-Touch-AMOLED-1.75 Wiki** — https://www.waveshare.com/wiki/ESP32-S3-Touch-AMOLED-1.75
+
+---
+
+## 🏷️ Versioning
+
+Public versioning starts at **v0.1.0 (2026-10-02)** — the first true baseline.
+Everything before it was internal *beta codenames* (`v0.2.0-beta` … `v0.9.0-beta`),
+never publicly versioned — all folded into the baseline (see
+[`CHANGELOG.md`](CHANGELOG.md) mapping table).
+
+- **Single source of truth:** the `OPENDASH_VERSION_*` defines in
+  [`common/include/opendash_common.h`](common/include/opendash_common.h). The version
+  string is *derived* from them — boot banners, the center splash, and the BLE OTA
+  version response all read that one define. Bump the numbers there, nowhere else.
+- **Scheme:** semver — minor = features, patch = fixes. 0.x is the public beta line.
+- **v1.0.0 (GA) gates:** boost-controller clean-room rewrite (GPL-3.0 lineage —
+  required before public distribution) + full-fleet BLE OTA hardening (TODO §1.2).
 
 ---
 
@@ -302,6 +319,11 @@ This is a proprietary project — all rights reserved. The codebase is designed 
 
 Copyright © 2024–2026 **uknowmelast** & **Axiom** (AI Co-Architect).
 All rights reserved. See [`LICENSE`](./LICENSE) for details.
+
+> **Release-gate notice:** the boost-controller subsystem descends from GPL-3.0
+> lineage code and **requires a clean-room rewrite before any public
+> distribution** (tracked in TODO §6.0; blocks v1.0.0). Until then this project
+> stays private / source-available — do not publish or redistribute it as-is.
 
 ---
 

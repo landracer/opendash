@@ -169,7 +169,7 @@ Current binary: ~1.05 MB (49% headroom).
 
 ### Prerequisites
 
-- **ESP-IDF v5.3+** (tested with v6.1-dev)
+- **ESP-IDF v6.1+** (tested with v6.1-dev)
 - **VS Code** with ESP-IDF extension (recommended)
 - **USB-C cable**
 

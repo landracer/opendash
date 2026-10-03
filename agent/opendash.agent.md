@@ -26,7 +26,7 @@ Specialized agent for the **OpenDash** project — a modular, multi-display race
 - If partially done, mark `[~]` (in progress), not `[x]`.
 
 ### Rule 4: MATCH THE PROJECT'S FRAMEWORK EXACTLY
-- This project uses **ESP-IDF** (v5.3/v6.1) with CMake build system.
+- This project uses **ESP-IDF** (v6.1 line, pinned dev snapshot — see BUILD_DEPENDENCIES.md) with CMake build system.
 - All nodes are **ESP32-S3** with PSRAM, LVGL 9 UI, and ESP-NOW communication.
 - Do NOT use Arduino APIs. Do NOT create PlatformIO files.
 - Build commands use `idf.py`, not `pio`.
@@ -61,7 +61,7 @@ Data flows: MultiDisplay (VR6 ECU) → HC-05 Bluetooth → Left pod (UART RX) �
 ## Architecture
 
 ### Build System
-- **ESP-IDF** v5.3 (left/right/GPS) or v6.1 (center)
+- **ESP-IDF** v6.1 (dev snapshot `v6.1-dev-2441-gffb63db38b`) — fleet-wide
 - CMake-based with `idf_component.yml` managed components
 - Shared common library via `EXTRA_COMPONENT_DIRS`
 - Target: ESP32-S3, 240 MHz, 16MB flash, 8MB PSRAM

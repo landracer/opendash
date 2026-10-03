@@ -18,6 +18,11 @@
  * See opendash_espnow.h for the transport and docs/espnow-protocol.md for the
  * human-readable specification.
  *
+ * @par Opcode count
+ * 39 opcodes defined below (master + slave + boost + parachute families) —
+ * verified 2026-10-02. When adding/removing an opcode, update the count in
+ * TODO.md §0 and docs/espnow-protocol.md.
+ *
  * @par Frame Format
  * | SYNC (0xAA) | CMD (1B) | LENGTH (1B) | PAYLOAD (0-248B) | CHECKSUM (1B) |
  * Checksum is XOR of SYNC, CMD, LENGTH and all payload bytes.

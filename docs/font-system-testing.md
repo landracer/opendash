@@ -5,7 +5,7 @@ This guide explains how to test the new automatic font conversion system in Open
 
 ## Prerequisites
 
-- ESP-IDF v5.3 installed and configured
+- ESP-IDF v6.1 installed and configured
 - Node.js and npm installed
 - Python 3 installed
 

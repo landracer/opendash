@@ -1,7 +1,7 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # Display Codebase Synchronization
 
-This document explains how the three display projects (center, left-right, gps) stay synchronized and share common code.
+This document explains how the OpenDash display projects (center, left, right, gps, pod1, pod2 — the unified `left-right/` tree is [LEGACY](left-right/README.md), superseded by the split `left/` + `right/` projects) stay synchronized and share common code. Headless nodes (mos/relay/openDstream) reuse the same `common/` component without a display.
 
 ## Architecture Overview
 
@@ -13,9 +13,10 @@ opendash/
 │   ├── fonts/          ← Font system (shared by all displays)
 │   ├── include/        ← Shared headers
 │   └── src/            ← Shared implementations
-├── center/             ← Center display project
-├── left-right/         ← Left/Right gauge projects
-└── gps/                ← GPS/Telemetry project
+├── center/             ← Center display project (ESP-NOW master)
+├── left/  right/       ← Gauge pod projects (split; left-right/ is legacy)
+├── gps/                ← GPS/Telemetry project
+└── pod1/  pod2/        ← AMOLED auxiliary pods (+ IMU deployment voting)
 ```
 
 ## How Code Stays Synchronized
@@ -52,7 +53,8 @@ vim common/fonts/font_config.json  # Set "default": true on desired font
 
 # 2. Rebuild ANY display project - all will pick up the change
 cd center && idf.py build
-cd ../left-right && idf.py build
+cd ../left && idf.py build
+cd ../right && idf.py build
 cd ../gps && idf.py build
 ```
 
@@ -150,8 +152,11 @@ When making changes to the common codebase, verify synchronization:
 ```bash
 # Verify all displays still compile
 cd center && idf.py build && cd ..
-cd left-right && idf.py build && cd ..
+cd left && idf.py build && cd ..
+cd right && idf.py build && cd ..
 cd gps && idf.py build && cd ..
+cd pod1 && idf.py build && cd ..
+cd pod2 && idf.py build && cd ..
 ```
 
 ## Current Status
@@ -217,12 +222,12 @@ grep -r "opendash_fonts.h" */main/*.c
 grep -r "opendash_set_font" */main/*.c
 
 # Build all projects
-for dir in center left-right gps; do
+for dir in center left right gps pod1 pod2; do
   cd $dir && idf.py build && cd ..
 done
 ```
 
 ---
 
-**Last Updated:** 2026-02-15  
+**Last Updated:** 2026-10-02 (v0.1.0 baseline pass)  
 **Status:** All displays synchronized and using dynamic font system

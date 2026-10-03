@@ -1,5 +1,11 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
-# OpenDash — Left/Right Gauges (2.8" Round LCD)
+# [LEGACY] OpenDash — Left/Right Gauges (2.8" Round LCD)
+
+> **LEGACY — DO NOT BUILD.** This is the unified pre-split pod firmware; it was
+> superseded by the separate [`left/`](../left/README.md) and
+> [`right/`](../right/README.md) projects (which carry all current features:
+> batched ESP-NOW, MD/OBD domain split, BLE OTA recipe). Kept only as the
+> historical record of the pre-split architecture.
 
 This is the Left and Right Gauge Pods project for OpenDash, running on the Waveshare ESP32-S3-LCD-2.8C hardware.
 
@@ -23,7 +29,7 @@ This is the Left and Right Gauge Pods project for OpenDash, running on the Waves
 
 ### Prerequisites
 
-1. **ESP-IDF v5.3** installed
+1. **ESP-IDF v6.1** installed
 2. **Visual Studio Code** with ESP-IDF extension (recommended)
 3. **USB-C cable** for programming and power
 

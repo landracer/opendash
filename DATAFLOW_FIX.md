@@ -1,6 +1,10 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # Data Flow — Pool / Pipe / Drain (2026-05)
 
+> **SUPERSEDED (2026-10-02):** the batching fix described here shipped and is
+> documented as-built in [`DATAFLOW.md`](DATAFLOW.md); this file is retained as
+> the historical diagnosis record only.
+>
 > The system pushes more ESP-NOW frames into the radio than the radio can drain. Symptom: `channel_mgr` quarantines slave peers every ~2.4 s with "5 consecutive TX-queue rejects". Visual: brief flashes / dropouts of values in display boxes.
 >
 > This doc captures the diagnosis, the **surgical fix** (one source-side change, 15× drop in frame rate), and the **roadmap** for the proper per-peer flow-control plumbing we'll need once the bus has more talkers.

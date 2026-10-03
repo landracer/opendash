@@ -18,6 +18,8 @@ Get up and running with OpenDash in 5 minutes!
 - **Python 3 + Pillow + ImageMagick** — For image conversion
 
 > **📦 Full dependency details:** See [BUILD_DEPENDENCIES.md](BUILD_DEPENDENCIES.md) for complete installation instructions
+>
+> **🏷️ Firmware version:** `0.1.0` — the v0.1.0 baseline is the first public version; see the "Versioning" section in [readme.md](readme.md).
 
 ---
 

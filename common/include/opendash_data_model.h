@@ -12,7 +12,7 @@
  *
  * @see docs/data-points.md for the full data point legend.
  * @see ESP-IDF NVS:
- *      https://docs.espressif.com/projects/esp-idf/en/release-v5.3/esp32s3/api-reference/storage/nvs_flash.html
+ *      https://docs.espressif.com/projects/esp-idf/en/release-v6.1/esp32s3/api-reference/storage/nvs_flash.html
  */
 
 #ifndef OPENDASH_DATA_MODEL_H

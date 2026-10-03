@@ -3,19 +3,19 @@
 
 ## Prerequisites
 
-### 1. Install ESP-IDF v5.3
+### 1. Install ESP-IDF v6.1
 
-OpenDash targets **ESP-IDF v5.3** for the ESP32-S3. Follow the official guide:
+OpenDash targets **ESP-IDF v6.1** for the ESP32-S3. Follow the official guide:
 
-- **Linux/macOS:** https://docs.espressif.com/projects/esp-idf/en/release-v5.3/esp32s3/get-started/linux-macos-setup.html
-- **Windows:** https://docs.espressif.com/projects/esp-idf/en/release-v5.3/esp32s3/get-started/windows-setup.html
+- **Linux/macOS:** https://docs.espressif.com/projects/esp-idf/en/release-v6.1/esp32s3/get-started/linux-macos-setup.html
+- **Windows:** https://docs.espressif.com/projects/esp-idf/en/release-v6.1/esp32s3/get-started/windows-setup.html
 
 Quick install (Linux/macOS):
 
 ```bash
 mkdir -p ~/esp
 cd ~/esp
-git clone -b v5.3 --recursive https://github.com/espressif/esp-idf.git
+git clone -b v6.1 --recursive https://github.com/espressif/esp-idf.git
 cd esp-idf
 ./install.sh esp32s3
 source export.sh
@@ -95,7 +95,7 @@ building and flashing each display project.
    - Type "ESP-IDF: Configure ESP-IDF Extension"
    - Select "Express" installation or "Use Existing Setup"
    - If using existing: Point to your ESP-IDF installation (e.g., `~/esp/esp-idf`)
-   - Select ESP-IDF version **v5.3**
+   - Select ESP-IDF version **v6.1**
    - Select Python executable
    - Wait for setup to complete
 

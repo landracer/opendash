@@ -728,7 +728,7 @@ codebase. Re-run these greps before you start implementing.
 
 [`readme.md`](./readme.md) prerequisites and the inline doxygen links inside
 [`opendash_data_model.h`](./common/include/opendash_data_model.h) (~line 12)
-both target **v5.3**. The opendash agent mode preamble says v6.1. Build
+both target **v6.1**. The opendash agent mode preamble says v6.1. Build
 against whatever the repo's `idf.py --version` reports during local
 verification. The acceptance checklist in §9 says "ESP-IDF v6.1" — adjust
 to match the actual build host. The spec is version-neutral.

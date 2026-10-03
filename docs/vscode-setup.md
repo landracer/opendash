@@ -6,7 +6,7 @@ This guide provides detailed instructions for setting up Visual Studio Code to b
 
 1. **Install Prerequisites**
    - [Visual Studio Code](https://code.visualstudio.com/)
-   - [ESP-IDF v5.3](https://docs.espressif.com/projects/esp-idf/en/release-v5.3/esp32s3/get-started/index.html)
+   - [ESP-IDF v6.1](https://docs.espressif.com/projects/esp-idf/en/release-v6.1/esp32s3/get-started/index.html)
 
 2. **Install ESP-IDF Extension**
    - Open VS Code
@@ -43,13 +43,13 @@ Download and install VS Code from https://code.visualstudio.com/
 1. Press **F1** (or Ctrl+Shift+P)
 2. Type: `ESP-IDF: Configure ESP-IDF Extension`
 3. Select **Express**
-4. Select ESP-IDF version: **v5.3**
+4. Select ESP-IDF version: **v6.1**
 5. Choose installation directory (e.g., `~/esp/esp-idf`)
 6. Wait for installation to complete (~10-15 minutes)
 
 #### Option B: Use Existing ESP-IDF Installation
 
-If you already have ESP-IDF v5.3 installed:
+If you already have ESP-IDF v6.1 installed:
 
 1. Press **F1**
 2. Type: `ESP-IDF: Configure ESP-IDF Extension`

@@ -16,7 +16,7 @@
  * This is the primary customization point — no code changes needed.
  *
  * @see ESP-IDF NVS API:
- *      https://docs.espressif.com/projects/esp-idf/en/release-v5.3/esp32s3/api-reference/storage/nvs_flash.html
+ *      https://docs.espressif.com/projects/esp-idf/en/release-v6.1/esp32s3/api-reference/storage/nvs_flash.html
  */
 
 #ifndef OPENDASH_DISPLAY_CONFIG_H
@@ -125,7 +125,7 @@ typedef struct {
  * @return OPENDASH_OK on success.
  *
  * @note Uses nvs_open() / nvs_get_blob() internally.
- * @see https://docs.espressif.com/projects/esp-idf/en/release-v5.3/esp32s3/api-reference/storage/nvs_flash.html
+ * @see https://docs.espressif.com/projects/esp-idf/en/release-v6.1/esp32s3/api-reference/storage/nvs_flash.html
  */
 opendash_err_t opendash_config_load(opendash_node_t node,
                                      opendash_display_layout_t *layout);

@@ -10,7 +10,7 @@
  *       Left/Right, GPS). Keep it hardware-agnostic.
  *
  * @see ESP-IDF API Reference:
- *      https://docs.espressif.com/projects/esp-idf/en/release-v5.3/esp32s3/api-reference/index.html
+ *      https://docs.espressif.com/projects/esp-idf/en/release-v6.1/esp32s3/api-reference/index.html
  */
 
 #ifndef OPENDASH_COMMON_H

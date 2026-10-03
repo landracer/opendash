@@ -5,7 +5,7 @@ This document explains all the dependencies required to build OpenDash and how t
 
 ## Overview
 
-OpenDash uses ESP-IDF v5.3 as the main build system. Additionally, the build process automatically converts:
+OpenDash uses ESP-IDF v6.1 as the main build system — pinned reproduction point: the fleet is built against the dev snapshot `v6.1-dev-2441-gffb63db38b`. Additionally, the build process automatically converts:
 - **TrueType fonts** → LVGL C format (requires Node.js + npm)
 - **Images (PNG/JPG)** → LVGL C format (requires Python + Pillow + ImageMagick)
 
@@ -15,13 +15,13 @@ These conversions happen automatically during the CMake configuration phase. If 
 
 ## Required Dependencies
 
-### 1. ESP-IDF v5.3 (Required)
+### 1. ESP-IDF v6.1 (Required)
 
 **What it is:** The Espressif IoT Development Framework for ESP32-S3.
 
 **Installation:**
 
-Follow the official guide: https://docs.espressif.com/projects/esp-idf/en/release-v5.3/esp32s3/get-started/index.html
+Follow the official guide: https://docs.espressif.com/projects/esp-idf/en/release-v6.1/esp32s3/get-started/index.html
 
 **Quick install (Linux/macOS):**
 ```bash
@@ -31,7 +31,7 @@ sudo apt-get install git wget flex bison gperf python3 python3-pip python3-venv 
 # Clone ESP-IDF
 mkdir -p ~/esp
 cd ~/esp
-git clone --recursive https://github.com/espressif/esp-idf.git -b release/v5.3
+git clone --recursive https://github.com/espressif/esp-idf.git -b release/v6.1
 cd esp-idf
 
 # Install tools
@@ -303,10 +303,10 @@ pip3 install Pillow
 ## Summary
 
 **Minimum required to build:**
-- ESP-IDF v5.3
+- ESP-IDF v6.1
 
 **For full functionality (fonts + images):**
-- ESP-IDF v5.3
+- ESP-IDF v6.1
 - Node.js + npm
 - Python 3 + Pillow
 - ImageMagick

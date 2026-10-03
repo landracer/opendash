@@ -4,7 +4,8 @@
 > **Central reference for the entire OpenDash codebase.**
 > Start here to understand the project, then follow links to detailed documents.
 >
-> Last updated: June 2025
+> **Last updated:** 2026-10-02 (v0.1.0 baseline pass). Convention: bump this line
+> on every documentation pass — every doc in this repo carries one.
 
 ---
 
@@ -215,8 +216,9 @@ Every documentation file in the project, grouped by purpose.
 | [**center/README.md**](center/README.md) | Center display: multi-screen UI, display modes, CAN |
 | [**left/README.md**](left/README.md) | Left gauge: pin map, init sequence, build, UI layout |
 | [**right/README.md**](right/README.md) | Right gauge: same as left, node id 2 |
-| [`pod1/main/main.c`](pod1/main/main.c) | Pod 1 display and safety deployment unit |
-| [`pod2/main/main.c`](pod2/main/main.c) | Pod 2 display and safety deployment unit |
+| [`pod1/README.md`](pod1/README.md) | Pod 1 display + safety-deployment unit (CO5300 AMOLED, QMI8658 IMU votes) |
+| [`pod2/README.md`](pod2/README.md) | Pod 2 display + safety-deployment unit (same hardware as pod1) |
+| [`left-right/README.md`](left-right/README.md) | **[LEGACY]** unified pre-split pod firmware — superseded by `left/` + `right/`; historical reference only |
 | [**gps/README.md**](gps/README.md) | GPS unit: LC76G I2C CASIC, IMU, AMOLED |
 | [**gps/INTENSIVE_TODO.md**](gps/INTENSIVE_TODO.md) | Phased build plan for GPS firmware (partially archived) |
 
@@ -690,7 +692,7 @@ IDLE0 when updating 10+ LVGL labels on a hidden screen.
 
 | Tool | Version | Purpose |
 |---|---|---|
-| ESP-IDF | v5.3+ (v6.1-dev tested) | Build framework, FreeRTOS, drivers |
+| ESP-IDF | v6.1+ (v6.1-dev tested) | Build framework, FreeRTOS, drivers |
 | LVGL | 9.2 | Display rendering (managed component) |
 | Node.js + npm | Any LTS | `lv_font_conv` for font conversion |
 | Python 3 + Pillow | Any | `convert_images.py` for image conversion |

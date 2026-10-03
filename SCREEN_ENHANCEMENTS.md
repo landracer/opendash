@@ -301,7 +301,7 @@ if (fuel_level < 10) {
 
 ### Compatibility
 - LVGL v9.2+ API (uses `lv_timer_get_user_data()`, `lv_obj_add_flag()`, etc.)
-- ESP-IDF v5.3+ (uses FreeRTOS task APIs)
+- ESP-IDF v6.1+ (uses FreeRTOS task APIs)
 - Works with all three display nodes (center, left, right) — inherit from common
 
 ---
@@ -395,5 +395,5 @@ Potential additions (not yet implemented):
 
 ---
 
-**Last Updated:** February 17, 2026  
+**Last Updated:** 2026-10-02 (v0.1.0 baseline pass; warning-box API re-verified against `center/main/ui_manager.h`)  
 **Version:** 0.2.0 (Multi-Screen & Warning Boxes)
