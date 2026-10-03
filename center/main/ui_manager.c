@@ -53,7 +53,7 @@
 #include "opendash_relay.h"
 #include "opendash_uart.h"
 #include "opendash_obd_config.h"
-#include "opendash_i2c_protocol.h"
+#include "opendash_protocol.h"
 #include <stdarg.h>
 #include <stdio.h>
 #include "opendash_layout.h"

@@ -1,24 +1,38 @@
 /* Licensed under Sovereign Individual License v1.0 — see LICENSE file */
 /**
- * @file opendash_i2c_protocol.h
- * @brief OpenDash I2C Inter-Node Communication Protocol
+ * @file opendash_protocol.h
+ * @brief OpenDash Inter-Node Wire Protocol (transport: ESP-NOW)
  *
- * Defines the message format, command IDs, and node addresses for
- * communication between all OpenDash display nodes over the shared I2C bus.
+ * Defines the message frame, command opcodes and payload layouts exchanged
+ * between all OpenDash nodes.
  *
- * The Center display is always the I2C master. All other nodes are slaves.
+ * TRANSPORT: ESP-NOW (WiFi peer-to-peer) — ALWAYS. There is no wired
+ * inter-node bus in this system and there never will be: the hardware has no
+ * multi-drop bus between enclosures, and the GPIOs once earmarked for it are
+ * used by on-board peripherals. I2C exists in this project ONLY as a local,
+ * point-to-point peripheral bus inside a single enclosure (touch controller,
+ * RTC, IO expander, IMU, GNSS). It is never used to network nodes together.
  *
- * @par Protocol Format
- * Every message uses a fixed-header format:
+ * The frame defined here is transport-agnostic (it was carried over I2C in
+ * pre-v0.4 firmware) and is today serialized straight into an ESP-NOW packet.
+ * See opendash_espnow.h for the transport and docs/espnow-protocol.md for the
+ * human-readable specification.
+ *
+ * @par Frame Format
  * | SYNC (0xAA) | CMD (1B) | LENGTH (1B) | PAYLOAD (0-248B) | CHECKSUM (1B) |
+ * Checksum is XOR of SYNC, CMD, LENGTH and all payload bytes.
  *
- * @see docs/i2c-protocol.md for the full protocol specification.
- * @see ESP-IDF I2C Driver:
- *      https://docs.espressif.com/projects/esp-idf/en/release-v5.3/esp32s3/api-reference/peripherals/i2c.html
+ * @par Node Identity
+ * Nodes are addressed by their 48-bit WiFi MAC over ESP-NOW and identified
+ * logically by opendash_node_t (opendash_common.h). There are no bus addresses.
+ *
+ * @see opendash_espnow.h — ESP-NOW transport (init, peers, send/recv queue)
+ * @see channel_management.h — priority channels, retries, quarantine
+ * @see docs/espnow-protocol.md — full protocol specification
  */
 
-#ifndef OPENDASH_I2C_PROTOCOL_H
-#define OPENDASH_I2C_PROTOCOL_H
+#ifndef OPENDASH_PROTOCOL_H
+#define OPENDASH_PROTOCOL_H
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -29,80 +43,6 @@
 extern "C" {
 #endif
 
-/* ────────────────────────────────────────────────────────────────────────────
- * I2C Bus Configuration
- * ──────────────────────────────────────────────────────────────────────────── */
-
-/** @brief I2C port used for inter-node communication.
- *
- * The inter-node bus MUST use a different I2C port than the on-board I2C bus.
- * On the Waveshare 2.8C boards (left/right), PORT 0 is used for
- * the on-board TCA9554 + GT911 (SDA=GPIO15, SCL=GPIO7).
- * Therefore the inter-node bus uses PORT 1.
- *
- * On the Waveshare 4.3" center board, PORT 0 is used for GT911 touch
- * (SDA=GPIO19, SCL=GPIO20).  The inter-node bus also uses PORT 1.
- */
-#define OPENDASH_I2C_PORT       1
-
-/** @brief I2C clock speed in Hz (400 kHz = Fast Mode). */
-#define OPENDASH_I2C_FREQ_HZ   400000
-
-/** @brief GPIO pin for I2C SDA (inter-node bus, shared across all nodes).
- *
- * WARNING: On the Waveshare 2.8C boards (left/right), GPIO 15 is used by
- * the on-board TCA9554 I2C master bus.  DO NOT use GPIO 15 for the
- * inter-node bus on those boards — it will cause NACK errors on every
- * TCA9554 transaction due to EMI coupled from the long inter-board wire.
- *
- * GPIO 4 is available on the 2.8C boards as I2C_SLAVE_SDA, but is
- * hardwired to GT911 INT on the PCB.  Using GPIO 4 requires the GT911
- * to be held in permanent reset (EXIO2=LOW) to prevent bus interference.
- *
- * For production boards, a dedicated inter-node SDA pin should be used.
- * Current prototype wiring: GPIO 4 (left/right), GPIO 15 (center).
- */
-#define OPENDASH_I2C_SDA_PIN   4
-
-/** @brief GPIO pin for I2C SCL (inter-node bus, shared across all nodes). */
-#define OPENDASH_I2C_SCL_PIN   16
-
-/* ────────────────────────────────────────────────────────────────────────────
- * I2C Slave Addresses
- * ──────────────────────────────────────────────────────────────────────────── */
-
-/** @brief I2C address of the Left gauge pod. */
-#define OPENDASH_I2C_ADDR_LEFT  0x10
-
-/** @brief I2C address of the Right gauge pod. */
-#define OPENDASH_I2C_ADDR_RIGHT 0x11
-
-/** @brief I2C address of the GPS/Telemetry unit. */
-#define OPENDASH_I2C_ADDR_GPS   0x12
-
-/** @brief I2C address of the external BMS node (rAtTrax).
- *  NOTE: 0x20 conflicts with the TCA9554 IO expander on the 2.8C boards.
- *  This is safe because the BMS is on the INTER-NODE bus (port 1) while
- *  the TCA9554 is on the ON-BOARD bus (port 0) — different physical buses.
- *  If the buses are ever bridged, change this address to avoid conflict. */
-#define OPENDASH_I2C_ADDR_BMS   0x20
-
-/* Expansion pod addresses (0x30–0x37) */
-#define OPENDASH_I2C_ADDR_POD1  0x30    /**< Expansion pod 1 */
-#define OPENDASH_I2C_ADDR_POD2  0x31    /**< Expansion pod 2 */
-#define OPENDASH_I2C_ADDR_POD3  0x32    /**< Expansion pod 3 */
-#define OPENDASH_I2C_ADDR_POD4  0x33    /**< Expansion pod 4 */
-#define OPENDASH_I2C_ADDR_POD5  0x34    /**< Expansion pod 5 */
-#define OPENDASH_I2C_ADDR_POD6  0x35    /**< Expansion pod 6 */
-#define OPENDASH_I2C_ADDR_POD7  0x36    /**< Expansion pod 7 */
-#define OPENDASH_I2C_ADDR_POD8  0x37    /**< Expansion pod 8 */
-
-/* Relay / MOS controller addresses (0x40–0x44) */
-#define OPENDASH_I2C_ADDR_RELAY_4CH   0x40  /**< 4-channel HD relay (fans, pumps) */
-#define OPENDASH_I2C_ADDR_RELAY_8CH_A 0x41  /**< 8-channel relay module A */
-#define OPENDASH_I2C_ADDR_RELAY_8CH_B 0x42  /**< 8-channel relay module B */
-#define OPENDASH_I2C_ADDR_MOS_4CH_A   0x43  /**< 4-channel MOS module A (PWM/on-off) */
-#define OPENDASH_I2C_ADDR_MOS_4CH_B   0x44  /**< 4-channel MOS module B (PWM/on-off) */
 
 /* ────────────────────────────────────────────────────────────────────────────
  * Message Format Constants
@@ -269,10 +209,11 @@ extern "C" {
  * ──────────────────────────────────────────────────────────────────────────── */
 
 /**
- * @brief I2C message structure.
+ * @brief Inter-node message structure.
  *
  * All inter-node messages use this structure. The checksum field is
  * automatically computed when building a message and verified on receipt.
+ * This frame is carried verbatim inside an ESP-NOW packet.
  */
 typedef struct {
     uint8_t  sync;                                  /**< Always OPENDASH_MSG_SYNC (0xAA) */
@@ -280,17 +221,18 @@ typedef struct {
     uint8_t  length;                                /**< Payload length in bytes */
     uint8_t  payload[OPENDASH_MSG_MAX_PAYLOAD];     /**< Message payload */
     uint8_t  checksum;                              /**< XOR of sync, cmd, length, and all payload bytes */
-} opendash_i2c_msg_t;
+} opendash_msg_t;
 
 /* ────────────────────────────────────────────────────────────────────────────
  * Protocol Functions
  * ──────────────────────────────────────────────────────────────────────────── */
 
 /**
- * @brief Build an I2C message with the correct sync byte and checksum.
+ * @brief Build a message with the correct sync byte and checksum.
  *
  * Populates the message structure with the given command and payload,
- * then computes and sets the checksum field.
+ * then computes and sets the checksum field. The result is handed to
+ * channel_mgr_send_to_node() / opendash_espnow_send() for ESP-NOW delivery.
  *
  * @param[out] msg      Pointer to message structure to populate.
  * @param[in]  cmd      Command ID byte.
@@ -299,13 +241,13 @@ typedef struct {
  *
  * @return OPENDASH_OK on success, OPENDASH_ERR_INVALID_ARG if parameters are invalid.
  */
-opendash_err_t opendash_i2c_build_msg(opendash_i2c_msg_t *msg,
+opendash_err_t opendash_msg_build(opendash_msg_t *msg,
                                        uint8_t cmd,
                                        const uint8_t *payload,
                                        uint8_t length);
 
 /**
- * @brief Validate a received I2C message.
+ * @brief Validate a received message.
  *
  * Checks the sync byte and verifies the checksum.
  *
@@ -313,13 +255,13 @@ opendash_err_t opendash_i2c_build_msg(opendash_i2c_msg_t *msg,
  *
  * @return true if the message is valid, false otherwise.
  */
-bool opendash_i2c_validate_msg(const opendash_i2c_msg_t *msg);
+bool opendash_msg_validate(const opendash_msg_t *msg);
 
 /**
- * @brief Serialize a message into a byte buffer for I2C transmission.
+ * @brief Serialize a message into a byte buffer for ESP-NOW transmission.
  *
- * Converts the message structure into a contiguous byte array suitable
- * for sending over the I2C bus.
+ * Converts the message structure into the contiguous byte array that is
+ * placed in the ESP-NOW packet payload.
  *
  * @param[in]  msg      Pointer to the message to serialize.
  * @param[out] buffer   Output byte buffer (must be at least OPENDASH_MSG_MAX_SIZE bytes).
@@ -327,7 +269,7 @@ bool opendash_i2c_validate_msg(const opendash_i2c_msg_t *msg);
  *
  * @return OPENDASH_OK on success, OPENDASH_ERR_INVALID_ARG if parameters are invalid.
  */
-opendash_err_t opendash_i2c_serialize(const opendash_i2c_msg_t *msg,
+opendash_err_t opendash_msg_serialize(const opendash_msg_t *msg,
                                        uint8_t *buffer,
                                        uint16_t *out_len);
 
@@ -344,21 +286,13 @@ opendash_err_t opendash_i2c_serialize(const opendash_i2c_msg_t *msg,
  * @return OPENDASH_OK on success, OPENDASH_ERR_CHECKSUM if checksum fails,
  *         OPENDASH_ERR_INVALID_ARG if parameters are invalid.
  */
-opendash_err_t opendash_i2c_deserialize(const uint8_t *buffer,
+opendash_err_t opendash_msg_deserialize(const uint8_t *buffer,
                                          uint16_t length,
-                                         opendash_i2c_msg_t *msg);
+                                         opendash_msg_t *msg);
 
-/**
- * @brief Get the I2C slave address for a given node type.
- *
- * @param[in] node  Node type enumeration value.
- *
- * @return I2C address (7-bit), or 0 if node is the master (Center) or invalid.
- */
-uint8_t opendash_i2c_get_addr(opendash_node_t node);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* OPENDASH_I2C_PROTOCOL_H */
+#endif /* OPENDASH_PROTOCOL_H */

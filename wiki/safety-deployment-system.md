@@ -383,7 +383,7 @@ python scripts/od-flash.py pod2   --no-monitor
 | Thresholds, structs, actuator + config API | [`common/include/opendash_parachute.h`](../common/include/opendash_parachute.h) |
 | Distributed-detection tunables + detector API | [`common/include/opendash_rollover.h`](../common/include/opendash_rollover.h) |
 | Shared detector state machine + zero/cal | [`common/src/opendash_rollover_detector.c`](../common/src/opendash_rollover_detector.c) |
-| Opcodes | [`common/include/opendash_i2c_protocol.h`](../common/include/opendash_i2c_protocol.h) |
+| Opcodes | [`common/include/opendash_protocol.h`](../common/include/opendash_protocol.h) |
 | Center vote cache, fusion, senders | [`center/main/espnow_master.c`](../center/main/espnow_master.c) |
 | Center deploy panel + ARM bar + ZERO/CAL | [`center/main/ui_manager.c`](../center/main/ui_manager.c) |
 | Detector wiring (config/pull/calibrate dispatch) | `right/main/main.c`, `pod1/main/main.c`, `pod2/main/main.c` |

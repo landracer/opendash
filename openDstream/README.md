@@ -21,7 +21,7 @@ line per DP over UART to the host (multidisplay-app Qt application).
 - **Channel**: locked to **channel 1** — matches the BMS Logger (`main.cpp`
   in `rAtTrax_BMS_Logger` pins the same channel).
 - **Frame format** (identical to the fleet protocol, see
-  `common/include/opendash_i2c_protocol.h`):
+  `common/include/opendash_protocol.h`):
 
   `[SYNC 0xAA][CMD 1B][LEN 1B][payload…][XOR checksum 1B]`
 

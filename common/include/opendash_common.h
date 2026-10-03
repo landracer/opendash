@@ -46,15 +46,17 @@ extern "C" {
 /**
  * @brief Enumeration of all OpenDash node types.
  *
- * Each physical device in the system is assigned a unique node type. This is
- * used for I2C addressing, logging, and configuration management.
+ * Each physical device in the system is assigned a unique node type. It is the
+ * logical identity used for routing, logging, health tracking and NVS
+ * configuration. On the wire, nodes are addressed by their WiFi MAC over
+ * ESP-NOW; this enum is how the fleet refers to them. There is no bus address.
  *
  * POD nodes (POD1–POD8) allow unlimited expansion with additional
- * Waveshare ESP32-S3 displays. Each pod gets a unique I2C address and
- * can have independent splash/background images and gauge layouts.
+ * Waveshare ESP32-S3 displays. Each pod joins the ESP-NOW mesh automatically
+ * and can have independent splash/background images and gauge layouts.
  */
 typedef enum {
-    OPENDASH_NODE_CENTER    = 0,    /**< Center display (4.3" LCD, I2C master) */
+    OPENDASH_NODE_CENTER    = 0,    /**< Center display (4.3" LCD, ESP-NOW master) */
     OPENDASH_NODE_LEFT      = 1,    /**< Left gauge pod (2.8" round LCD) */
     OPENDASH_NODE_RIGHT     = 2,    /**< Right gauge pod (2.8" round LCD) */
     OPENDASH_NODE_GPS       = 3,    /**< GPS/Telemetry unit (1.75" AMOLED) */

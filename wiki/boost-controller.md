@@ -3,7 +3,7 @@
 
 > **Heritage credit:** the runtime + map layout are direct descendants of the
 > `RPMBoostController` written by Stephan Martin & Dominik Gummel for the
-> [MultiDisplay](../multidisplay-firmware/multidisplay/) project (GPL-3.0).
+> `MultiDisplay` project (GPL-3.0; upstream repo not vendored in-tree).
 > Wire format is intentionally compatible so MultiDisplay-era maps can be
 > ported with zero loss.
 
@@ -95,7 +95,7 @@ setpoint rows + 1 throttle reduction curve + 1 params blob.
 | S→C       | `BOOST_THROTTLE_REPORT`          | `0x94` | `opendash_boost_throttle_curve_t`   |
 
 All frames go over ESP-NOW (250-byte max). The opcodes live in
-`opendash_i2c_protocol.h` because that header is the shared wire-format
+`opendash_protocol.h` because that header is the shared wire-format
 catalogue — the actual transport is `opendash_espnow_send()`.
 
 ## 5. Safety Flags
@@ -266,7 +266,7 @@ This ensures no conflicts occur during the OTA process.
 | [center/main/boost_config_ui.c](../center/main/boost_config_ui.c)       | LVGL System Config screen — Page 1 / Page 2 editor                            |
 | [center/main/system_config.c](../center/main/system_config.c)           | NVS-backed boost target selection                                             |
 | [common/src/opendash_bt_ota.c](../common/src/opendash_bt_ota.c)         | Shared BLE GATT OTA service (used by MOS-A/MOS-B)                            |
-| [common/include/opendash_i2c_protocol.h](../common/include/opendash_i2c_protocol.h) | Opcode catalogue (`BOOST_* 0x20..0x26`, `SYSTEM 0x07 + ENTER_BT_OTA 0x06`) |
+| [common/include/opendash_protocol.h](../common/include/opendash_protocol.h) | Opcode catalogue (`BOOST_* 0x20..0x26`, `SYSTEM 0x07 + ENTER_BT_OTA 0x06`) |
 | [boost-controller-opendash.md](../boost-controller-opendash.md)         | Design doc — Appendix B safe defaults, Appendix C MOS BLE OTA procedure       |
 
 ---

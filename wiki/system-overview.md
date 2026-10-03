@@ -42,7 +42,7 @@ the CENTER touch screen, and the CENTER USB console), and three update paths
 
 | Node | Hardware | Role |
 |---|---|---|
-| **openDstream** | ESP32-WROOM-32 | **ESP-NOW → UART bridge.** Listens on channel 1 (same as the BMS Logger), decodes OpenDash frames, and prints each DP as a `DP:0x…:v.vv` line over UART0 → onboard USB-UART bridge → host PC (multidisplay-app Qt application). Headless, no display. See [`openDstream/README.md`](../opendash/openDstream/README.md) |
+| **openDstream** | ESP32-WROOM-32 | **ESP-NOW → UART bridge.** Listens on channel 1 (same as the BMS Logger), decodes OpenDash frames, and prints each DP as a `DP:0x…:v.vv` line over UART0 → onboard USB-UART bridge → host PC (multidisplay-app Qt application). Headless, no display. See [`openDstream/README.md`](../openDstream/README.md) |
 
 All nodes share `common/` for: ESP-NOW protocol, data model, BLE-OTA service,
 node health state machine, NVS persistence, and layout system. Node-specific
@@ -346,7 +346,7 @@ insert before power-up. FAT32 is required. Files rotate at midnight UTC.
 | Want to… | Read this |
 |---|---|
 | Build for the first time | [`QUICKSTART.md`](../QUICKSTART.md) + [`BUILD_DEPENDENCIES.md`](../BUILD_DEPENDENCIES.md) |
-| Understand the wireless protocol | [`docs/i2c-protocol.md`](../docs/i2c-protocol.md) (despite the name, it covers ESP-NOW) |
+| Understand the wireless protocol | [`docs/espnow-protocol.md`](../docs/espnow-protocol.md) |
 | See every data point on the bus | [`docs/data-points.md`](../docs/data-points.md) |
 | Run a BLE OTA right now | [`wiki/ota-bluetooth.md`](./ota-bluetooth.md) |
 | Plan an Android client | [`wiki/ota-android-plan.md`](./ota-android-plan.md) |

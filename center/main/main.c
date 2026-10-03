@@ -39,7 +39,7 @@
 #include "opendash_identity.h"
 #include "opendash_uart.h"
 #include "opendash_obd_config.h"
-#include "opendash_i2c_protocol.h"
+#include "opendash_protocol.h"
 #include "splash_center.h"
 #include "background_center.h"
 #include "system_config.h"

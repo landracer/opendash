@@ -24,7 +24,8 @@ ESP-NOW mesh, with CENTER as master.
 │  └──────┬───────┘   └─────────┬──────────┘   └──────┬───────┘      │
 │         │                     │                      │              │
 │         └─────────────────────┼──────────────────────┘              │
-│                               │  I2C Bus                            │
+│                               │  ESP-NOW (2.4 GHz radio,             │
+│                               │  no wires between nodes)              │
 │                    ┌──────────┴──────────┐                          │
 │                    │    GPS / TELEMETRY   │                          │
 │                    │   (1.75" AMOLED Rnd) │                          │
@@ -37,18 +38,37 @@ ESP-NOW mesh, with CENTER as master.
 
 ## Communication Architecture
 
-All four devices communicate using ESP-NOW (WiFi peer-to-peer) instead of I2C due to hardware limitations and GPIO conflicts. The **Center** display acts as the ESP-NOW master, with all other nodes acting as slaves.
+## Communication Architecture
 
-| Node | Address | Role | Description |
-|---|---|---|---|
-| Center | Master | ESP-NOW Master | Broadcasts data to slaves, aggregates data, primary display |
-| Left | `0x10` | ESP-NOW Slave | Receives display data from master |
-| Right | `0x11` | ESP-NOW Slave | Receives display data from master |
-| GPS | `0x12` | ESP-NOW Slave | Provides GPS/IMU data, receives display commands |
-| BMS (ext.) | `0x20` | ESP-NOW Slave | External BMS node (rAtTrax integration) |
+All nodes communicate over **ESP-NOW** (Wi-Fi peer-to-peer radio). There is **no
+wired inter-node bus** — the historical I2C inter-node design was abandoned
+(see Important Note below). The **Center** display is the logical master; every
+other node is a slave that pushes data on change.
+
+Nodes are identified by a **logical node ID** carried in every frame and mapped
+to a MAC via the persistent peer table — the ID is *not* a bus address.
+
+| Node | `opendash_node_t` | ID | Role | Description |
+|---|---|---|---|---|
+| Center | `OPENDASH_NODE_CENTER` | 0 | Master | Routes frames to the owning channel task, aggregates data, primary display |
+| Left | `OPENDASH_NODE_LEFT` | 1 | Slave | Renders gauge data pushed by Center |
+| Right | `OPENDASH_NODE_RIGHT` | 2 | Slave | Renders gauge data pushed by Center |
+| GPS | `OPENDASH_NODE_GPS` | 3 | Slave | **⛔ FROZEN 2026-09-29** — LC76G module is hard-fixed at 1 Hz with no usable command channel; unusable for racing telemetry. See `wiki/GPS-LC76G-POSTMORTEM.md`. No further development. |
+| BMS (ext.) | `OPENDASH_NODE_BMS` | 4 | Slave | External BMS node (rAtTrax integration) |
+| POD1–POD8 | `OPENDASH_NODE_POD1..8` | 5–12 | Slave | Expansion gauge pods |
+| Relay / MOS | `OPENDASH_NODE_RELAY_4CH` … `MOS_4CH_B` | 13–17 | Slave | Silent-slave relay + MOS FET controllers |
 
 ### ⚠️ Important Note
-The original design intended to use I2C for inter-node communication, but due to hardware limitations and GPIO conflicts, the system was re-implemented to use ESP-NOW (WiFi peer-to-peer) for communication between nodes. This provides zero-wire communication with no GPIO conflicts and better reliability.
+The original design intended to use I2C for inter-node communication, but due to
+hardware limitations and GPIO conflicts, the system was re-implemented to use
+ESP-NOW (Wi-Fi peer-to-peer). This provides zero-wire communication with no GPIO
+conflicts and better reliability.
+
+I2C remains only as a **local peripheral** bus (touch controller, IMU, GNSS
+receiver). Those pins are fixed in silicon and are unrelated to inter-node
+traffic. The only surviving I2C code is therefore `peripheral_i2c_init()`
+(`common/src/opendash_i2c_master.c`), which initializes a local controller —
+it does not carry node traffic.
 
 ## Data Flow
 
@@ -81,15 +101,13 @@ The original design intended to use I2C for inter-node communication, but due to
 
 1. **Center** unit acts as the ESP-NOW master and system coordinator
 2. **GPS unit** continuously reads GNSS and IMU data, stores latest readings
-3. **Center** polls GPS unit for position, speed, g-force data
+3. **GPS unit** pushes position, speed, and g-force on change (no polling — see
+   `docs/espnow-protocol.md` §4)
 4. **Center** reads OBD2/CAN data directly (onboard CAN transceiver)
 5. **Center** distributes relevant data to Left and Right gauge pods
 6. **Left/Right** render their configured data points
-7. **BMS node** provides battery data when polled
+7. **BMS node** pushes battery data on change
 8. **SD card logging** happens on the Center unit (primary) and GPS unit (backup)
-
-### ⚠️ Important Note
-The original design intended to use I2C for inter-node communication, but due to hardware limitations and GPIO conflicts, the system was re-implemented to use ESP-NOW (WiFi peer-to-peer) for communication between nodes. This provides zero-wire communication with no GPIO conflicts and better reliability.
 
 ## Software Architecture (Per Node)
 
@@ -104,33 +122,53 @@ Each node follows the same layered architecture:
 │  (Data Model, Checklist, Alarms)     │
 ├─────────────────────────────────────┤
 │          Communication Layer         │
-│  (I2C Protocol, WiFi/BLE, OBD2)     │
+│ (ESP-NOW transport, channel router,  │
+│   node_health, protocol codec, OBD2) │
 ├─────────────────────────────────────┤
 │           Driver Layer               │
-│  (Display, Touch, GPS, IMU, SD)      │
+│  (Display, Touch, GNSS, IMU, SD,     │
+│   RTC — local peripheral I2C only)   │
 ├─────────────────────────────────────┤
 │           ESP-IDF / FreeRTOS         │
-│  (Tasks, Timers, GPIO, SPI, I2C)     │
+│  (Tasks, Timers, GPIO, SPI, I2C      │
+│   peripheral controllers)            │
 └─────────────────────────────────────┘
 ```
 
 ## FreeRTOS Task Structure
 
-Each node runs the following tasks:
+Values below are read from the code, not planned. Priorities are FreeRTOS
+priority numbers (higher = more urgent).
+
+### Center (master) — see `center/main/espnow_master.c`
 
 | Task | Priority | Core | Description |
 |---|---|---|---|
-| `ui_task` | 5 | 1 | LVGL rendering loop (runs on core 1 for smooth UI) |
-| `comms_task` | 4 | 0 | I2C communication (master polling or slave responses) |
-| `data_task` | 3 | 0 | Data processing, alarm checking, logging |
-| `wifi_ble_task` | 2 | 0 | WiFi/BLE management (only when active) |
+| `ch_control` | 6 | 0 | Control channel — commands, highest priority ("commands must not wait") |
+| `ch_critical` | 5 | 0 | Critical channel (GPS/BMS/engine class data) |
+| `espnow_dispatch` | 4 | 0 | Routes raw ESP-NOW frames into the per-channel queues |
+| `ch_medium` | 4 | 0 | Medium channel (pod displays, relay feedback) |
+| `ch_low` | 3 | 1 | Low channel (diagnostics, config) — off-cored to keep core 0 responsive |
+| `ota_serial_cmd_task` | — | — | UART OTA ingest (`od-serial-ota-req`) |
 
-### GPS Unit Additional Tasks
+A health-evaluation timer runs at 2 Hz (500 ms); `node_health_evaluate()` checks
+internally whether the window has elapsed.
+
+### Gauge pods (left / right / POD1–POD8)
 
 | Task | Priority | Core | Description |
 |---|---|---|---|
-| `gps_task` | 5 | 0 | GNSS data reading and parsing |
-| `imu_task` | 5 | 0 | IMU data reading (accelerometer + gyro) |
+| `ui_task` | 5 | 1 | LVGL rendering loop (core 1 for smooth UI) |
+| `touch_rd` | 3 | 0 | Touch controller polling |
+| `boot_btn` | 2 | 0 | Boot/GPIO0 button reader |
+
+### GPS unit (frozen)
+
+| Task | Priority | Core | Description |
+|---|---|---|---|
+| `gps_task` | 8 | 0 | GNSS read/parse — above touch/IMU/UI so GPS is never starved |
+| `imu_task` | 5 | 0 | QMI8658 motion sampling |
+| `gps_broadcast` | 4 | 0 | Reads sensors + handles inbound ESP-NOW messages |
 | `parachute_task` | 6 | 0 | Safety monitor — highest priority for immediate response |
 
 ## Configuration System

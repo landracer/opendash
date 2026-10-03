@@ -126,41 +126,46 @@
 | Touch SDA | GPIO1 | CST9217 I2C data |
 | Touch SCL | GPIO2 | CST9217 I2C clock |
 | Touch INT | GPIO3 | Touch interrupt |
-| ~~GPS TX~~ | ~~GPIO17~~ | ~~LC76G UART TX~~ — **NOT USED: GPS is I2C** |
-| ~~GPS RX~~ | ~~GPIO18~~ | ~~LC76G UART RX~~ — **NOT USED: GPS is I2C** |
-| **GPS I2C** | **GPIO15/14** | LC76G via **CASIC I2C** (0x50/0x54/0x58, 100 kHz, shared bus) |
-| IMU SDA | GPIO5 | QMI8658 I2C data |
-| IMU SCL | GPIO6 | QMI8658 I2C clock |
-| I2C SDA (ext) | GPIO15 | External I2C bus (inter-node) |
-| I2C SCL (ext) | GPIO16 | External I2C bus (inter-node) |
+| ~~GPS TX~~ | ~~GPIO17~~ | ~~LC76G UART TX~~ — **NOT USED: LC76G is CASIC-over-I2C** |
+| ~~GPS RX~~ | ~~GPIO18~~ | ~~LC76G UART RX~~ — **NOT USED** |
+| **GNSS SDA** | **GPIO15** | LC76G GNSS receiver — **local peripheral**, CASIC addresses 0x50/0x54/0x58 @ 100 kHz |
+| **GNSS SCL** | **GPIO16** | LC76G GNSS receiver clock — **local peripheral** |
+| IMU SDA | GPIO5 | QMI8658 I2C data (local peripheral) |
+| IMU SCL | GPIO6 | QMI8658 I2C clock (local peripheral) |
 | SD CMD | GPIO40 | SD card command |
 | SD CLK | GPIO41 | SD card clock |
 | SD D0 | GPIO39 | SD card data |
 
+> ⚠️ **These I2C pins carry no inter-node traffic.** They connect a module to its
+> own controller. Note also that **GPIO14 is AMOLED D3 (QSPI data)** on this board,
+> so the older `GPIO15/14` pairing quoted in pre-v16 docs is wrong on both counts —
+> it collides with the QSPI data line. Use the pair above.
+
 ---
 
-## Wiring — Inter-Node I2C Bus
+## Inter-Node Wiring — None (ESP-NOW)
 
-All four nodes (Center, Left, Right, GPS) connect via a shared I2C bus:
+There is **no inter-node bus to wire.** Every node is radio-only (ESP-NOW on
+channel 1): no SDA/SCL between nodes, no pairing wire, no bus terminator, no
+shared pull-ups. The historical 4-node I2C bus design was abandoned because
+those GPIOs collide with the display/touch FPC connectors on every board in use.
 
+If you find a `GPIO15 SDA / GPIO16 SCL "external bus"` pair in an older doc,
+schematic note, or source comment, it is obsolete — **do not wire it.** The
+only I2C that still exists is point-to-point between a chip and its own module
+(touch controller, IMU, GNSS receiver on their own pins).
+
+To check a node joined the mesh, use the radio, not a multimeter:
+
+```bash
+cd /home/sysadmin/Documents/rAtTrax-Dash/opendash/center
+idf.py -p /dev/ttyACM0 monitor | grep -iE 'espnow_master|ANNOUNCE|ONLINE'
 ```
-        3.3V ──┬──── 4.7kΩ ────┬──── 4.7kΩ ────┐
-               │                │                │
-              SDA              SCL              GND
-               │                │                │
-    ┌──────────┼────────────────┼────────────────┼──────────┐
-    │  CENTER  │  GPIO15(SDA)   │  GPIO16(SCL)   │  GND     │
-    ├──────────┼────────────────┼────────────────┼──────────┤
-    │  LEFT    │  GPIO15(SDA)   │  GPIO16(SCL)   │  GND     │
-    ├──────────┼────────────────┼────────────────┼──────────┤
-    │  RIGHT   │  GPIO15(SDA)   │  GPIO16(SCL)   │  GND     │
-    ├──────────┼────────────────┼────────────────┼──────────┤
-    │  GPS     │  GPIO15(SDA)   │  GPIO16(SCL)   │  GND     │
-    └──────────┴────────────────┴────────────────┴──────────┘
-```
 
-> **Important:** Use 4.7kΩ pull-up resistors on SDA and SCL lines.
-> Only one set of pull-ups is needed per bus (not per device).
+A slave that has joined prints its one-time `ANNOUNCE`; Center then pins its MAC
+into the persistent peer table (`node_health_register_mac()`).
+
+---
 
 ## Power Supply
 

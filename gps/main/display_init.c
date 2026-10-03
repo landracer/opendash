@@ -107,6 +107,21 @@ static TaskHandle_t            button_task_handle = NULL;
 static bool     touch_pressed = false;
 static uint16_t touch_x = 0, touch_y = 0;
 
+/* v16k-port: Touch is INTERRUPT-driven. The CST9217 INT line (GPIO11, active
+ * low) wakes the reader task only while a finger is on the panel — zero I2C
+ * traffic on the shared bus while idle. This keeps touch functional WITHOUT
+ * the 50 Hz blind polling that was root cause #2 (bus contention with LC76G).
+ * See wiki/gps-driver-debugging-v16.md §2.2. */
+static SemaphoreHandle_t touch_irq_sem = NULL;
+
+static void touch_irq_cb(esp_lcd_touch_handle_t tp)
+{
+    (void)tp;
+    BaseType_t hi = pdFALSE;
+    if (touch_irq_sem) xSemaphoreGiveFromISR(touch_irq_sem, &hi);
+    if (hi) portYIELD_FROM_ISR();
+}
+
 /* ──────────────────────────────────────────────────────────────────────────
  * CO5300 Vendor Init Commands
  * ──────────────────────────────────────────────────────────────────────── */
@@ -281,6 +296,9 @@ static esp_err_t touch_init(void)
 {
     ESP_LOGI(TAG, "Initializing CST9217 touch controller...");
 
+    if (touch_irq_sem == NULL) touch_irq_sem = xSemaphoreCreateBinary();
+    configASSERT(touch_irq_sem);
+
     /* Create touch panel IO over I2C */
     esp_lcd_panel_io_handle_t tp_io_handle = NULL;
     esp_lcd_panel_io_i2c_config_t tp_io_config = ESP_LCD_TOUCH_IO_I2C_CST9217_CONFIG();
@@ -297,6 +315,7 @@ static esp_err_t touch_init(void)
             .reset     = 0,
             .interrupt = 0,
         },
+        .interrupt_callback = touch_irq_cb,   /* v16k-port: INT-driven wake */
         .flags = {
             .swap_xy  = 0,
             .mirror_x = 1,
@@ -320,24 +339,56 @@ static void touch_read_task(void *pvParameters)
     esp_lcd_touch_point_data_t points[1];
     uint8_t count = 0;
 
-    ESP_LOGI(TAG, "Touch reading task started");
+    ESP_LOGI(TAG, "Touch reading task started (interrupt-driven — no idle polling)");
     while (1) {
+        /* Idle: sleep until CST9217 INT fires (binary sem). The 2s timeout is
+         * a fallback heartbeat probe so touch still works even if the INT line
+         * misbehaves — one probe read every 2s is negligible bus traffic. */
+        (void)xSemaphoreTake(touch_irq_sem, pdMS_TO_TICKS(2000));
+
         if (touch_handle != NULL) {
             esp_lcd_touch_read_data(touch_handle);
+            count = 0;
             esp_err_t ret = esp_lcd_touch_get_data(touch_handle, points, &count, 1);
+            if (ret != ESP_OK) count = 0;
+        } else {
+            count = 0;
+        }
 
+        if (count == 0) continue;   /* no contact — back to sleep */
+
+        if (display_lvgl_lock(10)) {
+            touch_pressed = true;
+            touch_x = points[0].x;
+            touch_y = points[0].y;
+            display_lvgl_unlock();
+        }
+        ESP_LOGI(TAG, "TOUCH: contact at %u,%u", (unsigned)points[0].x, (unsigned)points[0].y);
+
+        /* Contact active: fast-poll at 50 Hz only while finger is down. */
+        for (;;) {
+            vTaskDelay(pdMS_TO_TICKS(20));
+            if (touch_handle == NULL) break;
+            esp_lcd_touch_read_data(touch_handle);
+            uint8_t c2 = 0;
+            if (esp_lcd_touch_get_data(touch_handle, points, &c2, 1) != ESP_OK || c2 == 0) break;
             if (display_lvgl_lock(10)) {
-                if (ret == ESP_OK && count > 0) {
-                    touch_pressed = true;
-                    touch_x = points[0].x;
-                    touch_y = points[0].y;
-                } else {
-                    touch_pressed = false;
-                }
+                touch_x = points[0].x;
+                touch_y = points[0].y;
                 display_lvgl_unlock();
             }
         }
-        vTaskDelay(pdMS_TO_TICKS(20));  /* 50 Hz */
+
+        if (display_lvgl_lock(10)) {
+            touch_pressed = false;
+            touch_x = 0;
+            touch_y = 0;
+            display_lvgl_unlock();
+        }
+        ESP_LOGI(TAG, "TOUCH: release");
+
+        /* Drain IRQs queued during the contact burst. */
+        while (xSemaphoreTake(touch_irq_sem, 0) == pdTRUE) { }
     }
 }
 
@@ -484,9 +535,9 @@ esp_err_t display_init(void)
     /* 5. Boot button */
     boot_button_init();
 
-    /* 6. Start touch reading task */
+    /* 6. Start touch reading task (interrupt-driven — no idle bus traffic) */
     xTaskCreatePinnedToCore(touch_read_task, "touch_read", 4096, NULL, 4, NULL, 0);
-    ESP_LOGI(TAG, "Touch read task started (50 Hz)");
+    ESP_LOGI(TAG, "Touch read task started (IRQ-gated; 50 Hz only during contact)");
 
     /* 7. Start button reading task */
     xTaskCreatePinnedToCore(button_read_task, "button_task", 4096, NULL, 4,

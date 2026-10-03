@@ -103,22 +103,15 @@ extern "C" {
 
 /* ────────────────────────────────────────────────────────────────────────────
  * Touch Controller — GT911 (Capacitive)
- * Same I2C bus as TCA9554.
+ * Same I2C bus as TCA9554. This bus is LOCAL to this enclosure only — it is
+ * never used to communicate with other OpenDash nodes (that is ESP-NOW).
  * RST: TCA9554 EXIO2 (pulsed during touch_probe)
- * INT: Board-specific GPIO (may conflict with I2C slave SCL on GPIO16)
+ * INT: GPIO16 (dedicated to GT911 INT on this board)
  * Address: 0x5D when INT LOW at reset, 0x14 when HIGH.
  *          Both addresses are tried during probe.
  * ──────────────────────────────────────────────────────────────────────────── */
 #define TOUCH_I2C_ADDR_A    0x5D    /* GT911 address when INT=LOW at reset */
 #define TOUCH_I2C_ADDR_B    0x14    /* GT911 address when INT=HIGH at reset */
-
-/* ────────────────────────────────────────────────────────────────────────────
- * I2C Slave — Communication with Center unit
- * Uses I2C port 1 on available GPIOs (not used by display or SPI).
- * ──────────────────────────────────────────────────────────────────────────── */
-#define I2C_SLAVE_PORT  1
-#define I2C_SLAVE_SDA   GPIO_NUM_4
-#define I2C_SLAVE_SCL   GPIO_NUM_16
 
 /* ────────────────────────────────────────────────────────────────────────────
  * Boot Button — GPIO0 (shared with all ESP32-S3 boards)

@@ -292,7 +292,7 @@ NVS-persisted trip and total distance meter:
 
 ## I2C Protocol
 
-See [`../common/include/opendash_i2c_protocol.h`](../common/include/opendash_i2c_protocol.h) for the full protocol definition.
+See [`../common/include/opendash_protocol.h`](../common/include/opendash_protocol.h) for the full protocol definition.
 
 | Command | ID | Description |
 |---|---|---|

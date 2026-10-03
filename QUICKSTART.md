@@ -217,8 +217,8 @@ idf.py build
 | [`center/README.md`](center/README.md) | Center display guide |
 | [`left/README.md`](left/README.md) | Left gauge pod guide |
 | [`right/README.md`](right/README.md) | Right gauge pod guide |
-| [`pod1/README.md`](pod1/README.md) | Pod 1 display and safety deployment unit |
-| [`pod2/README.md`](pod2/README.md) | Pod 2 display and safety deployment unit |
+| [`pod1/main/main.c`](pod1/main/main.c) | Pod 1 display and safety deployment unit |
+| [`pod2/main/main.c`](pod2/main/main.c) | Pod 2 display and safety deployment unit |
 | [`gps/README.md`](gps/README.md) | GPS/telemetry guide |
 
 ---

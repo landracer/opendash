@@ -34,7 +34,7 @@
 |---|---|
 | Active node families | 12: center, left, right, gps, pod1, pod2, mos-4ch-a, mos-4ch-b, relay-4ch-hd, relay-8ch-a, relay-8ch-b, openDstream (+ external BMS Logger) |
 | Total node slots | `OPENDASH_NODE_COUNT = 18` ([common/include/opendash_common.h](common/include/opendash_common.h)) |
-| ESP-NOW protocol | 39 opcodes defined in `opendash_i2c_protocol.h` (master + slave + boost families), batched (DATA_BATCH 0x88 / SET_DATA_BATCH 0x0C), 4 priority channels, polling eliminated |
+| ESP-NOW protocol | 39 opcodes defined in `opendash_protocol.h` (master + slave + boost families), batched (DATA_BATCH 0x88 / SET_DATA_BATCH 0x0C), 4 priority channels, polling eliminated |
 | Sensor source | MultiDisplay (HC-05/HC-06 BT @ 115200, 95-byte SERIALOUT_BINARY @ ~100 Hz, consumed at 5 Hz) |
 | Working displays | center (4.3" RGB), left/right (2.8C round RGB), gps + pod1/pod2 (1.75" AMOLED) |
 | BLE OTA | Working: pod1, pod2, left, right. **Fragile:** gps, pod1, pod2 still missing the full sdkconfig recipe + slave-side suspend sequence — see §1.2 |
@@ -374,7 +374,7 @@
 ### 4.1 ESP-NOW Bus — Batched + Channel Managed (v0.8.x)
 
 > Canonical reference: [DATAFLOW.md](DATAFLOW.md). All listed opcodes are
-> defined in [common/include/opendash_i2c_protocol.h](common/include/opendash_i2c_protocol.h)
+> defined in [common/include/opendash_protocol.h](common/include/opendash_protocol.h)
 > (the "i2c" in the filename is legacy — transport is ESP-NOW since v0.4).
 
 - [x] 4 priority channels: CRITICAL (0, 10 ms, 1 s timeout), MEDIUM (1, 50 ms),
@@ -396,7 +396,7 @@
 - [x] **Boost opcodes (11):** M→S 0x20 LIVE_DATA, 0x21 SET_PARAMS, 0x22 SET_MODE,
       0x23 SET_DUTY_ROW, 0x24 SET_SETP_ROW, 0x25 SET_THROTTLE, 0x26 PULL_ALL;
       S→M 0x90 TELEMETRY, 0x91–0x93 PARAMS_REPORT. All in shared header
-      ([common/include/opendash_i2c_protocol.h](common/include/opendash_i2c_protocol.h) ~L205–222)
+      ([common/include/opendash_protocol.h](common/include/opendash_protocol.h) ~L205–222)
 - [ ] Protocol version handshake on startup
 - [ ] Dynamic data point subscription (slave requests specific DPs)
 
@@ -452,7 +452,9 @@
       every batched dp (GPS single-value path was unaffected, which is why only
       GPS data showed). Outer lock removed; `master_dp_deliver()` is the single
       lock owner on that path. Verified live: UI update rate back to ~250 dp/s.
-- [x] Comprehensive docs: [UART_CONNECTION.md](UART_CONNECTION.md), [SERIAL_PROTOCOL.md](../multidisplay-firmware/multidisplay/SERIAL_PROTOCOL.md)
+- [x] Comprehensive docs: [UART_CONNECTION.md](UART_CONNECTION.md); MultiDisplay's
+      `SERIAL_PROTOCOL.md` is upstream-only and is **not** vendored in this repo
+      (referenced for lineage, not as a live link)
 - [ ] Frame timing validation (§1.5)
 - [ ] HC-05 AT-command auto-connect (currently relies on pre-paired modules)
 
@@ -560,7 +562,7 @@
 
 - [x] Boost opcodes in shared header — 0x20 LIVE_DATA, 0x21 SET_PARAMS, 0x22 SET_MODE,
       0x23 SET_DUTY_ROW, 0x24 SET_SETP_ROW, 0x25 SET_THROTTLE, 0x26 PULL_ALL,
-      0x90 TELEMETRY, 0x91–0x93 PARAMS_REPORT ([opendash_i2c_protocol.h](common/include/opendash_i2c_protocol.h) ~L205–222)
+      0x90 TELEMETRY, 0x91–0x93 PARAMS_REPORT ([opendash_protocol.h](common/include/opendash_protocol.h) ~L205–222)
 - [x] **Migrate payload structs from MOS-A-private to shared header** (now shared)
 - [x] Center → MOS-A push helpers in [center/main/espnow_master.c](center/main/espnow_master.c) for each SET_* opcode
 - [x] Live-data fan-out at ≥10 Hz: RPM, MAP/boost, EGT, AFR, fuel_psi, throttle%, gear
@@ -755,7 +757,7 @@
 - [x] ESP-NOW slave receive callback (channel 6, passthrough all frames)
 - [x] USB Serial/JTAG high-level driver API (`driver/usb_serial_jtag.h`)
 - [x] Build verified: `openDstream.bin` (~267KB) compiles cleanly
-- [x] Wiki documentation: [`wiki/opendstream-relay-node.md`](wiki/opendstream-relay-node.md)
+- [x] Relay-node documentation: [`openDstream/README.md`](openDstream/README.md)
 - [x] No LVGL, no display, no common component — pure relay
 
 ### 10.5 openDstream Next Steps

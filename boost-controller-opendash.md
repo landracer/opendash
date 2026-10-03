@@ -20,7 +20,7 @@ These rules are **non-negotiable**. PRs violating them will be rejected.
 1. **Do not modify any file under `boostcontrol-staging/`.** It is the frozen
    peer-review baseline. Compare against it.
 2. **Do not delete or break existing ESP-NOW opcodes** in
-   [`common/include/opendash_i2c_protocol.h`](./common/include/opendash_i2c_protocol.h).
+   [`common/include/opendash_protocol.h`](common/include/opendash_protocol.h).
    Append new ones, never renumber existing ones.
 3. **Boost transport rides ESP-NOW only.** Do not bring back I2C/UART for this
    subsystem (radio is the system bus — see [`readme.md`](./readme.md) §
@@ -48,7 +48,7 @@ These rules are **non-negotiable**. PRs violating them will be rejected.
 |---|---|---|
 | Shared header — slave API | [`common/include/opendash_boost.h`](./common/include/opendash_boost.h) | ✅ Complete: params, duty rows, setpoint rows, throttle curve, live frame, telemetry, safety flags |
 | Shared impl — PID + safety + NVS | [`common/src/opendash_boost.c`](./common/src/opendash_boost.c) | ✅ Complete: dual-tuning PID, RPM interp, throttle reduction, overboost/EGT/AFR/fuel cuts, per-row NVS persistence |
-| ESP-NOW opcode catalogue | [`common/include/opendash_i2c_protocol.h`](./common/include/opendash_i2c_protocol.h) | ❌ **No boost opcodes yet** (only DP/Layout/Alarm/Relay/etc.) |
+| ESP-NOW opcode catalogue | [`common/include/opendash_protocol.h`](common/include/opendash_protocol.h) | ❌ **No boost opcodes yet** (only DP/Layout/Alarm/Relay/etc.) |
 | MOS-A application | [`mos-4ch-a/main/main.c`](./mos-4ch-a/main/main.c) | ❌ No call to `opendash_boost_init()`, no ESP-NOW dispatch for boost frames, no PWM-out task, no live-data sink |
 | Center ESP-NOW master | [`center/main/espnow_master.c`](./center/main/espnow_master.c) | ❌ No boost push helpers, no live-data fanout to MOS-A |
 | Center UI — System Config | `center/main/ui_manager.c` | ❌ No System Config screen at all — must be added |
@@ -143,7 +143,7 @@ invalidated cleanly. The slave already discards mismatched versions in
 
 ### 3.1 New ESP-NOW opcodes
 
-Append to [`common/include/opendash_i2c_protocol.h`](./common/include/opendash_i2c_protocol.h)
+Append to [`common/include/opendash_protocol.h`](common/include/opendash_protocol.h)
 **at the end of the existing Master→Slave / Slave→Master blocks** — do not
 re-use any existing ID. Reserve a contiguous range:
 
@@ -249,11 +249,11 @@ static void boost_telem_task(void *arg)
         if (s_center_mac_known) {
             opendash_boost_telemetry_t t;
             opendash_boost_get_telemetry(&t);
-            opendash_i2c_msg_t m;
-            opendash_i2c_build_msg(&m, OPENDASH_CMD_BOOST_TELEMETRY,
+            opendash_msg_t m;
+            opendash_msg_build(&m, OPENDASH_CMD_BOOST_TELEMETRY,
                                    (uint8_t *)&t, sizeof(t));
             uint8_t buf[OPENDASH_ESPNOW_MAX_DATA]; uint16_t len = 0;
-            if (opendash_i2c_serialize(&m, buf, &len) == OPENDASH_OK) {
+            if (opendash_msg_serialize(&m, buf, &len) == OPENDASH_OK) {
                 opendash_espnow_send(s_center_mac, buf, len);
             }
         }
@@ -435,8 +435,8 @@ esp_err_t espnow_master_boost_set_mode(opendash_node_t node,
 esp_err_t espnow_master_boost_request_pull(opendash_node_t node);  /* GET_PARAMS+rows */
 ```
 
-Each is a 5-line wrapper around `opendash_i2c_build_msg` →
-`opendash_i2c_serialize` → `opendash_espnow_send` using the IDs from §3.1.
+Each is a 5-line wrapper around `opendash_msg_build` →
+`opendash_msg_serialize` → `opendash_espnow_send` using the IDs from §3.1.
 
 ### 5.2 Inbound telemetry — cache for UI
 
@@ -607,7 +607,7 @@ For OBD2-only cars, gear is rarely published. The slave already treats
 ## 8. Build, Flash, Smoke-Test Order
 
 1. **Header + opcode patch** — modify the staged header (mode count → 3),
-   add opcodes to `opendash_i2c_protocol.h`, mirror to
+   add opcodes to `opendash_protocol.h`, mirror to
    `boostcontrol-staging/boost_control.h`. Build `mos-4ch-a` and `center`.
    Expect zero call-site regressions because the new IDs are unused.
 2. **MOS-A runtime** — add boost init, compute task, telem task, dispatch
@@ -668,7 +668,7 @@ A PR closes this task only when **every** item below holds:
   [`common/src/opendash_boost.c`](./common/src/opendash_boost.c).
 - ESP-NOW transport & frame format:
   [`common/include/opendash_espnow.h`](./common/include/opendash_espnow.h),
-  [`common/include/opendash_i2c_protocol.h`](./common/include/opendash_i2c_protocol.h).
+  [`common/include/opendash_protocol.h`](common/include/opendash_protocol.h).
 - Existing MOS node template:
   [`mos-4ch-a/main/main.c`](./mos-4ch-a/main/main.c).
 - BLE OTA service (reuse, do not modify):
@@ -696,7 +696,7 @@ codebase. Re-run these greps before you start implementing.
 | `opendash_espnow_send(mac, data, len)` / `_broadcast` / `_add_peer` | [common/include/opendash_espnow.h](./common/include/opendash_espnow.h) | OK exact |
 | `OPENDASH_ESPNOW_MAX_DATA = 250`, channel 1 | same | OK exact |
 | `opendash_espnow_event_t { src_mac[6], data[250], len, rssi }` | same | OK exact |
-| `opendash_i2c_build_msg` / `_serialize` return `opendash_err_t` (success = `OPENDASH_OK`) | [common/include/opendash_i2c_protocol.h](./common/include/opendash_i2c_protocol.h) | OK exact — note: **not** `esp_err_t` |
+| `opendash_msg_build` / `_serialize` return `opendash_err_t` (success = `OPENDASH_OK`) | [common/include/opendash_protocol.h](common/include/opendash_protocol.h) | OK exact — note: **not** `esp_err_t` |
 | Existing CMDs 0x01–0x07 (M→S), 0x81–0x84 (S→M), 0xFF (NAK) | same | OK exact — new 0x20–0x2A / 0x90–0x94 ranges are free |
 | `opendash_relay_set_pwm(channel, duty)` | [common/include/opendash_relay.h](./common/include/opendash_relay.h) | OK exact |
 | `opendash_bt_ota_start(opendash_node_t)` triggered by `OPENDASH_SUBCMD_ENTER_BT_OTA` | [common/include/opendash_bt_ota.h](./common/include/opendash_bt_ota.h) | OK exact, reused as-is |
@@ -768,7 +768,7 @@ dispatch pattern already exists. New code surface is roughly:
 - `center/main/system_config.{h,c}` — new ~120 LOC.
 - `center/main/boost_config_ui.{h,c}` — new ~600 LOC (System Config
   screen, Boost box, Map Editor, PID/Safety/OTA panes).
-- `common/include/opendash_i2c_protocol.h` — 9 new `OPENDASH_CMD_BOOST_*`
+- `common/include/opendash_protocol.h` — 9 new `OPENDASH_CMD_BOOST_*`
   defines.
 - `common/include/opendash_boost.h` — bump `_MODES` 2→3,
   `_PARAMS_VERSION` 1→2, add `_MODE_HIGH`.

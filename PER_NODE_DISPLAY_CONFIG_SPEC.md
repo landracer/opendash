@@ -30,7 +30,7 @@ Let the end-user, from the CENTER touchscreen, pick which PIDs each node (LEFT, 
 
 | Piece | Location | State |
 |---|---|---|
-| DP IDs | [common/include/opendash_i2c_protocol.h](common/include/opendash_i2c_protocol.h) | ✅ Defined and stable |
+| DP IDs | [common/include/opendash_protocol.h](common/include/opendash_protocol.h) | ✅ Defined and stable |
 | `mode_dp_maps[]` | [center/main/ui_manager.c](center/main/ui_manager.c) ~L2460 | ⚠ `static const`, hard-coded, not editable at runtime |
 | Slave layouts | each slave's `main.c` / `ui_manager.c` | ⚠ Hard-coded in code, identical pattern to CENTER |
 | Wire opcode `OPENDASH_CMD_SET_SCREEN_LAYOUT = 0x02` | protocol header | ⚠ Reserved, payload format not yet defined |
@@ -106,7 +106,7 @@ Total: `13 + 2 × slot_count` bytes. For 16 slots = 45 B, well under the 248 B E
 
 **Direction**: CENTER → slave only. Slaves never send this opcode.
 
-**Acceptance**: a hand-built buffer for `(mode=ENGINE, arc=RPM, slots=[COOLANT, OIL_T, BOOST, AFR, GEAR, SPEED])` round-trips through `opendash_i2c_serialize`/`deserialize` without checksum errors.
+**Acceptance**: a hand-built buffer for `(mode=ENGINE, arc=RPM, slots=[COOLANT, OIL_T, BOOST, AFR, GEAR, SPEED])` round-trips through `opendash_msg_serialize`/`deserialize` without checksum errors.
 
 ---
 

@@ -101,7 +101,7 @@ All displays share:
 | **Font System** | `common/fonts/` | TTF conversion, font declarations |
 | **Font Headers** | `common/include/opendash_fonts.h` | Font helper functions |
 | **Image System** | `common/images/` | JPG/PNG conversion, auto-scaling |
-| **I2C Protocol** | `common/src/opendash_i2c_protocol.c` | Communication between displays |
+| **I2C Protocol** | `common/src/opendash_protocol.c` | Communication between displays |
 | **Data Models** | `common/src/opendash_data_model.c` | Shared data structures |
 | **Display Config** | `common/src/opendash_display_config.c` | Display configuration |
 | **Checklist** | `common/src/opendash_checklist.c` | Pre-start checklist logic |

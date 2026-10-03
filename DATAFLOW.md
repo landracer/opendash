@@ -55,9 +55,9 @@ Other slaves (GPS 0x12, BMS 0x20, RELAY/MOS pods) feed CENTER on the same channe
 
 ---
 
-## 2. Wire Protocol — `common/include/opendash_i2c_protocol.h`
+## 2. Wire Protocol — `common/include/opendash_protocol.h`
 
-A single ESP-NOW payload is one **opendash_i2c_msg_t** frame. The name is historical — we no longer use I²C — but the framing was kept so the same encoder/decoder serves both transports.
+A single ESP-NOW payload is one **opendash_msg_t** frame. The codec is transport-independent: the same encoder/decoder serves every frame regardless of which radio carries it. Inter-node transport is ESP-NOW only.
 
 ```
 ┌──────┬──────┬──────┬──────────────┬──────────┐
@@ -173,7 +173,7 @@ Both pods also **receive** `OPENDASH_CMD_SET_DATA_BATCH` (0x0C) from CENTER and 
 Four tasks: `channel_critical_task`, `channel_medium_task`, `channel_low_task`, `channel_control_task`. Each one:
 
 1. Dequeues from its own queue (no cross-channel head-of-line blocking).
-2. Calls `opendash_i2c_deserialize()` to validate SYNC/LEN/CHECKSUM.
+2. Calls `opendash_msg_deserialize()` to validate SYNC/LEN/CHECKSUM.
 3. Switches on `cmd`:
    * `DATA_RESPONSE` (single) → `master_dp_deliver(dp_id, value)` → forward the same point as `SET_DATA_POINT` to **both** pods.
    * `DATA_BATCH` → parse `[count][dp_id:2][float32]×count`, call `master_dp_deliver()` per entry, **re-pack** the same payload as `SET_DATA_BATCH` and forward to **both** pods in one packet each.

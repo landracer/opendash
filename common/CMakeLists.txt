@@ -106,7 +106,7 @@ file(GLOB IMAGE_SOURCES "${CMAKE_CURRENT_LIST_DIR}/images/generated/*.c")
 
 idf_component_register(
     SRCS
-        "src/opendash_i2c_protocol.c"
+        "src/opendash_protocol.c"
         "src/opendash_data_model.c"
         "src/opendash_checklist.c"
         "src/opendash_display_config.c"

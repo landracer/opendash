@@ -49,7 +49,7 @@
 #include "opendash_display_config.h"
 #include "opendash_espnow.h"
 #include "opendash_bt_ota.h"
-#include "opendash_i2c_protocol.h"
+#include "opendash_protocol.h"
 #include "opendash_data_model.h"
 #include "opendash_rtc.h"
 #include "sd_logger.h"
@@ -76,10 +76,10 @@ static uint8_t s_tx_buf[OPENDASH_ESPNOW_MAX_DATA];
 /**
  * @brief Send a protocol response to center (unicast if MAC known).
  */
-static esp_err_t send_to_center(const opendash_i2c_msg_t *msg)
+static esp_err_t send_to_center(const opendash_msg_t *msg)
 {
     uint16_t len;
-    if (opendash_i2c_serialize(msg, s_tx_buf, &len) != OPENDASH_OK) {
+    if (opendash_msg_serialize(msg, s_tx_buf, &len) != OPENDASH_OK) {
         return ESP_FAIL;
     }
     if (s_center_mac_known) {
@@ -98,8 +98,8 @@ static esp_err_t send_data_point(uint16_t dp_id, float value)
     payload[1] = dp_id & 0xFF;
     memcpy(&payload[2], &value, sizeof(float));
 
-    opendash_i2c_msg_t msg;
-    opendash_i2c_build_msg(&msg, OPENDASH_CMD_DATA_RESPONSE, payload, sizeof(payload));
+    opendash_msg_t msg;
+    opendash_msg_build(&msg, OPENDASH_CMD_DATA_RESPONSE, payload, sizeof(payload));
     return send_to_center(&msg);
 }
 
@@ -107,7 +107,7 @@ static esp_err_t send_data_point(uint16_t dp_id, float value)
  * @brief Process a single received ESP-NOW message.
  */
 static void dispatch_message(const opendash_espnow_event_t *evt,
-                              const opendash_i2c_msg_t *msg)
+                              const opendash_msg_t *msg)
 {
     /* Learn center's MAC from first valid message */
     /* Only latch on center-originated cmds (bit 7 clear). Slave broadcasts
@@ -157,8 +157,8 @@ static void dispatch_message(const opendash_espnow_event_t *evt,
                         OPENDASH_NODE_GPS,
                         0x01, 0x00
                     };
-                    opendash_i2c_msg_t resp;
-                    opendash_i2c_build_msg(&resp, OPENDASH_CMD_STATUS_REPORT,
+                    opendash_msg_t resp;
+                    opendash_msg_build(&resp, OPENDASH_CMD_STATUS_REPORT,
                                            status_payload, sizeof(status_payload));
                     send_to_center(&resp);
                     ESP_LOGD(TAG, "PING → STATUS_REPORT sent");
@@ -246,8 +246,8 @@ static void process_espnow_messages(void)
     int processed = 0;
 
     while (opendash_espnow_recv(&evt, 0)) {
-        opendash_i2c_msg_t msg;
-        opendash_err_t ret = opendash_i2c_deserialize(evt.data, evt.len, &msg);
+        opendash_msg_t msg;
+        opendash_err_t ret = opendash_msg_deserialize(evt.data, evt.len, &msg);
         if (ret != OPENDASH_OK) {
             ESP_LOGD(TAG, "Invalid ESP-NOW msg from " MACSTR " (len=%d)",
                      MAC2STR(evt.src_mac), evt.len);
@@ -329,12 +329,12 @@ static void data_broadcast_task(void *pvParameters)
             time_payload[7] = 0;  /* year_hi */
             time_payload[8] = gps.fix_valid ? 1 : 0;
 
-            opendash_i2c_msg_t time_msg;
-            opendash_i2c_build_msg(&time_msg, OPENDASH_CMD_SYSTEM,
+            opendash_msg_t time_msg;
+            opendash_msg_build(&time_msg, OPENDASH_CMD_SYSTEM,
                                    time_payload, sizeof(time_payload));
 
             uint16_t tslen;
-            if (opendash_i2c_serialize(&time_msg, s_tx_buf, &tslen) == OPENDASH_OK) {
+            if (opendash_msg_serialize(&time_msg, s_tx_buf, &tslen) == OPENDASH_OK) {
                 opendash_espnow_broadcast(s_tx_buf, tslen);
             }
             ESP_LOGD(TAG, "TIME_SYNC broadcast: %02d:%02d:%02d UTC",

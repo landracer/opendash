@@ -69,7 +69,7 @@ NODES = {
     "gps": {
         # Espressif USB-JTAG, MAC-based. Update if board swapped.
         "serial_substr": "10:20:BA:46:61:FC",
-        "tag":           None,  # GPS node logs as display_init early
+        "tag":           "opendash_gps",  # main.c app tag (display_init/gps_handler log under their own tags)
         "project_dir":   "gps",
     },
     "pod1": {

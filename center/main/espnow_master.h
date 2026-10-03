@@ -19,7 +19,7 @@
  * @see channel_config.h      for timing and buffer tuning.
  * @see node_definitions.h    for node→channel mapping.
  * @see opendash_espnow.h     for the transport layer.
- * @see opendash_i2c_protocol.h for message format.
+ * @see opendash_protocol.h for message format.
  */
 
 #ifndef ESPNOW_MASTER_H
@@ -29,7 +29,7 @@
 #include <stdbool.h>
 #include "esp_err.h"
 #include "opendash_common.h"
-#include "opendash_i2c_protocol.h"
+#include "opendash_protocol.h"
 #include "opendash_espnow.h"
 #include "opendash_parachute.h"
 #include "channel_config.h"
@@ -176,7 +176,7 @@ void espnow_master_get_dtc_data(char codes[][6], uint8_t *count, bool *valid);
  * fit the SET_DATA_POINT/SET_RELAY shaped slots.
  *
  * @param node     Target node.
- * @param cmd      Opcode (see opendash_i2c_protocol.h).
+ * @param cmd      Opcode (see opendash_protocol.h).
  * @param payload  Pointer to payload bytes (may be NULL if @p length == 0).
  * @param length   Payload byte count (0..OPENDASH_ESPNOW_MAX_DATA-2).
  * @return ESP_OK on success.
@@ -253,7 +253,7 @@ int espnow_master_rollover_status(bool *manual, int *detectors_total);
  * Runs in the dispatcher task — keep the callback short and non-blocking.
  */
 typedef void (*espnow_master_rx_cb_t)(const opendash_espnow_event_t *evt,
-                                       const opendash_i2c_msg_t *msg);
+                                       const opendash_msg_t *msg);
 
 /** @brief Install (or replace) the auxiliary RX callback. Pass NULL to remove. */
 void espnow_master_set_aux_rx_callback(espnow_master_rx_cb_t cb);

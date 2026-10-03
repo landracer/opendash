@@ -389,7 +389,7 @@ Potential additions (not yet implemented):
 
 - [data-points.md](docs/data-points.md) — Full list of displayable data points
 - [architecture.md](docs/architecture.md) — System architecture and data flow
-- [i2c-protocol.md](docs/i2c-protocol.md) — Inter-node communication
+- [espnow-protocol.md](docs/espnow-protocol.md) — Inter-node communication
 - [LVGL Documentation](https://docs.lvgl.io/master/) — LVGL API reference
 - [ESP-IDF API Reference](https://docs.espressif.com/projects/esp-idf/) — ESP32 APIs
 

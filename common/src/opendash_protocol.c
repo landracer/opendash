@@ -1,16 +1,18 @@
 /* Licensed under Sovereign Individual License v1.0 — see LICENSE file */
 /**
- * @file opendash_i2c_protocol.c
- * @brief OpenDash I2C Protocol — Implementation
+ * @file opendash_protocol.c
+ * @brief OpenDash Wire Protocol — Implementation (transport: ESP-NOW)
  *
  * Implements message building, validation, serialization, and deserialization
- * for the OpenDash inter-node I2C communication protocol.
+ * for the OpenDash inter-node protocol. Messages produced here are carried in
+ * ESP-NOW packets via opendash_espnow.c / channel_management.c. There is no
+ * wired inter-node bus in this system.
  *
- * @see opendash_i2c_protocol.h for the full API documentation.
- * @see docs/i2c-protocol.md for the protocol specification.
+ * @see opendash_protocol.h for the full API documentation.
+ * @see docs/espnow-protocol.md for the protocol specification.
  */
 
-#include "opendash_i2c_protocol.h"
+#include "opendash_protocol.h"
 
 /* ────────────────────────────────────────────────────────────────────────────
  * Internal Helper: Compute XOR Checksum
@@ -26,7 +28,7 @@
  *
  * @return Computed checksum byte.
  */
-static uint8_t compute_checksum(const opendash_i2c_msg_t *msg)
+static uint8_t compute_checksum(const opendash_msg_t *msg)
 {
     uint8_t cs = 0;
 
@@ -44,10 +46,10 @@ static uint8_t compute_checksum(const opendash_i2c_msg_t *msg)
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
- * opendash_i2c_build_msg
+ * opendash_msg_build
  * ──────────────────────────────────────────────────────────────────────────── */
 
-opendash_err_t opendash_i2c_build_msg(opendash_i2c_msg_t *msg,
+opendash_err_t opendash_msg_build(opendash_msg_t *msg,
                                        uint8_t cmd,
                                        const uint8_t *payload,
                                        uint8_t length)
@@ -84,10 +86,10 @@ opendash_err_t opendash_i2c_build_msg(opendash_i2c_msg_t *msg,
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
- * opendash_i2c_validate_msg
+ * opendash_msg_validate
  * ──────────────────────────────────────────────────────────────────────────── */
 
-bool opendash_i2c_validate_msg(const opendash_i2c_msg_t *msg)
+bool opendash_msg_validate(const opendash_msg_t *msg)
 {
     if (msg == NULL) {
         return false;
@@ -113,10 +115,10 @@ bool opendash_i2c_validate_msg(const opendash_i2c_msg_t *msg)
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
- * opendash_i2c_serialize
+ * opendash_msg_serialize
  * ──────────────────────────────────────────────────────────────────────────── */
 
-opendash_err_t opendash_i2c_serialize(const opendash_i2c_msg_t *msg,
+opendash_err_t opendash_msg_serialize(const opendash_msg_t *msg,
                                        uint8_t *buffer,
                                        uint16_t *out_len)
 {
@@ -149,12 +151,12 @@ opendash_err_t opendash_i2c_serialize(const opendash_i2c_msg_t *msg,
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
- * opendash_i2c_deserialize
+ * opendash_msg_deserialize
  * ──────────────────────────────────────────────────────────────────────────── */
 
-opendash_err_t opendash_i2c_deserialize(const uint8_t *buffer,
+opendash_err_t opendash_msg_deserialize(const uint8_t *buffer,
                                          uint16_t length,
-                                         opendash_i2c_msg_t *msg)
+                                         opendash_msg_t *msg)
 {
     if (buffer == NULL || msg == NULL) {
         return OPENDASH_ERR_INVALID_ARG;
@@ -194,33 +196,9 @@ opendash_err_t opendash_i2c_deserialize(const uint8_t *buffer,
     msg->checksum = buffer[OPENDASH_MSG_HEADER_SIZE + msg->length];
 
     /* Validate checksum */
-    if (!opendash_i2c_validate_msg(msg)) {
+    if (!opendash_msg_validate(msg)) {
         return OPENDASH_ERR_CHECKSUM;
     }
 
     return OPENDASH_OK;
-}
-
-/* ────────────────────────────────────────────────────────────────────────────
- * opendash_i2c_get_addr
- * ──────────────────────────────────────────────────────────────────────────── */
-
-uint8_t opendash_i2c_get_addr(opendash_node_t node)
-{
-    switch (node) {
-        case OPENDASH_NODE_LEFT:    return OPENDASH_I2C_ADDR_LEFT;
-        case OPENDASH_NODE_RIGHT:   return OPENDASH_I2C_ADDR_RIGHT;
-        case OPENDASH_NODE_GPS:     return OPENDASH_I2C_ADDR_GPS;
-        case OPENDASH_NODE_BMS:     return OPENDASH_I2C_ADDR_BMS;
-        case OPENDASH_NODE_POD1:    return OPENDASH_I2C_ADDR_POD1;
-        case OPENDASH_NODE_POD2:    return OPENDASH_I2C_ADDR_POD2;
-        case OPENDASH_NODE_POD3:    return OPENDASH_I2C_ADDR_POD3;
-        case OPENDASH_NODE_POD4:    return OPENDASH_I2C_ADDR_POD4;
-        case OPENDASH_NODE_POD5:    return OPENDASH_I2C_ADDR_POD5;
-        case OPENDASH_NODE_POD6:    return OPENDASH_I2C_ADDR_POD6;
-        case OPENDASH_NODE_POD7:    return OPENDASH_I2C_ADDR_POD7;
-        case OPENDASH_NODE_POD8:    return OPENDASH_I2C_ADDR_POD8;
-        case OPENDASH_NODE_CENTER:  return 0;  /* Center is the master, no slave address */
-        default:                    return 0;  /* Invalid node */
-    }
 }

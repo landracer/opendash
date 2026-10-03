@@ -36,7 +36,7 @@
 
 #include "opendash_common.h"
 #include "opendash_espnow.h"
-#include "opendash_i2c_protocol.h"
+#include "opendash_protocol.h"
 #include "opendash_relay.h"
 #include "opendash_boost.h"
 #include "opendash_bt_ota.h"
@@ -96,11 +96,11 @@ static bool    s_center_mac_known = false;
 static void send_heartbeat_broadcast(void)
 {
     uint8_t payload[3] = { OPENDASH_NODE_MOS_4CH_A, 0x01, 0x00 };
-    opendash_i2c_msg_t msg;
-    opendash_i2c_build_msg(&msg, OPENDASH_CMD_STATUS_REPORT, payload, sizeof(payload));
+    opendash_msg_t msg;
+    opendash_msg_build(&msg, OPENDASH_CMD_STATUS_REPORT, payload, sizeof(payload));
     uint8_t tx_buf[OPENDASH_ESPNOW_MAX_DATA];
     uint16_t len = 0;
-    if (opendash_i2c_serialize(&msg, tx_buf, &len) == OPENDASH_OK) {
+    if (opendash_msg_serialize(&msg, tx_buf, &len) == OPENDASH_OK) {
         opendash_espnow_broadcast(tx_buf, len);
     }
 }
@@ -123,12 +123,12 @@ static void send_parachute_status(void)
     st.armed     = opendash_parachute_actuator_is_armed()   ? 1 : 0;
     st.deployed  = (s_para_fired || opendash_parachute_actuator_is_deployed()) ? 1 : 0;
 
-    opendash_i2c_msg_t m;
-    opendash_i2c_build_msg(&m, OPENDASH_CMD_PARACHUTE_STATUS,
+    opendash_msg_t m;
+    opendash_msg_build(&m, OPENDASH_CMD_PARACHUTE_STATUS,
                             (const uint8_t *)&st, sizeof(st));
     uint8_t bb[OPENDASH_ESPNOW_MAX_DATA];
     uint16_t bl = 0;
-    if (opendash_i2c_serialize(&m, bb, &bl) == OPENDASH_OK) {
+    if (opendash_msg_serialize(&m, bb, &bl) == OPENDASH_OK) {
         opendash_espnow_send(s_center_mac, bb, bl);
     }
 }
@@ -209,7 +209,7 @@ static void parachute_disarm_reset(void)
 }
 
 static void dispatch_message(const opendash_espnow_event_t *evt,
-                              const opendash_i2c_msg_t *msg)
+                              const opendash_msg_t *msg)
 {
     /* Learn and track the center's MAC from genuine center→MOS commands ONLY.
      * These commands are issued exclusively by the center and arrive as unicast
@@ -252,10 +252,10 @@ static void dispatch_message(const opendash_espnow_event_t *evt,
                 if (opendash_relay_get_state(i, &st) == ESP_OK && st.is_on) boot_mask |= (1u << i);
             }
             uint8_t bp[3] = { 0xCA, OPENDASH_NODE_MOS_4CH_A, boot_mask };
-            opendash_i2c_msg_t bm;
-            opendash_i2c_build_msg(&bm, OPENDASH_CMD_RELAY_STATUS, bp, sizeof(bp));
+            opendash_msg_t bm;
+            opendash_msg_build(&bm, OPENDASH_CMD_RELAY_STATUS, bp, sizeof(bp));
             uint8_t bb[OPENDASH_ESPNOW_MAX_DATA]; uint16_t bl = 0;
-            if (opendash_i2c_serialize(&bm, bb, &bl) == OPENDASH_OK) {
+            if (opendash_msg_serialize(&bm, bb, &bl) == OPENDASH_OK) {
                 opendash_espnow_send(s_center_mac, bb, bl);
             }
             ESP_LOGI(TAG, "Boot state announce: mask 0x%02X", boot_mask);
@@ -280,11 +280,11 @@ static void dispatch_message(const opendash_espnow_event_t *evt,
                 /* Immediate confirmation → center knows state without audit delay */
                 if (s_center_mac_known) {
                     uint8_t ack_pay[3] = { 0xCA, OPENDASH_NODE_MOS_4CH_A, mask };
-                    opendash_i2c_msg_t ack_msg;
-                    opendash_i2c_build_msg(&ack_msg, OPENDASH_CMD_RELAY_STATUS, ack_pay, sizeof(ack_pay));
+                    opendash_msg_t ack_msg;
+                    opendash_msg_build(&ack_msg, OPENDASH_CMD_RELAY_STATUS, ack_pay, sizeof(ack_pay));
                     uint8_t ack_buf[OPENDASH_ESPNOW_MAX_DATA];
                     uint16_t ack_len = 0;
-                    if (opendash_i2c_serialize(&ack_msg, ack_buf, &ack_len) == OPENDASH_OK) {
+                    if (opendash_msg_serialize(&ack_msg, ack_buf, &ack_len) == OPENDASH_OK) {
                         opendash_espnow_send(s_center_mac, ack_buf, ack_len);
                     }
                 }
@@ -329,11 +329,11 @@ static void dispatch_message(const opendash_espnow_event_t *evt,
                 if (audit_st[i].is_on) actual_mask |= (1u << i);
             }
             uint8_t audit_pay[3] = { 0xCA, OPENDASH_NODE_MOS_4CH_A, actual_mask };
-            opendash_i2c_msg_t audit_resp;
-            opendash_i2c_build_msg(&audit_resp, OPENDASH_CMD_RELAY_STATUS, audit_pay, sizeof(audit_pay));
+            opendash_msg_t audit_resp;
+            opendash_msg_build(&audit_resp, OPENDASH_CMD_RELAY_STATUS, audit_pay, sizeof(audit_pay));
             uint8_t audit_buf[OPENDASH_ESPNOW_MAX_DATA];
             uint16_t audit_len = 0;
-            if (opendash_i2c_serialize(&audit_resp, audit_buf, &audit_len) == OPENDASH_OK) {
+            if (opendash_msg_serialize(&audit_resp, audit_buf, &audit_len) == OPENDASH_OK) {
                 opendash_espnow_send(s_center_mac, audit_buf, audit_len);
                 ESP_LOGI(TAG, "Audit reply: mask 0x%02X", actual_mask);
             }
@@ -430,11 +430,11 @@ static void dispatch_message(const opendash_espnow_event_t *evt,
             opendash_boost_set_params(&p);
             /* Echo back so center confirms commit */
             if (s_center_mac_known) {
-                opendash_i2c_msg_t rm;
-                opendash_i2c_build_msg(&rm, OPENDASH_CMD_BOOST_PARAMS_REPORT,
+                opendash_msg_t rm;
+                opendash_msg_build(&rm, OPENDASH_CMD_BOOST_PARAMS_REPORT,
                                         (const uint8_t *)&p, sizeof(p));
                 uint8_t bb[OPENDASH_ESPNOW_MAX_DATA]; uint16_t bl = 0;
-                if (opendash_i2c_serialize(&rm, bb, &bl) == OPENDASH_OK) {
+                if (opendash_msg_serialize(&rm, bb, &bl) == OPENDASH_OK) {
                     opendash_espnow_send(s_center_mac, bb, bl);
                 }
             }
@@ -455,11 +455,11 @@ static void dispatch_message(const opendash_espnow_event_t *evt,
                 (const opendash_boost_duty_row_t *)msg->payload;
             opendash_boost_set_duty_row(r->mode, r->gear, r->duty);
             if (s_center_mac_known) {
-                opendash_i2c_msg_t rm;
-                opendash_i2c_build_msg(&rm, OPENDASH_CMD_BOOST_DUTY_REPORT,
+                opendash_msg_t rm;
+                opendash_msg_build(&rm, OPENDASH_CMD_BOOST_DUTY_REPORT,
                                         (const uint8_t *)r, sizeof(*r));
                 uint8_t bb[OPENDASH_ESPNOW_MAX_DATA]; uint16_t bl = 0;
-                if (opendash_i2c_serialize(&rm, bb, &bl) == OPENDASH_OK) {
+                if (opendash_msg_serialize(&rm, bb, &bl) == OPENDASH_OK) {
                     opendash_espnow_send(s_center_mac, bb, bl);
                 }
             }
@@ -473,11 +473,11 @@ static void dispatch_message(const opendash_espnow_event_t *evt,
             memcpy(setp, r.setpoint_cbar, sizeof(setp));
             opendash_boost_set_setpoint_row(r.mode, r.gear, setp);
             if (s_center_mac_known) {
-                opendash_i2c_msg_t rm;
-                opendash_i2c_build_msg(&rm, OPENDASH_CMD_BOOST_SETP_REPORT,
+                opendash_msg_t rm;
+                opendash_msg_build(&rm, OPENDASH_CMD_BOOST_SETP_REPORT,
                                         (const uint8_t *)&r, sizeof(r));
                 uint8_t bb[OPENDASH_ESPNOW_MAX_DATA]; uint16_t bl = 0;
-                if (opendash_i2c_serialize(&rm, bb, &bl) == OPENDASH_OK) {
+                if (opendash_msg_serialize(&rm, bb, &bl) == OPENDASH_OK) {
                     opendash_espnow_send(s_center_mac, bb, bl);
                 }
             }
@@ -489,11 +489,11 @@ static void dispatch_message(const opendash_espnow_event_t *evt,
             memcpy(&c, msg->payload, sizeof(c));
             opendash_boost_set_throttle_curve(&c);
             if (s_center_mac_known) {
-                opendash_i2c_msg_t rm;
-                opendash_i2c_build_msg(&rm, OPENDASH_CMD_BOOST_THROTTLE_REPORT,
+                opendash_msg_t rm;
+                opendash_msg_build(&rm, OPENDASH_CMD_BOOST_THROTTLE_REPORT,
                                         (const uint8_t *)&c, sizeof(c));
                 uint8_t bb[OPENDASH_ESPNOW_MAX_DATA]; uint16_t bl = 0;
-                if (opendash_i2c_serialize(&rm, bb, &bl) == OPENDASH_OK) {
+                if (opendash_msg_serialize(&rm, bb, &bl) == OPENDASH_OK) {
                     opendash_espnow_send(s_center_mac, bb, bl);
                 }
             }
@@ -505,14 +505,14 @@ static void dispatch_message(const opendash_espnow_event_t *evt,
              * blow the RX queue at the other end. */
             if (!s_center_mac_known) break;
             uint8_t bb[OPENDASH_ESPNOW_MAX_DATA]; uint16_t bl;
-            opendash_i2c_msg_t rm;
+            opendash_msg_t rm;
 
             opendash_boost_params_t p;
             if (opendash_boost_get_params(&p) == ESP_OK) {
-                opendash_i2c_build_msg(&rm, OPENDASH_CMD_BOOST_PARAMS_REPORT,
+                opendash_msg_build(&rm, OPENDASH_CMD_BOOST_PARAMS_REPORT,
                                         (const uint8_t *)&p, sizeof(p));
                 bl = 0;
-                if (opendash_i2c_serialize(&rm, bb, &bl) == OPENDASH_OK) {
+                if (opendash_msg_serialize(&rm, bb, &bl) == OPENDASH_OK) {
                     opendash_espnow_send(s_center_mac, bb, bl);
                 }
             }
@@ -520,10 +520,10 @@ static void dispatch_message(const opendash_espnow_event_t *evt,
                 for (uint8_t gear = 0; gear < OPENDASH_BOOST_GEARS; ++gear) {
                     opendash_boost_duty_row_t dr = { .mode = mode, .gear = gear };
                     if (opendash_boost_get_duty_row(mode, gear, dr.duty) == ESP_OK) {
-                        opendash_i2c_build_msg(&rm, OPENDASH_CMD_BOOST_DUTY_REPORT,
+                        opendash_msg_build(&rm, OPENDASH_CMD_BOOST_DUTY_REPORT,
                                                 (const uint8_t *)&dr, sizeof(dr));
                         bl = 0;
-                        if (opendash_i2c_serialize(&rm, bb, &bl) == OPENDASH_OK) {
+                        if (opendash_msg_serialize(&rm, bb, &bl) == OPENDASH_OK) {
                             opendash_espnow_send(s_center_mac, bb, bl);
                         }
                     }
@@ -531,10 +531,10 @@ static void dispatch_message(const opendash_espnow_event_t *evt,
                     uint16_t setp[OPENDASH_BOOST_MAP_POINTS];
                     if (opendash_boost_get_setpoint_row(mode, gear, setp) == ESP_OK) {
                         memcpy(sr.setpoint_cbar, setp, sizeof(setp));
-                        opendash_i2c_build_msg(&rm, OPENDASH_CMD_BOOST_SETP_REPORT,
+                        opendash_msg_build(&rm, OPENDASH_CMD_BOOST_SETP_REPORT,
                                                 (const uint8_t *)&sr, sizeof(sr));
                         bl = 0;
-                        if (opendash_i2c_serialize(&rm, bb, &bl) == OPENDASH_OK) {
+                        if (opendash_msg_serialize(&rm, bb, &bl) == OPENDASH_OK) {
                             opendash_espnow_send(s_center_mac, bb, bl);
                         }
                     }
@@ -543,10 +543,10 @@ static void dispatch_message(const opendash_espnow_event_t *evt,
             }
             opendash_boost_throttle_curve_t tc;
             if (opendash_boost_get_throttle_curve(&tc) == ESP_OK) {
-                opendash_i2c_build_msg(&rm, OPENDASH_CMD_BOOST_THROTTLE_REPORT,
+                opendash_msg_build(&rm, OPENDASH_CMD_BOOST_THROTTLE_REPORT,
                                         (const uint8_t *)&tc, sizeof(tc));
                 bl = 0;
-                if (opendash_i2c_serialize(&rm, bb, &bl) == OPENDASH_OK) {
+                if (opendash_msg_serialize(&rm, bb, &bl) == OPENDASH_OK) {
                     opendash_espnow_send(s_center_mac, bb, bl);
                 }
             }
@@ -592,11 +592,11 @@ static void boost_telemetry_task(void *pv)
         if (s_center_mac_known) {
             opendash_boost_telemetry_t t;
             opendash_boost_get_telemetry(&t);
-            opendash_i2c_msg_t rm;
-            opendash_i2c_build_msg(&rm, OPENDASH_CMD_BOOST_TELEMETRY,
+            opendash_msg_t rm;
+            opendash_msg_build(&rm, OPENDASH_CMD_BOOST_TELEMETRY,
                                     (const uint8_t *)&t, sizeof(t));
             uint8_t bb[OPENDASH_ESPNOW_MAX_DATA]; uint16_t bl = 0;
-            if (opendash_i2c_serialize(&rm, bb, &bl) == OPENDASH_OK) {
+            if (opendash_msg_serialize(&rm, bb, &bl) == OPENDASH_OK) {
                 opendash_espnow_send(s_center_mac, bb, bl);
             }
         }
@@ -624,8 +624,8 @@ static void espnow_task(void *pvParameters)
         esp_task_wdt_reset();
         opendash_espnow_event_t evt;
         while (opendash_espnow_recv(&evt, 0)) {
-            opendash_i2c_msg_t msg;
-            if (opendash_i2c_deserialize(evt.data, evt.len, &msg) == OPENDASH_OK) {
+            opendash_msg_t msg;
+            if (opendash_msg_deserialize(evt.data, evt.len, &msg) == OPENDASH_OK) {
                 dispatch_message(&evt, &msg);
             }
         }

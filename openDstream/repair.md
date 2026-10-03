@@ -12,8 +12,8 @@ The openDstream node was receiving incomplete data from the rAtTrax-BMS via ESP-
 // Old code - parses only ONE frame:
 static void espnow_recv_callback(const esp_now_recv_info_t *recv_info, const uint8_t *data, int data_len)
 {
-    opendash_i2c_msg_t msg;
-    esp_err_t ret = opendash_i2c_deserialize(data, (uint16_t)data_len, &msg);
+    opendash_msg_t msg;
+    esp_err_t ret = opendash_msg_deserialize(data, (uint16_t)data_len, &msg);
     // If data contains multiple frames, only the first is parsed!
     ...
 }
@@ -84,8 +84,8 @@ static void espnow_recv_callback(const esp_now_recv_info_t *recv_info, const uin
             continue;
         }
         
-        opendash_i2c_msg_t msg;
-        esp_err_t ret = opendash_i2c_deserialize(data + offset, (uint16_t)frame_len, &msg);
+        opendash_msg_t msg;
+        esp_err_t ret = opendash_msg_deserialize(data + offset, (uint16_t)frame_len, &msg);
         if (ret != ESP_OK) {
             ESP_LOGW(TAG, "Deserialize failed at offset %d: %s", offset, esp_err_to_name(ret));
             offset += frame_len;
@@ -148,4 +148,4 @@ After flashing the updated firmware:
 ## Related Documentation
 
 - `/home/sysadmin/Documents/multidisplay-app/ESPNOW_BATTLE_REPORT_SUMMARY.md` - Original MD ECU fix
-- `/home/sysadmin/Documents/rAtTrax-Dash/opendash/common/include/opendash_i2c_protocol.h` - Protocol specification
+- `/home/sysadmin/Documents/rAtTrax-Dash/opendash/common/include/opendash_protocol.h` - Protocol specification

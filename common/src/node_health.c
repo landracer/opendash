@@ -11,7 +11,7 @@
 
 #include "node_health.h"
 #include "node_definitions.h"
-#include "opendash_i2c_protocol.h"  /* OPENDASH_STATUS_FLAG_* */
+#include "opendash_protocol.h"  /* OPENDASH_STATUS_FLAG_* */
 
 #include "nvs_flash.h"
 #include "nvs.h"

@@ -1,6 +1,23 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # GPS Driver Debugging Journal — v16 Series (v16a through v16k)
 
+> ## ⛔ PROJECT CLOSED 2026-09-29
+>
+> > ## ✅ CLOSED-FINAL 2026-09-30 — iteration-5/6 spec-exact probes ran (§13).
+> > The reopening resolved against rehabilitation: spec-exact `$PAIR051`/
+> > `$PAIR050,100` delivered with verified transport-ACKs produce ZERO parser
+> > response; the `$PAIR010/011` bursts are periodic unsolicited chatter
+> > (anti-correlated with delivery). Read-only pipe: PROVEN with correct
+> > evidence. Post-mortem §8 is the final word.
+>
+> This journal documents the full v16 debugging arc. Its final entry (§10-11)
+> closes the case: the LC76G's I2C interface has **no usable command channel**,
+> the nav engine output is fixed at **1 Hz**, and no firmware on this hardware
+> can serve the >1 Hz requirement that motivated the project. Everything in
+> this journal was real, hard-won bus work spent rescuing a read-only data
+> pipe. The complete final analysis, including the controlled experiments that
+> proved it: **`wiki/GPS-LC76G-POSTMORTEM.md`**.
+
 > **Purpose:** Complete documentation of the GPS driver rewrite from v15L2 baseline
 > to v16k final. This is the definitive debugging reference for anyone working on
 > the LC76G I2C driver or debugging similar shared-bus I2C issues on ESP32-S3.
@@ -22,6 +39,7 @@
 7. [Key Discoveries and Insights](#7-key-discoveries-and-insights)
 8. [Debugging Methodology That Worked](#8-debugging-methodology-that-worked)
 9. [Quick Reference — What Every Setting Does](#9-quick-reference--what-every-setting-does)
+10. [Final Port Results — v16k into `gps/main` (Sept 2026)](#10-final-port-results--v16k-into-gpsmain-sept-2026)
 
 ---
 
@@ -650,3 +668,150 @@ investigation.
 *This document represents months of cumulative debugging. If you change the GPS
 driver and it breaks, come back here first. The answer is almost certainly one
 of the five root causes documented above.*
+
+---
+
+## 10. Final Port Results — v16k into `gps/main` (Sept 2026)
+
+The v16k feature set was ported into the active `gps/main/gps_handler.c` +
+`gps/main/display_init.c` and validated live on the bench node (`/dev/ttyACM5`,
+node tag `opendash_gps` — `scripts/od-flash.py` gate bug for the GPS node was
+also fixed; it previously skipped flashing because the flashed build was
+tagged `opendash_gps` while the gate compared a mismatched value).
+
+### What was ported (all verified live via serial capture)
+
+| v16k feature | Status | Live evidence |
+|---|---|---|
+| Priority 8 + pin-48 latch pinning | DONE | boot log `GPS task started on core 0` |
+| LC76G-address wake probes removed | DONE | boot log shows only `Wake[0..2]` (0x58 dummies), no `0x10/0x70` probes |
+| Wall-clock fix watchdog 48s/72s/96s (warm/warm/cold) | DONE | `Watchdog: no fix for 49s ... WARM restart`, `72s ... (2nd)`, `96s ... COLD restart` |
+| 20-cycle grace after recovery | DONE | in `gps_handler.c` |
+| IRQ-gated touch (CST9217 INT) replacing 50 Hz polling | DONE | `Touch reading task started (interrupt-driven — no idle polling)` |
+| `$PAIR050,<Hz>,<Hz>` rate command after first fix | DONE (inert — see below) | `Sending command to LC76G: $PAIR050,10,10*..` logged at fix |
+
+### The decisive empirical finding: the command channel is dead
+
+Across every capture session, with both the old and corrected command syntax:
+
+- **Zero `$PAIR001` ACKs** were ever received. The module never acknowledges
+  any command (`PAIR050` rate, `PAIR066` constellation, `PAIR513/514`
+  cold/warm restart). The `$PAIR010`/`$PAIR011` sentences that do appear are
+  unsolicited periodic info sentences (60 s cadence, week-seconds incrementing
+  +60), not replies.
+- The rate never changes: byte-rate stays ~50–60 B/s (~1 Hz sentence output)
+  before and after every command.
+- The vendor's own reference driver (`gps/waveshare-amoled-gps-i2c-lc76g.py`)
+  implements **read only**: offset-0x0008 length query + offset-0x2000 data
+  read. It has **no command write path at all**. The `0x58` write endpoint our
+  driver sends NMEA into is a reverse-engineered guess; it only ACKs after the
+  CW_CMD (0xAA53 / offset 0x1000) arm-write, but the module's parser never
+  consumes what lands there.
+
+**Conclusion: 10 Hz was never actually running in any firmware generation.**
+The "8.3 Hz verified" line in `LC76G-10Hz-Spec-Breakout.md` describes an
+aspiration, not a measurement — every generation (v15L2 → v16k) has run the
+module's default ~1 Hz NMEA output. The "sats visible but no fix" symptom is
+driven by the module's natural acquisition time (~7–9 min cold on the bench
+with stale almanac — fix does arrive at ~420–530 s), **not** by the rate
+command. Rate control over this I2C interface is not achievable with NMEA
+sentences; it would require the CASIC binary (CR_CFG) protocol, which is a
+separate, still-open workstream.
+
+### Net effect of the port
+
+- No blind 50 Hz touch polling on the shared I2C bus (interrupt-driven now).
+- Watchdog + grace semantics per v16k spec are in place and log correctly.
+- Fixed-position reporting (39.66 / -105.01 = Golden, CO) works end to end:
+  fix → broadcast task at 5 Hz → hub.
+
+## 11. Max-Rate Debug Session (Sept 29, later same day) — FINAL VERDICT
+
+Question asked: what Hz is the GPS actually at, and can we crank it higher with
+a "HIGH-SPEED (no touch)" driver variant?
+
+**Measured rate, objectively instrumented** (rolling 30 s windows in the driver:
+`NMEA throughput: X sent/s, Y GGA/s, Z B/s`): **1.0 Hz** — 1.0 GGA/s, ~15
+sent/s, ~670 B/s. Identical in every session, every firmware generation.
+(Host-side read loop runs ~3.3 cycles/s and bus utilization is <2% — neither
+is the limiter. Touch is IRQ-gated with zero idle traffic — removing it buys
+nothing, which is why the two-driver fork was rejected.)
+
+Rate attempts tried after instrumentation: `$CFGSVIO,01,10,...` and
+`$CFGSVIO,01,070,...` (SiRF/L80 dialect) and legacy `$PAIR050,100`. None
+changed the rate — several didn't even reach the module: the 0x58 payload
+write NACKs (`ESP_ERR_INVALID_RESPONSE`) RANDOMLY on all dialects, and the
+offset-0x0004 "free space" query returns a constant 4096 in every session
+(junk value — read-path recovery always rescues the bus, so it never mattered).
+
+**The decisive controlled experiment:** the session whose log shows
+`$PQTMCOLD*1C` payload writes *succeeding* ("Command sent OK (14 bytes to
+0x58)") is the session where the module NEVER achieved a fix in 1500 s.
+Every session where PQTM bytes were NOT delivered → natural fix at 422/528/~450 s.
+Same delivery path, same bus, same sky — only the payload family differs.
+Conclusion: the module's parser consumes the **`$PQTM` family** (matching the
+Quectel app note, which documents `$PQTMCOLD` all along) and ignores the
+`$PAIR` family entirely. The "LC76G supports a subset of PAIR" line in the
+10 Hz spec doc was a red herring — the subset that exists is PQTM.
+
+**Why 10 Hz still isn't reachable:** no rate-changing command was ever found
+for this module (the app note documents cold start only), CFGSVIO never
+survives the 0x58 transport, and `$PQTMCOLD` is a reset, not a rate setting.
+**1 Hz is the hardware floor/ceiling of this LC76G-as-shipped.** If the gauge
+use case truly requires >1 Hz position updates, that is a hardware change
+(UART GNSS receiver with a documented command interface), not a firmware one.
+
+Final firmware state: ladder attempts remain (inert by default), watchdog is
+LOG-ONLY (critical: it must never deliver a cold-start again — that was the
+only thing that ever changed module behavior, and it cancels acquisition).
+
+## 12. Doc-Comparison Session (Sept 30) — Case REOPENED, iteration-5 armed
+
+The two official references were finally compared against our work:
+the LC76G product wiki and the **Quectel LC26G&LC76G&LC86G GNSS Protocol
+Specification V1.0.0** (the doc the product page itself links).
+
+Key findings (full analysis in `GPS-LC76G-POSTMORTEM.md` §7):
+
+- The LC76G command protocol is **100% `$PAIR` packets** — ACK (`001`),
+  subsystem power (`002/003`), hot/warm/cold starts (`004–007`),
+  **`050` SET_FIX_RATE = single ms parameter, 100–1000 ms (default 1000 =
+  1 Hz; 100 ms = 10 Hz)**, `051` GET_FIX_RATE, `062/063` sentence rates,
+  `066/067` search mode, `864/865` baud. `$PQTM` appears in NO LC76G doc.
+- Our driver never sent a spec-exact command: we sent CASIC-style
+  `$PAIR050,<Hz>,<Hz>` (a form that exists in no LC76G document) and the
+  CASIC `020/021` getter. The correct getter `$PAIR051*3E` — the one
+  unambiguous channel probe — was NEVER sent.
+- Therefore the "parser only speaks PQTM" conclusion rests on one (n=1)
+  correlated session and contradicts the vendor docs. It is no longer
+  acceptable as closed science.
+
+**Iteration-5 (built, clean `idf.py build`, awaiting the board on the bench):**
+ladder replaced with the two spec-exact commands — `$PAIR051*3E` (query;
+a `$PAIR001,051,0` ACK or `$PAIR051,<ms>` echo on the read stream PROVES the
+command RX path is alive) and `$PAIR050,100*22` (10 Hz, single ms param).
+Watchdog stays LOG-ONLY. Whichever way the probe lands, the verdict gets
+either rescues the node or finally proves the read-only-pipe conclusion
+with the right evidence.
+
+
+## 13. CLOSED-FINAL (Sept 30) — iteration-5/6: parser verifiably dead, reopening resolved
+
+Board back on the bench (ACM5), iteration-5 flashed, then iteration-6
+(probes repeat forever; constellation auto-config removed). Raw capture
+analysis (see post-mortem §8 for the full evidence chain):
+
+1. Spec-exact `$PAIR050,100*22` + `$PAIR051*3E` delivered to 0x58 with
+   transport success multiple times — stream never reacted (GGA/s ~1.0, no
+   001 ACK, no 051 echo, no RMC ever, rate flat). Commands dead at parser.
+2. The `$PAIR011,001` / `$PAIR010,1,-1` / `$PAIR010,2,-1` / `$PQTMVER` bursts
+   appeared even when a probe FAILED before writing anything, and stayed
+   absent after two successful deliveries: periodic (~55 s) unsolicited
+   chatter, anti-correlated with delivery — definitively NOT responses.
+3. 0x58 also NAK'd its own address on 4/7 probe writes while reads kept
+   streaming — the write interface is half-dead at the wire level too.
+
+Final verdict: **data-out-only pipe, proven with correct syntax and verified
+delivery.** Go-forward: `POD3-CONVERSION-PLAN.md`. The gps/ tree stays as a
+1 Hz read-only library; its ladder remains but is inert by design (the probe
+responses never come — that IS the finding).

@@ -22,7 +22,7 @@
 
 #include "opendash_rollover.h"
 #include "opendash_parachute.h"
-#include "opendash_i2c_protocol.h"
+#include "opendash_protocol.h"
 #include "opendash_espnow.h"
 
 #include <math.h>
@@ -103,13 +103,13 @@ static void broadcast_vote(bool rolling, bool manual,
         .seq       = ++s_seq,
     };
 
-    opendash_i2c_msg_t m;
-    opendash_i2c_build_msg(&m, OPENDASH_CMD_PARACHUTE_VOTE,
+    opendash_msg_t m;
+    opendash_msg_build(&m, OPENDASH_CMD_PARACHUTE_VOTE,
                            (const uint8_t *)&v, sizeof(v));
 
     uint8_t  buf[OPENDASH_ESPNOW_MAX_DATA];
     uint16_t len = 0;
-    if (opendash_i2c_serialize(&m, buf, &len) == OPENDASH_OK) {
+    if (opendash_msg_serialize(&m, buf, &len) == OPENDASH_OK) {
         opendash_espnow_broadcast(buf, len);
         s_last_vote_us = esp_timer_get_time();
     }
@@ -149,13 +149,13 @@ void opendash_rollover_detector_send_status(void)
     st.armed     = 0;
     st.deployed  = 0;
 
-    opendash_i2c_msg_t m;
-    opendash_i2c_build_msg(&m, OPENDASH_CMD_PARACHUTE_STATUS,
+    opendash_msg_t m;
+    opendash_msg_build(&m, OPENDASH_CMD_PARACHUTE_STATUS,
                            (const uint8_t *)&st, sizeof(st));
 
     uint8_t  buf[OPENDASH_ESPNOW_MAX_DATA];
     uint16_t len = 0;
-    if (opendash_i2c_serialize(&m, buf, &len) == OPENDASH_OK) {
+    if (opendash_msg_serialize(&m, buf, &len) == OPENDASH_OK) {
         opendash_espnow_broadcast(buf, len);
     }
 }

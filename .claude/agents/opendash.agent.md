@@ -19,7 +19,7 @@ OpenDash is a modular, bleeding-edge digital dashboard system for race cars buil
 ## Architecture
 
 - **Communication**: ESP-NOW wireless bus (WiFi peer-to-peer) instead of I2C due to hardware limitations
-- **Shared Code**: All units use code from [`common/`](./common/) directory
+- **Shared Code**: All units use code from the top-level `common/` directory
 - **Node Roles**: 
   - Center: ESP-NOW Master
   - Left: ESP-NOW Slave (addr 0x10)

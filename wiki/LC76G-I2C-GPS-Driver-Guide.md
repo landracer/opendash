@@ -1,7 +1,32 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # OpenDash LC76G I2C GPS Driver — Definitive Implementation Guide
 
-> **Status:** WORKING — Production-verified, March 2025 (v15L2 stable)  
+> ## ⛔ CLOSED 2026-09-29 — READ-ONLY DATA PIPE, BY DESIGN
+>
+> > ## ✅ CLOSED-FINAL 2026-09-30 — iteration-5/6 settled the reopened case:
+> > spec-exact `$PAIR051`/`$PAIR050,100` delivered with verified I2C write-ACKs
+> > produce zero parser response (post-mortem §8). The `$PAIR010/011` bursts are
+> > periodic (~55 s) unsolicited chatter — they appear even when nothing was
+> > delivered. Data-out-only: PROVEN with the right evidence this time.
+>
+> > ## 🔔 REOPENED 2026-09-30 — see post-mortem §7: per the official LC76G
+> > protocol spec the module IS configurable (PAIR packets, `$PAIR050` rate
+> > 100–1000 ms). "By design" is no longer proven — what is proven is that
+> > our *non-spec* syntax never got a response. Iteration-5 spec-exact
+> > probe awaits bench.
+>
+>
+> The read path documented here (offset-0x0008 length query + offset-0x2000
+> data read) is the **only** part of this interface that works, and it works
+> fine. The write path (§8) delivers bytes into a buffer the module's parser
+> never consumes except for `$PQTMCOLD` (cold start) — every rate/constellation
+> "configuration" claim in this guide family was disproven by live controlled
+> experiments. The vendor's own reference driver (`gps/waveshare-amoled-gps-i2c-lc76g.py`)
+> implements **read only** — there is no command channel by design. A module
+> that outputs a fixed 1 Hz NMEA stream with zero configurability is a data
+> logger, not a telemetry sensor. Final analysis: `wiki/GPS-LC76G-POSTMORTEM.md`.
+
+> **Status:** WORKING — Production-verified, March 2025 (v15L2 stable) — *for reading only; superseded, see banner above*  
 > **Board:** Waveshare ESP32-S3-Touch-AMOLED-1.75  
 > **Module:** Quectel LC76G (firmware LC76GABNR12A03S, 2024/04/14)  
 > **Framework:** ESP-IDF v6.1 (esp_driver_i2c new API)  

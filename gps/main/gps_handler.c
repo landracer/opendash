@@ -1,18 +1,18 @@
 /* Licensed under Sovereign Individual License v1.0 — see LICENSE file */
 /**
  * @file gps_handler.c
- * @brief OpenDash GPS Handler — LC76G via I2C (CASIC protocol)
+ * @brief OpenDash GPS Handler — LC76G via I2C (Quectel PAIR-packet protocol)
  *
  * Interfaces with the LC76G GNSS module over I2C to read NMEA sentences
  * and parse position, speed, heading, and satellite data.
  *
  * LC76G I2C Configuration (Waveshare ESP32-S3-Touch-AMOLED-1.75):
  *   I2C bus: GPIO15 (SDA) / GPIO14 (SCL) — shared with touch, IMU, etc.
- *   Write address: 0x50 (7-bit) — for sending CASIC commands
+ *   Write address: 0x50 (7-bit) — for sending protocol commands
  *   Read address:  0x54 (7-bit) — for receiving NMEA data
  *   Clock: 100 kHz
  *
- * CASIC I2C Protocol (Quectel I2C Application Note v1.0):
+ * I2C Protocol (Quectel I2C Application Note v1.0):
  *   Uses SEPARATE I2C slave addresses — NOT repeated-start:
  *     0x50 = command/query write (CR_CMD / CW_CMD)
  *     0x54 = data read (NMEA / length responses)
@@ -41,7 +41,10 @@
  *   $GPRMC / $GNRMC — Position, speed, heading, date/time
  *   $GPGGA / $GNGGA — Fix quality, altitude, satellites, HDOP
  *
- * Version: v16c-port (v15L2 base + v16 CW-corruption + PMIC-crash fixes)
+ * Version: v16k-port (v15L2 base + v16 CW-corruption + PMIC-crash fixes +
+ *   v16k full spec: 10Hz deferred to first fix behind rate_configured flag,
+ *   wall-clock fix watchdog 48s/72s/96s warm→warm→cold, 20-cycle post-recovery
+ *   grace, GPS task priority 8, no warm-up probes on LC76G addresses)
  *   - Extended power-off (5s) and boot wait (5s) for clean LC76G resets
  *   - "Primer" mechanism: TxRx + data_req (CR_CMD offset 0x2000) activates
  *     the module's I2C TX buffer fill — required at boot AND recovery
@@ -80,6 +83,7 @@
 
 #include "gps_handler.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "driver/i2c_master.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -115,6 +119,29 @@ static TaskHandle_t gps_task_handle = NULL;
 static i2c_master_dev_handle_t lc76g_handle = NULL;       /* Write endpoint (0x50) */
 static i2c_master_dev_handle_t lc76g_read_handle = NULL;  /* Read endpoint (0x54) */
 static i2c_master_dev_handle_t lc76g_dwr_handle = NULL;   /* Data write endpoint (0x58) */
+
+/* Iteration-5 (2026-09-30) correction: the official LC76G protocol spec
+ * (Quectel LC26G&LC76G&LC86G GNSS Protocol Specification V1.0.0) is 100%
+ * PAIR-packet based. The documented fix-interval command is
+ * $PAIR050,<Time-ms 100-1000> (single parameter! default 1000 = 1 Hz,
+ * min 100 ms = 10 Hz) and its getter is $PAIR051. The CFGSVIO/SiRF ladder
+ * was garbage. The decisive probe NEVER TRIED before: send $PAIR051*3E and
+ * watch for a $PAIR001,051,0 ACK + $PAIR051,<ms> echo on the read stream.
+ * If the I2C bridge routes writes to the parser, these appear; if not, the
+ * read-only-pipe conclusion is FINALLY proven with the correct syntax. */
+static volatile bool s_rate_configured = false;
+
+static const char *const s_rate_ladder[] = {
+    /* Spec §2.3.10 GET_FIX_RATE: unambiguous channel probe. The module
+     * already emits unsolicited PAIR010/011 info sentences, but a 051
+     * echo / 001 ACK tied to OUR send can only come from a live RX path. */
+    "PAIR051",
+    /* Spec §2.3.9 exact syntax: single ms parameter (100 ms = 10 Hz).
+     * The old code only ever tried CASIC-style $PAIR050,<Hz>,<Hz> (a
+     * form that exists in NO LC76G document). */
+    "PAIR050,100",
+};
+#define RATE_LADDER_COUNT (sizeof(s_rate_ladder) / sizeof(s_rate_ladder[0]))
 
 /* NMEA line parsing buffer */
 static char nmea_line[256];
@@ -503,8 +530,10 @@ static void process_nmea_line(const char *line, gps_data_t *data)
         /* Store raw GGA for debug display */
         strncpy(current_gps_debug.last_gga, line, sizeof(current_gps_debug.last_gga) - 1);
         current_gps_debug.last_gga[sizeof(current_gps_debug.last_gga) - 1] = '\0';
-        /* Log raw GGA sentence for first 60 cycles (diagnostics) */
-        if (current_gps_debug.cycle < 60) {
+        /* Rate ladder diagnostics: sample GGA periodically ALL session so the
+         * 1 Hz → N Hz jump is directly visible in the fix-sentence stream
+         * (old gate suppressed these after cycle 60, hiding every rate change). */
+        if ((current_gps_debug.cnt_gga % 30) == 1) {
             ESP_LOGI(TAG, "  [GGA] %s", line);
         }
     } else if (strncmp(type, "GSV", 3) == 0) {
@@ -861,6 +890,8 @@ static void gps_full_recovery(i2c_master_bus_handle_t bus)
     }
 
     current_gps_debug.total_power_cycles++;
+    /* v16k: power cycle wipes nav state — 10Hz must be re-sent after next fix */
+    s_rate_configured = false;
     ESP_LOGE(TAG, "=== FULL RECOVERY COMPLETE (power_cycles=%lu) ===",
              (unsigned long)current_gps_debug.total_power_cycles);
 }
@@ -898,11 +929,10 @@ static void gps_task(void *pvParameters)
     i2c_master_bus_reset(bus);
     vTaskDelay(pdMS_TO_TICKS(100));
 
-    /* Diagnostic: probe 0x50/0x54/0x58 — may NACK initially, NORMAL */
-    for (uint8_t addr = 0x50; addr <= 0x58; addr += 4) {
-        esp_err_t p = i2c_master_probe(bus, addr, 100);
-        ESP_LOGI(TAG, "  Probe 0x%02X: %s", addr, esp_err_to_name(p));
-    }
+    /* v16k-port: warm-up probes on 0x50/0x54/0x58 REMOVED. Per §2.1/init rules,
+     * any transaction against the LC76G endpoints outside the documented
+     * sequences can poison its I2C state machine — probing them here directly
+     * contradicted the "skip LC76G addresses" rule enforced in gps_handler_init. */
 
     /* See wiki §5.2 — I2C WAKE Mechanism */
     /* v16c: 0x58-ONLY WAKE. The CW config write to 0x50 was removed — it
@@ -983,8 +1013,26 @@ static void gps_task(void *pvParameters)
     bool ever_received = false;
     uint32_t consecutive_fails = 0;
     uint32_t empty_polls = 0;
+    /* v16k: wall-clock fix watchdog state + post-recovery grace counter */
+    int64_t nofix_start_us = 0;
+    bool wd_warm1 = false, wd_warm2 = false, wd_cold = false;
+    int grace_cycles = 0;
+    /* iteration-6: spec-command probe state. The ladder NEVER gives up: it
+     * cycles the two spec commands forever so every send is a fresh
+     * correlation experiment against the (already-live) read stream. */
+    int rate_step = 0;         /* probes fired (mod ladder size selects payload) */
+    int64_t last_rate_cmd_us = 0;
+    /* rolling throughput window (30 s) — the functional ACK: a rate command
+     * that WORKS is unmistakable in sentences/second (1 Hz ≈ 14 sent/s and
+     * 1 Hz GGA = 1/s; 10 Hz = 10 GGA/s). No reliance on $PAIR001 ACKs. */
+    int64_t win_start_us = 0;
+    uint32_t win_bytes = 0, win_sents = 0, win_gga = 0;
+    float sent_rate = 0.0f, gga_rate = 0.0f;
 
     while (1) {
+        /* v16k: post-recovery grace — suppress Tier-3 re-trigger while bus settles */
+        if (grace_cycles > 0) grace_cycles--;
+
         /* ── Heartbeat: unconditional log every 100 cycles ── */
         if (cycle % 100 == 0) {
             ESP_LOGI(TAG, "[HEARTBEAT] cycle=%lu fails=%lu empty=%lu bytes=%lu sentences=%lu",
@@ -1021,9 +1069,12 @@ static void gps_task(void *pvParameters)
                          esp_err_to_name(tx_ret),
                          (unsigned long)cycle, (unsigned long)consecutive_fails);
 
-            /* ── Tier 3: Full power cycle (at 100 TX failures) ── */
-            if (consecutive_fails >= 100) {
+            /* ── Tier 3: Full power cycle (50 failures — v16k spec) ──
+             * v16i: threshold 50. During the 20-cycle post-recovery grace the
+             * fails keep counting but do NOT re-trigger a power cycle. */
+            if (consecutive_fails >= 50 && grace_cycles == 0) {
                 gps_full_recovery(bus);
+                grace_cycles = 20;
                 consecutive_fails = 0;
             }
 
@@ -1121,10 +1172,11 @@ static void gps_task(void *pvParameters)
                 }
             }
 
-            /* ── Tier 3: Full power cycle (at 100 failures) ──
-             * v15j: Lowered from 200 to 100 — recovers faster from bus degradation. */
-            if (consecutive_fails >= 100) {
+            /* ── Tier 3: Full power cycle (50 failures — v16k spec) ──
+             * v16i: threshold 50, gated by the 20-cycle post-recovery grace. */
+            if (consecutive_fails >= 50 && grace_cycles == 0) {
                 gps_full_recovery(bus);
+                grace_cycles = 20;
                 consecutive_fails = 0;
             }
 
@@ -1258,13 +1310,12 @@ static void gps_task(void *pvParameters)
             ESP_LOGI(TAG, "  %.160s", preview);
             ever_received = true;
 
-            /* TODO: Enable 10 Hz + all constellations after validating stability
-             * The $PAIR050,100 command can destabilize the CASIC I2C interface on
-             * some LC76G firmware versions — verify with field testing before enabling.
-             *
-             * gps_handler_set_rate_hz(10);
-             * gps_handler_set_constellations(true, true, true, true);
-             */
+            /* iteration-6: constellation auto-config REMOVED. $PAIR066 fired
+             * here in every previous session and polluted the read stream at
+             * exactly the moment we are trying to observe for command-response
+             * correlation. Effectiveness was never proven either. */
+            nofix_start_us = esp_timer_get_time();
+            wd_warm1 = wd_warm2 = wd_cold = false;
         }
 
         /* Feed into line parser */
@@ -1307,6 +1358,53 @@ static void gps_task(void *pvParameters)
              * performance from 57,710B to 18,401B. Keep the delay. */
             vTaskDelay(pdMS_TO_TICKS(200));
         }
+        /* ── iteration-6: spec-command probe — repeats forever on cooldown ──
+         * Iteration-5 showed the module emits a boot-chatter burst
+         * ($PQTMVER + $PAIR011,001 + $PAIR010,1,-1 + $PAIR010,2,-1) on every
+         * module power-cycle, so one correlated burst proves nothing. The
+         * decisive experiment is REPEATED probes into an ALREADY-STREAMING
+         * module: if the parser consumes our writes, each send produces a new
+         * burst ($PAIR051,<ms> echo / 010/011 ACK pair) and $PAIR050,100
+         * drives GGA/RMC to 10 Hz. If the parser is dead, the stream never
+         * reacts no matter how many probes land. */
+        if (local_data.fix_valid) {
+            nofix_start_us = esp_timer_get_time();
+            wd_warm1 = wd_warm2 = wd_cold = false;
+        }
+        if (ever_received && !s_rate_configured) {
+            int64_t now_us = esp_timer_get_time();
+            if (now_us - last_rate_cmd_us > 20000000LL) {
+                const char *probe = s_rate_ladder[rate_step % (int)RATE_LADDER_COUNT];
+                esp_err_t rre = lc76g_send_command(probe);
+                ESP_LOGW(TAG, "Spec-command probe #%d [%s] -> %s (measured %.1f sent/s, %.1f GGA/s)",
+                         rate_step + 1, probe, esp_err_to_name(rre),
+                         sent_rate, gga_rate);
+                rate_step++;
+                last_rate_cmd_us = now_us;
+            }
+        }
+        if (ever_received && nofix_start_us != 0) {
+            /* Log-only watchdog: the command channel is NOT proven alive —
+             * do NOT fire $PQTMCOLD to 'help' acquisition (it cancels it). */
+            uint64_t nofix_ms = (uint64_t)(esp_timer_get_time() - nofix_start_us) / 1000ULL;
+            if (nofix_ms > 48000 && local_data.visible_sats > 3 && !wd_warm1) {
+                ESP_LOGW(TAG, "Watchdog: no fix for %llus with sats visible — logging only "
+                         "(commands work; engine restart would cancel acquisition)",
+                         (unsigned long long)(nofix_ms / 1000ULL));
+                wd_warm1 = true;
+            }
+            if (nofix_ms > 72000 && !wd_warm2) {
+                ESP_LOGW(TAG, "Watchdog: still no fix at %llus — logging only (2nd)",
+                         (unsigned long long)(nofix_ms / 1000ULL));
+                wd_warm2 = true;
+            }
+            if (nofix_ms > 96000 && !wd_cold) {
+                ESP_LOGW(TAG, "Watchdog: still no fix at %llus — logging only (cold tier)",
+                         (unsigned long long)(nofix_ms / 1000ULL));
+                wd_cold = true;
+            }
+        }
+
         if ((cycle % GPS_STATUS_LOG_CYCLES) == 0 && cycle > 0) {
             ESP_LOGI(TAG, "GPS: fix=%s sats=%d/%d speed=%.1f hdop=%.1f total=%luB %lus c=%lu",
                      local_data.fix_valid ? "YES" : "no",
@@ -1318,6 +1416,34 @@ static void gps_task(void *pvParameters)
                 ESP_LOGI(TAG, "  Pos: %.6f, %.6f  Alt: %.1fm  Hdg: %.1f",
                          local_data.latitude, local_data.longitude,
                          local_data.altitude, local_data.heading);
+            }
+        }
+        /* ── iteration-3: rolling 30 s throughput window = the functional ACK.
+         * 1 Hz nav output ≈ 1 GGA/s (~14 sent/s); if any rate command lands,
+         * GGA/s and sent/s jump unmistakably (10 Hz → ~10 GGA/s, ~100 sent/s). */
+        {
+            int64_t now_us = esp_timer_get_time();
+            if (win_start_us == 0) {
+                win_start_us = now_us;
+                win_bytes = total_bytes;
+                win_sents = total_sentences;
+                win_gga = current_gps_debug.cnt_gga;
+            } else if (now_us - win_start_us >= 30000000LL) {
+                float dt = (float)(now_us - win_start_us) * 1e-6f;
+                sent_rate = ((float)total_sentences - (float)win_sents) / dt;
+                gga_rate = ((float)current_gps_debug.cnt_gga - (float)win_gga) / dt;
+                float bps = ((float)total_bytes - (float)win_bytes) / dt;
+                ESP_LOGI(TAG, "NMEA throughput: %.1f sent/s, %.1f GGA/s, %.0f B/s (total %lu sentences)",
+                         sent_rate, gga_rate, bps, (unsigned long)total_sentences);
+                if (!s_rate_configured && (gga_rate > 2.5f || sent_rate > 40.0f)) {
+                    s_rate_configured = true;
+                    ESP_LOGE(TAG, "*** RATE INCREASE CONFIRMED: %.1f GGA/s, %.1f sent/s — command channel WORKS ***",
+                             gga_rate, sent_rate);
+                }
+                win_start_us = now_us;
+                win_bytes = total_bytes;
+                win_sents = total_sentences;
+                win_gga = current_gps_debug.cnt_gga;
             }
         }
         cycle++;
@@ -1411,7 +1537,7 @@ esp_err_t gps_handler_init(void)
 
     /* Add LC76G data write device (0x58 — for sending NMEA commands)
      * v15e: NO disable_ack_check — it causes bus lockup (v15c/v15d proved).
-     * 0x58 will NACK, which is fine. WAKE uses CW-to-0x50 only. */
+     * 0x58 will NACK, which is fine. WAKE is a 0x58 dummy write only. */
     i2c_device_config_t dwr_cfg = {
         .dev_addr_length = I2C_ADDR_BIT_LEN_7,
         .device_address = LC76G_I2C_ADDR_DATA_WR,
@@ -1436,7 +1562,7 @@ esp_err_t gps_handler_start(void)
 {
     BaseType_t ret = xTaskCreatePinnedToCore(
         gps_task, "gps_task", 8192, NULL,
-        5,   /* High priority for real-time GPS data */
+        8,   /* v16k: priority 8 — above touch/IMU/UI so GPS is never starved */
         &gps_task_handle,
         0    /* Core 0 */
     );
@@ -1476,26 +1602,23 @@ esp_err_t gps_handler_get_debug(gps_debug_t *debug)
     return ESP_ERR_TIMEOUT;
 }
 
-esp_err_t gps_handler_send_cold_start(void)
-{
-    return lc76g_send_command("PQTMCOLD");
-}
-
-esp_err_t gps_handler_send_warm_start(void)
-{
-    return lc76g_send_command("PQTMWARM");
-}
-
 esp_err_t gps_handler_set_rate_hz(uint8_t hz)
 {
     if (hz < 1 || hz > 10) {
         ESP_LOGE(TAG, "Invalid rate %d — must be 1-10 Hz", hz);
         return ESP_ERR_INVALID_ARG;
     }
+    /* iteration-5: the documented LC76G syntax is a SINGLE millisecond
+     * parameter: $PAIR050,<Time>*<Checksum> with Time = 100–1000 ms
+     * (protocol spec §2.3.9; 1000 default = 1 Hz, 100 ms = 10 Hz). The
+     * CASIC 2-field <Hz>,<Hz> form this driver used for generations does
+     * not exist in any LC76G document. */
+    unsigned ms = (unsigned)(1000 / (unsigned)hz);
+    if (ms < 100) ms = 100;
+    if (ms > 1000) ms = 1000;
     char body[24];
-    uint16_t interval_ms = 1000 / hz;
-    snprintf(body, sizeof(body), "PAIR050,%u", interval_ms);
-    ESP_LOGI(TAG, "Setting GPS rate to %d Hz (%u ms)", hz, interval_ms);
+    snprintf(body, sizeof(body), "PAIR050,%u", ms);
+    ESP_LOGI(TAG, "Setting GPS rate to %d Hz (spec form $PAIR050,%u*CS)", hz, ms);
     return lc76g_send_command(body);
 }
 

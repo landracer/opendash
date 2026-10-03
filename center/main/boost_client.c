@@ -19,7 +19,7 @@
 #include "boost_client.h"
 #include "espnow_master.h"
 #include "system_config.h"
-#include "opendash_i2c_protocol.h"
+#include "opendash_protocol.h"
 #include "opendash_data_model.h"
 
 #include <string.h>
@@ -63,7 +63,7 @@ static bool s_initialized = false;
  * ==========================================================================*/
 
 static void on_rx_frame(const opendash_espnow_event_t *evt,
-                         const opendash_i2c_msg_t *msg)
+                         const opendash_msg_t *msg)
 {
     (void)evt;
     switch (msg->cmd) {

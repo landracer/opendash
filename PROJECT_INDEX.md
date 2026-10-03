@@ -16,7 +16,7 @@
 4. [Documentation Index](#documentation-index)
 5. [Common Library Reference](#common-library-reference)
 6. [Display Node Architecture](#display-node-architecture)
-7. [I2C Bus & Protocol](#i2c-bus--protocol)
+7. [Inter-Node Protocol (ESP-NOW)](#inter-node-protocol-esp-now)
 8. [Data Points (Sensor Legend)](#data-points-sensor-legend)
 9. [Unit Conversion System](#unit-conversion-system)
 10. [Font System](#font-system)
@@ -79,7 +79,7 @@ opendash/
 ├── docs/                       ── Detailed Design Docs ──────────────────
 │   ├── architecture.md         System architecture & data flow diagrams
 │   ├── hardware.md             Hardware specs, pin maps, wiring
-│   ├── i2c-protocol.md         I2C message format, commands, polling
+│   ├── espnow-protocol.md      ESP-NOW frame, opcodes, priority channels
 │   ├── data-points.md          Data point IDs (0x0100–0x0500) with units
 │   ├── setup-guide.md          Dev environment setup (ESP-IDF, toolchains)
 │   ├── vscode-setup.md         VS Code workspace configuration
@@ -91,7 +91,7 @@ opendash/
 │   ├── include/                Public C headers (10 files)
 │   │   ├── opendash_common.h           Node types, version, errors
 │   │   ├── opendash_data_model.h       Data point IDs & registry
-│   │   ├── opendash_i2c_protocol.h     I2C message format & commands
+│   │   ├── opendash_protocol.h         ESP-NOW message format & opcodes
 │   │   ├── opendash_display_config.h   Layout struct, unit enums, NVS API
 │   │   ├── opendash_ui_styles.h        Colors, style helpers, unit converters
 │   │   ├── opendash_fonts.h            Font size enum, set_font() helpers
@@ -102,7 +102,7 @@ opendash/
 │   ├── src/                    Implementations (.c files)
 │   │   ├── opendash_data_model.c
 │   │   ├── opendash_display_config.c
-│   │   ├── opendash_i2c_protocol.c
+│   │   ├── opendash_protocol.c
 │   │   ├── opendash_odometer.c
 │   │   └── opendash_checklist.c
 │   ├── fonts/                  Font build pipeline
@@ -117,7 +117,7 @@ opendash/
 │
 ├── center/                     ── Center Display Project ────────────────
 │   ├── main/
-│   │   ├── main.c              Entry point, I2C master, OBD2/CAN
+│   │   ├── main.c              Entry point, ESP-NOW master boot, OBD2/CAN
 │   │   ├── display_init.c/h    ST7262 RGB panel, touch, LVGL init
 │   │   └── ui_manager.c/h      Multi-screen UI (ENGINE, GPS, custom modes)
 │   ├── partitions.csv          Flash partition table
@@ -204,7 +204,7 @@ Every documentation file in the project, grouped by purpose.
 |---|---|
 | [**docs/architecture.md**](docs/architecture.md) | System block diagram, node roles, software layers |
 | [**docs/hardware.md**](docs/hardware.md) | Board specs, pin mappings, wiring for all 4 nodes |
-| [**docs/i2c-protocol.md**](docs/i2c-protocol.md) | I2C message format, command table, polling cycle |
+| [**docs/espnow-protocol.md**](docs/espnow-protocol.md) | ESP-NOW frame format, opcode map, priority channels |
 | [**docs/data-points.md**](docs/data-points.md) | All data point IDs (engine, GPS, IMU, BMS, system) |
 | [**DISPLAY_SYNCHRONIZATION.md**](DISPLAY_SYNCHRONIZATION.md) | How shared code stays in sync across nodes |
 
@@ -214,18 +214,42 @@ Every documentation file in the project, grouped by purpose.
 |---|---|
 | [**center/README.md**](center/README.md) | Center display: multi-screen UI, display modes, CAN |
 | [**left/README.md**](left/README.md) | Left gauge: pin map, init sequence, build, UI layout |
-| [**right/README.md**](right/README.md) | Right gauge: same as left but I2C `0x11` |
-| [**pod1/README.md**](pod1/README.md) | Pod 1 display and safety deployment unit |
-| [**pod2/README.md**](pod2/README.md) | Pod 2 display and safety deployment unit |
+| [**right/README.md**](right/README.md) | Right gauge: same as left, node id 2 |
+| [`pod1/main/main.c`](pod1/main/main.c) | Pod 1 display and safety deployment unit |
+| [`pod2/main/main.c`](pod2/main/main.c) | Pod 2 display and safety deployment unit |
 | [**gps/README.md**](gps/README.md) | GPS unit: LC76G I2C CASIC, IMU, AMOLED |
 | [**gps/INTENSIVE_TODO.md**](gps/INTENSIVE_TODO.md) | Phased build plan for GPS firmware (partially archived) |
 
-### GPS / I2C Reference Documents
+### GPS / GNSS Reference (unit frozen — reference only)
 
 | Document | What You'll Learn |
 |---|---|
-| [**wiki/LC76G-I2C-GPS-Driver-Guide.md**](wiki/LC76G-I2C-GPS-Driver-Guide.md) | **SOLE AUTHORITATIVE GPS REFERENCE** — v2.0.0, v15L2 production |
-| [**wiki/LC76G-10Hz-Spec-Breakout.md**](wiki/LC76G-10Hz-Spec-Breakout.md) | 10 Hz GPS logging: bandwidth, timing, implementation checklist |
+| [**wiki/GPS-LC76G-POSTMORTEM.md**](wiki/GPS-LC76G-POSTMORTEM.md) | **WHY GPS IS FROZEN** — 1 Hz hard limit, read-only receiver, abort criteria met. Read before touching `gps/` |
+| [**wiki/LC76G-I2C-GPS-Driver-Guide.md**](wiki/LC76G-I2C-GPS-Driver-Guide.md) | CASIC-over-I2C driver reference (0x50 W / 0x54 R / 0x58 DWR) for the local GNSS chip |
+| [**wiki/LC76G-10Hz-Spec-Breakout.md**](wiki/LC76G-10Hz-Spec-Breakout.md) | The 10 Hz plan that was rejected, and the math showing why |
+| [**wiki/gps-driver-debugging-v16.md**](wiki/gps-driver-debugging-v16.md) | Debug log for the v15M→v16 driver work |
+| [**wiki/gps-unit.md**](wiki/gps-unit.md) | GPS unit board overview |
+| [**wiki/waveshare-1.75-opendash-conversion.md**](wiki/waveshare-1.75-opendash-conversion.md) | AMOLED-1.75 board bring-up |
+
+### Subsystem References
+
+| Document | What You'll Learn |
+|---|---|
+| [**wiki/system-overview.md**](wiki/system-overview.md) | Whole-system orientation for a new contributor |
+| [**docs/relay-espnow-protocol.md**](docs/relay-espnow-protocol.md) | Silent-slave relay/MOS nodes, mask format, boot-into-selftest bug |
+| [**wiki/relay-mos-controllers.md**](wiki/relay-mos-controllers.md) | Relay + MOS FET board behavior |
+| [**wiki/boost-controller.md**](wiki/boost-controller.md) | N75 boost subsystem |
+| [**wiki/safety-deployment-system.md**](wiki/safety-deployment-system.md) | Parachute/rollover deployment subsystem |
+| [**wiki/warning-system.md**](wiki/warning-system.md) | Alarm / warning routing |
+| [**wiki/obd2-integration.md**](wiki/obd2-integration.md) | CAN + UART OBD2 intake |
+| [**wiki/vesc-integration.md**](wiki/vesc-integration.md) | VESC ESC intake (planned) |
+| [**wiki/ota-bluetooth.md**](wiki/ota-bluetooth.md) | BLE OTA design |
+| [**wiki/ota-android-plan.md**](wiki/ota-android-plan.md) | Android OTA sender tool plan |
+| [**wiki/data-intake-formats.md**](wiki/data-intake-formats.md) | Per-protocol payload framing |
+| [**wiki/device-identity-serial-numbers.md**](wiki/device-identity-serial-numbers.md) | Serial-number/identity design |
+| [**docs/center-display-guide.md**](docs/center-display-guide.md) | Center display guide |
+| [**docs/LAP_TRACKING_PLAN.md**](docs/LAP_TRACKING_PLAN.md) | Lap/sector timing plan |
+| [**wiki/POD3-CONVERSION-PLAN.md**](wiki/POD3-CONVERSION-PLAN.md) | Pod 3 bring-up plan |
 
 ### Asset Pipelines
 
@@ -283,7 +307,7 @@ Defines 16-bit IDs for every displayable value. Grouped by category:
 
 Full table: [`docs/data-points.md`](docs/data-points.md)
 
-### `opendash_i2c_protocol.h` — I2C Message Format
+### `opendash_protocol.h` — Inter-Node Message Format (carried over ESP-NOW)
 
 | Field | Size | Description |
 |---|---|---|
@@ -295,9 +319,9 @@ Full table: [`docs/data-points.md`](docs/data-points.md)
 
 Key commands: `SET_DATA_POINT (0x01)`, `SET_SCREEN_LAYOUT (0x02)`,
 `SET_ALARM (0x03)`, `SET_BRIGHTNESS (0x04)`, `REQUEST_DATA (0x06)`,
-`SYSTEM_CMD (0x07)`.
+`SYSTEM (0x07)`.
 
-Full protocol: [`docs/i2c-protocol.md`](docs/i2c-protocol.md)
+Full protocol: [`docs/espnow-protocol.md`](docs/espnow-protocol.md)
 
 ### `opendash_display_config.h` — Layout & Unit Configuration
 
@@ -479,29 +503,34 @@ ui_manager_warning_clear();
 
 ---
 
-## I2C Bus & Protocol
+## Inter-Node Protocol (ESP-NOW)
+
+> There is **no wired inter-node bus**. Nodes are separate boards with no
+> shared signal; all node-to-node traffic is ESP-NOW. I2C exists only as a
+> local peripheral bus inside one enclosure (touch, RTC, IO expander, IMU).
+
+Nodes are addressed by **logical node ID**, not bus address. Center keeps a
+persistent MAC↔node-ID peer table; the ID travels inside every frame.
 
 ```
-                ┌──────────┐
-  Left (0x10) ◄─┤  CENTER  ├─► Right (0x11)
-                │ (Master) │
-                └────┬─────┘
-                     │
-                GPS (0x12)
-                     │
-                BMS (0x20)
+                 ┌───────────┐
+  LEFT (id 1) ◄──┤  CENTER   ├─► RIGHT (id 2)
+  POD1-8 (5-12)  │  (id 0)   │
+  BMS    (id 4)  └───────────┘
+  RELAY/MOS(13-17)   all ESP-NOW, channel 1
 ```
 
-- **Bus speed:** 400 kHz (I2C Fast Mode)
-- **Master:** Center display, polls all slaves
-- **Message format:** `[0xAA][CMD][LEN][PAYLOAD...][XOR_CHECKSUM]`
-- **Polling rate:** ~50 Hz for sensor data, 2 Hz for BMS, 1 Hz for checklist
+- **Transport:** ESP-NOW, Wi-Fi channel 1, no hopping, no wired inter-node link
+- **Frame:** `[0xAA][CMD][LEN][NODE_ID][PAYLOAD...][XOR_CHECKSUM]`
+- **Topology:** peer-to-peer star around Center; Center is the logical master
+- **No polling:** slaves push on change; offline is inferred from data absence
+  (`node_health`), not from a missed poll
+- **Local I2C only:** each pod runs a single peripheral controller, port num 0,
+  SDA=15 / SCL=7, 400 kHz, serving that board's touch controller and IO expander
 
-Left/Right pods use **two separate I2C ports**:
-- **Port 0 (Master):** SDA=15, SCL=7 — internal bus for TCA9554 IO expander + GT911 touch
-- **Port 1 (Slave):** SDA=4, SCL=16 — external bus to Center unit
-
-Full protocol: [`docs/i2c-protocol.md`](docs/i2c-protocol.md)
+Full protocol: [`docs/espnow-protocol.md`](docs/espnow-protocol.md) ·
+channel routing: [`common/include/channel_management.h`](common/include/channel_management.h) ·
+relay/MOS slaves: [`docs/relay-espnow-protocol.md`](docs/relay-espnow-protocol.md)
 
 ---
 
@@ -639,10 +668,11 @@ IDLE0 when updating 10+ LVGL labels on a hidden screen.
 
 | Task | Priority | Core | Description |
 |---|---|---|---|
-| `ui_task` | 5 | 1 | LVGL rendering |
-| `comms_task` | 4 | 0 | I2C master polling loop |
-| `data_task` | 3 | 0 | Data processing, alarms, logging |
-| `wifi_ble_task` | 2 | 0 | WiFi/BLE management |
+| `ch_control` | 6 | 0 | Control channel (commands) — highest |
+| `ch_critical` | 5 | 0 | Critical channel |
+| `espnow_dispatch` | 4 | 0 | Routes inbound frames into channel queues |
+| `ch_medium` | 4 | 0 | Medium channel |
+| `ch_low` | 3 | 1 | Low channel (off-cored to protect core 0) |
 
 ### GPS Unit (additional tasks)
 
@@ -693,9 +723,9 @@ See [`docs/vscode-setup.md`](docs/vscode-setup.md).
 | Term | Definition |
 |---|---|
 | **Arc** | 270° circular gauge rendered by LVGL `lv_arc`. Shows primary sensor sweep with white outline. |
-| **BMS** | Battery Management System. External rAtTrax node at I2C `0x20`. |
+| **BMS** | Battery Management System. External rAtTrax node (`OPENDASH_NODE_BMS`, id 4), reached over ESP-NOW. |
 | **Boot Button** | GPIO 0 button on ESP32-S3 boards. Used to cycle display modes (Gauge → Odo → ...). |
-| **Center** | Main 4.3" dashboard display. I2C master, aggregates all data. |
+| **Center** | Main 4.3" dashboard display. ESP-NOW master; routes and aggregates all data. |
 | **Common** | Shared C library at `common/`. Included by all four node projects. |
 | **Data Point** | A single displayable value identified by a 16-bit ID (e.g., `0x0106` = Boost Pressure). |
 | **Display Mode** | A screen layout (Gauge, Odometer, etc.) that the user can cycle through. |

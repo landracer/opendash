@@ -46,7 +46,7 @@
 #include "node_health.h"
 
 #include "opendash_espnow.h"
-#include "opendash_i2c_protocol.h"
+#include "opendash_protocol.h"
 #include "opendash_data_model.h"
 #include "opendash_common.h"
 #include "opendash_rollover.h"
@@ -250,7 +250,7 @@ static opendash_node_t identify_sender(const uint8_t *mac)
  * This replaces the old PING discovery — nodes self-identify on first contact.
  */
 static void auto_register_node(const uint8_t *mac,
-                                const opendash_i2c_msg_t *msg)
+                                const opendash_msg_t *msg)
 {
     if (msg->length < 1) return;
 
@@ -300,8 +300,8 @@ static void espnow_dispatcher_task(void *pvParameters)
         }
 
         /* Deserialize the protocol frame */
-        opendash_i2c_msg_t msg;
-        opendash_err_t ret = opendash_i2c_deserialize(evt.data, evt.len, &msg);
+        opendash_msg_t msg;
+        opendash_err_t ret = opendash_msg_deserialize(evt.data, evt.len, &msg);
         if (ret != OPENDASH_OK) {
             ESP_LOGD(TAG, "Invalid frame from " MACSTR " (len=%d, err=%d)",
                      MAC2STR(evt.src_mac), evt.len, ret);
@@ -499,8 +499,8 @@ static void channel_critical_task(void *pvParameters)
     while (1) {
         /* Drain all pending messages from critical channel */
         while (channel_mgr_recv(CHANNEL_CRITICAL, &inbound, 0)) {
-            opendash_i2c_msg_t msg;
-            if (opendash_i2c_deserialize(inbound.data, inbound.len, &msg) != OPENDASH_OK) {
+            opendash_msg_t msg;
+            if (opendash_msg_deserialize(inbound.data, inbound.len, &msg) != OPENDASH_OK) {
                 continue;
             }
 
@@ -526,12 +526,12 @@ static void channel_critical_task(void *pvParameters)
                     payload[1] = dp_id & 0xFF;
                     memcpy(&payload[2], &value, sizeof(float));
 
-                    opendash_i2c_msg_t fwd;
-                    opendash_i2c_build_msg(&fwd, OPENDASH_CMD_SET_DATA_POINT,
+                    opendash_msg_t fwd;
+                    opendash_msg_build(&fwd, OPENDASH_CMD_SET_DATA_POINT,
                                             payload, sizeof(payload));
                     uint8_t tx_buf[OPENDASH_ESPNOW_MAX_DATA];
                     uint16_t tx_len = 0;
-                    if (opendash_i2c_serialize(&fwd, tx_buf, &tx_len) == OPENDASH_OK) {
+                    if (opendash_msg_serialize(&fwd, tx_buf, &tx_len) == OPENDASH_OK) {
                         channel_mgr_send_to_node(OPENDASH_NODE_LEFT, tx_buf, tx_len);
                         channel_mgr_send_to_node(OPENDASH_NODE_RIGHT, tx_buf, tx_len);
                     }
@@ -560,8 +560,8 @@ static void channel_medium_task(void *pvParameters)
 
     while (1) {
         while (channel_mgr_recv(CHANNEL_MEDIUM, &inbound, 0)) {
-            opendash_i2c_msg_t msg;
-            if (opendash_i2c_deserialize(inbound.data, inbound.len, &msg) != OPENDASH_OK) {
+            opendash_msg_t msg;
+            if (opendash_msg_deserialize(inbound.data, inbound.len, &msg) != OPENDASH_OK) {
                 continue;
             }
 
@@ -579,12 +579,12 @@ static void channel_medium_task(void *pvParameters)
                 fwd_payload[0] = (dp_id >> 8) & 0xFF;
                 fwd_payload[1] = dp_id & 0xFF;
                 memcpy(&fwd_payload[2], &value, sizeof(float));
-                opendash_i2c_msg_t fwd;
-                opendash_i2c_build_msg(&fwd, OPENDASH_CMD_SET_DATA_POINT,
+                opendash_msg_t fwd;
+                opendash_msg_build(&fwd, OPENDASH_CMD_SET_DATA_POINT,
                                         fwd_payload, sizeof(fwd_payload));
                 uint8_t tx_buf[OPENDASH_ESPNOW_MAX_DATA];
                 uint16_t tx_len = 0;
-                if (opendash_i2c_serialize(&fwd, tx_buf, &tx_len) == OPENDASH_OK) {
+                if (opendash_msg_serialize(&fwd, tx_buf, &tx_len) == OPENDASH_OK) {
                     channel_mgr_send_to_node(OPENDASH_NODE_LEFT, tx_buf, tx_len);
                     channel_mgr_send_to_node(OPENDASH_NODE_RIGHT, tx_buf, tx_len);
                 }
@@ -619,12 +619,12 @@ static void channel_medium_task(void *pvParameters)
                  * LEFT needs the relay too: its fixed page set binds
                  * ECU-domain ids (e.g. COOLANT on the WATER page) which
                  * only ever arrive through this relay. */
-                opendash_i2c_msg_t fwd;
-                opendash_i2c_build_msg(&fwd, OPENDASH_CMD_SET_DATA_BATCH,
+                opendash_msg_t fwd;
+                opendash_msg_build(&fwd, OPENDASH_CMD_SET_DATA_BATCH,
                                         msg.payload, msg.length);
                 uint8_t tx_buf[OPENDASH_ESPNOW_MAX_DATA];
                 uint16_t tx_len = 0;
-                if (opendash_i2c_serialize(&fwd, tx_buf, &tx_len) == OPENDASH_OK) {
+                if (opendash_msg_serialize(&fwd, tx_buf, &tx_len) == OPENDASH_OK) {
                     channel_mgr_send_to_node(OPENDASH_NODE_LEFT, tx_buf, tx_len);
                     channel_mgr_send_to_node(OPENDASH_NODE_RIGHT, tx_buf, tx_len);
                 }
@@ -670,8 +670,8 @@ static void channel_low_task(void *pvParameters)
 
     while (1) {
         while (channel_mgr_recv(CHANNEL_LOW, &inbound, 0)) {
-            opendash_i2c_msg_t msg;
-            if (opendash_i2c_deserialize(inbound.data, inbound.len, &msg) != OPENDASH_OK) {
+            opendash_msg_t msg;
+            if (opendash_msg_deserialize(inbound.data, inbound.len, &msg) != OPENDASH_OK) {
                 continue;
             }
 
@@ -788,8 +788,8 @@ static void channel_control_task(void *pvParameters)
 
         /* Process any inbound control messages */
         while (channel_mgr_recv(CHANNEL_CONTROL, &inbound, 0)) {
-            opendash_i2c_msg_t msg;
-            if (opendash_i2c_deserialize(inbound.data, inbound.len, &msg) != OPENDASH_OK) {
+            opendash_msg_t msg;
+            if (opendash_msg_deserialize(inbound.data, inbound.len, &msg) != OPENDASH_OK) {
                 continue;
             }
             ESP_LOGD(TAG, "Control msg cmd=0x%02X from " MACSTR,
@@ -970,11 +970,11 @@ esp_err_t espnow_master_start(void)
         hello_payload[0] = (OPENDASH_DP_GPS_SPEED >> 8) & 0xFF;
         hello_payload[1] = OPENDASH_DP_GPS_SPEED & 0xFF;
         /* value=0.0f (already zeroed) */
-        opendash_i2c_msg_t hello;
-        opendash_i2c_build_msg(&hello, OPENDASH_CMD_SET_DATA_POINT,
+        opendash_msg_t hello;
+        opendash_msg_build(&hello, OPENDASH_CMD_SET_DATA_POINT,
                                 hello_payload, sizeof(hello_payload));
         uint8_t tx[OPENDASH_ESPNOW_MAX_DATA]; uint16_t tl = 0;
-        if (opendash_i2c_serialize(&hello, tx, &tl) == OPENDASH_OK) {
+        if (opendash_msg_serialize(&hello, tx, &tl) == OPENDASH_OK) {
             channel_mgr_send_to_node(OPENDASH_NODE_LEFT, tx, tl);
             channel_mgr_send_to_node(OPENDASH_NODE_RIGHT, tx, tl);
             channel_mgr_send_to_node(OPENDASH_NODE_POD1, tx, tl);
@@ -1009,13 +1009,13 @@ esp_err_t espnow_master_send_data_point(opendash_node_t node,
     payload[1] = dp_id & 0xFF;
     memcpy(&payload[2], &value, sizeof(float));
 
-    opendash_i2c_msg_t msg;
-    opendash_i2c_build_msg(&msg, OPENDASH_CMD_SET_DATA_POINT,
+    opendash_msg_t msg;
+    opendash_msg_build(&msg, OPENDASH_CMD_SET_DATA_POINT,
                             payload, sizeof(payload));
 
     uint8_t tx_buf[OPENDASH_ESPNOW_MAX_DATA];
     uint16_t tx_len = 0;
-    opendash_err_t od_ret = opendash_i2c_serialize(&msg, tx_buf, &tx_len);
+    opendash_err_t od_ret = opendash_msg_serialize(&msg, tx_buf, &tx_len);
     if (od_ret != OPENDASH_OK) {
         return ESP_FAIL;
     }
@@ -1034,13 +1034,13 @@ esp_err_t espnow_master_send_relay_command(opendash_node_t node,
 
     uint8_t payload[3] = { channel, state, pwm_duty };
 
-    opendash_i2c_msg_t msg;
-    opendash_i2c_build_msg(&msg, OPENDASH_CMD_SET_RELAY,
+    opendash_msg_t msg;
+    opendash_msg_build(&msg, OPENDASH_CMD_SET_RELAY,
                             payload, sizeof(payload));
 
     uint8_t tx_buf[OPENDASH_ESPNOW_MAX_DATA];
     uint16_t tx_len = 0;
-    opendash_err_t od_ret = opendash_i2c_serialize(&msg, tx_buf, &tx_len);
+    opendash_err_t od_ret = opendash_msg_serialize(&msg, tx_buf, &tx_len);
     if (od_ret != OPENDASH_OK) {
         return ESP_FAIL;
     }
@@ -1054,13 +1054,13 @@ esp_err_t espnow_master_send_system_subcmd(opendash_node_t node, uint8_t subcmd)
 {
     uint8_t payload[1] = { subcmd };
 
-    opendash_i2c_msg_t msg;
-    opendash_i2c_build_msg(&msg, OPENDASH_CMD_SYSTEM,
+    opendash_msg_t msg;
+    opendash_msg_build(&msg, OPENDASH_CMD_SYSTEM,
                             payload, sizeof(payload));
 
     uint8_t tx_buf[OPENDASH_ESPNOW_MAX_DATA];
     uint16_t tx_len = 0;
-    opendash_err_t od_ret = opendash_i2c_serialize(&msg, tx_buf, &tx_len);
+    opendash_err_t od_ret = opendash_msg_serialize(&msg, tx_buf, &tx_len);
     if (od_ret != OPENDASH_OK) {
         return ESP_FAIL;
     }
@@ -1103,13 +1103,13 @@ esp_err_t espnow_master_send_screen_layout(opendash_node_t node,
         return ESP_FAIL;
     }
 
-    opendash_i2c_msg_t msg;
-    opendash_i2c_build_msg(&msg, OPENDASH_CMD_SET_SCREEN_LAYOUT,
+    opendash_msg_t msg;
+    opendash_msg_build(&msg, OPENDASH_CMD_SET_SCREEN_LAYOUT,
                            payload, (uint8_t)payload_len);
 
     uint8_t tx_buf[OPENDASH_ESPNOW_MAX_DATA];
     uint16_t tx_len = 0;
-    if (opendash_i2c_serialize(&msg, tx_buf, &tx_len) != OPENDASH_OK) {
+    if (opendash_msg_serialize(&msg, tx_buf, &tx_len) != OPENDASH_OK) {
         return ESP_FAIL;
     }
 
@@ -1136,13 +1136,13 @@ esp_err_t espnow_master_send_obd_command(uint8_t obd_cmd)
 {
     uint8_t payload[1] = { obd_cmd };
 
-    opendash_i2c_msg_t msg;
-    opendash_i2c_build_msg(&msg, OPENDASH_CMD_OBD_COMMAND,
+    opendash_msg_t msg;
+    opendash_msg_build(&msg, OPENDASH_CMD_OBD_COMMAND,
                             payload, sizeof(payload));
 
     uint8_t tx_buf[OPENDASH_ESPNOW_MAX_DATA];
     uint16_t tx_len = 0;
-    opendash_err_t od_ret = opendash_i2c_serialize(&msg, tx_buf, &tx_len);
+    opendash_err_t od_ret = opendash_msg_serialize(&msg, tx_buf, &tx_len);
     if (od_ret != OPENDASH_OK) {
         return ESP_FAIL;
     }
@@ -1170,12 +1170,12 @@ esp_err_t espnow_master_send_raw(opendash_node_t node, uint8_t cmd,
     if (length > (OPENDASH_ESPNOW_MAX_DATA - 4)) return ESP_ERR_INVALID_SIZE;
     if (length > 0 && payload == NULL)            return ESP_ERR_INVALID_ARG;
 
-    opendash_i2c_msg_t msg;
-    opendash_i2c_build_msg(&msg, cmd, (const uint8_t *)payload, length);
+    opendash_msg_t msg;
+    opendash_msg_build(&msg, cmd, (const uint8_t *)payload, length);
 
     uint8_t  tx_buf[OPENDASH_ESPNOW_MAX_DATA];
     uint16_t tx_len = 0;
-    if (opendash_i2c_serialize(&msg, tx_buf, &tx_len) != OPENDASH_OK) {
+    if (opendash_msg_serialize(&msg, tx_buf, &tx_len) != OPENDASH_OK) {
         return ESP_FAIL;
     }
 
@@ -1206,12 +1206,12 @@ static esp_err_t espnow_master_send_raw_force(opendash_node_t node, uint8_t cmd,
     if (length > (OPENDASH_ESPNOW_MAX_DATA - 4)) return ESP_ERR_INVALID_SIZE;
     if (length > 0 && payload == NULL)            return ESP_ERR_INVALID_ARG;
 
-    opendash_i2c_msg_t msg;
-    opendash_i2c_build_msg(&msg, cmd, (const uint8_t *)payload, length);
+    opendash_msg_t msg;
+    opendash_msg_build(&msg, cmd, (const uint8_t *)payload, length);
 
     uint8_t  tx_buf[OPENDASH_ESPNOW_MAX_DATA];
     uint16_t tx_len = 0;
-    if (opendash_i2c_serialize(&msg, tx_buf, &tx_len) != OPENDASH_OK) {
+    if (opendash_msg_serialize(&msg, tx_buf, &tx_len) != OPENDASH_OK) {
         return ESP_FAIL;
     }
     return channel_mgr_force_send_to_node(node, tx_buf, tx_len, max_retries);

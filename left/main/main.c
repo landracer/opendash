@@ -46,7 +46,7 @@
 #include "ui_manager.h"
 #include "opendash_common.h"
 #include "opendash_display_config.h"
-#include "opendash_i2c_protocol.h"
+#include "opendash_protocol.h"
 #include "opendash_data_model.h"
 #include "opendash_odometer.h"
 #include "opendash_uart.h"
@@ -83,13 +83,13 @@ static bool     s_center_mac_known = false;
 /**
  * @brief Send a protocol response back to the Center master.
  */
-static esp_err_t send_response_to_center(const opendash_i2c_msg_t *resp)
+static esp_err_t send_response_to_center(const opendash_msg_t *resp)
 {
     if (!s_center_mac_known) return ESP_ERR_NOT_FOUND;
 
     uint8_t buf[OPENDASH_ESPNOW_MAX_DATA];
     uint16_t len;
-    if (opendash_i2c_serialize(resp, buf, &len) != OPENDASH_OK) {
+    if (opendash_msg_serialize(resp, buf, &len) != OPENDASH_OK) {
         return ESP_FAIL;
     }
 
@@ -111,8 +111,8 @@ static void send_data_point_to_center(uint16_t dp_id, float value)
     payload[1] = dp_id & 0xFF;
     memcpy(&payload[2], &value, sizeof(float));
 
-    opendash_i2c_msg_t msg;
-    opendash_i2c_build_msg(&msg, OPENDASH_CMD_DATA_RESPONSE,
+    opendash_msg_t msg;
+    opendash_msg_build(&msg, OPENDASH_CMD_DATA_RESPONSE,
                             payload, sizeof(payload));
     send_response_to_center(&msg);
 }
@@ -172,8 +172,8 @@ static void forward_md_data_to_center(const opendash_md_data_t *md)
     PUT(OPENDASH_DP_MD_OIL_TEMP,      md->vdo_temp1);
     #undef PUT
 
-    opendash_i2c_msg_t msg;
-    opendash_i2c_build_msg(&msg, OPENDASH_CMD_DATA_BATCH, payload, off);
+    opendash_msg_t msg;
+    opendash_msg_build(&msg, OPENDASH_CMD_DATA_BATCH, payload, off);
     send_response_to_center(&msg);
 }
 
@@ -227,8 +227,8 @@ static void forward_obd2_to_center(const opendash_md_data_t *md)
     PUT(OPENDASH_DP_DTC_COUNT,       (float)md->mil_dtc_count);
     #undef PUT
 
-    opendash_i2c_msg_t msg;
-    opendash_i2c_build_msg(&msg, OPENDASH_CMD_DATA_BATCH, payload, off);
+    opendash_msg_t msg;
+    opendash_msg_build(&msg, OPENDASH_CMD_DATA_BATCH, payload, off);
     send_response_to_center(&msg);
 }
 
@@ -242,7 +242,7 @@ static void forward_obd2_to_center(const opendash_md_data_t *md)
  *   - SYSTEM:         PING response, REBOOT, FACTORY_RESET
  */
 static void dispatch_message(const opendash_espnow_event_t *evt,
-                              const opendash_i2c_msg_t *msg)
+                              const opendash_msg_t *msg)
 {
     /* Learn center's MAC from first valid message */
     /* Only latch on center-originated cmds (bit 7 clear). Slave broadcasts
@@ -348,8 +348,8 @@ static void dispatch_message(const opendash_espnow_event_t *evt,
                         OPENDASH_NODE_LEFT,  /* Node ID */
                         0x01, 0x00           /* Flags: running, no errors */
                     };
-                    opendash_i2c_msg_t resp;
-                    opendash_i2c_build_msg(&resp, OPENDASH_CMD_STATUS_REPORT,
+                    opendash_msg_t resp;
+                    opendash_msg_build(&resp, OPENDASH_CMD_STATUS_REPORT,
                                            status_payload, sizeof(status_payload));
                     send_response_to_center(&resp);
                     ESP_LOGD(TAG, "PING → STATUS_REPORT sent");
@@ -436,8 +436,8 @@ static void process_espnow_messages(void)
     int processed = 0;
     while (opendash_espnow_recv(&evt, 0 /* non-blocking */)) {
         /* Deserialize the protocol message */
-        opendash_i2c_msg_t msg;
-        opendash_err_t ret = opendash_i2c_deserialize(evt.data, evt.len, &msg);
+        opendash_msg_t msg;
+        opendash_err_t ret = opendash_msg_deserialize(evt.data, evt.len, &msg);
         if (ret != OPENDASH_OK) {
             ESP_LOGD(TAG, "Invalid ESP-NOW msg from " MACSTR " (len=%d)",
                      MAC2STR(evt.src_mac), evt.len);

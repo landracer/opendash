@@ -31,12 +31,14 @@ The GPS unit is a WaveShare ESP32-S3-Touch-AMOLED-1.75 display node that provide
 ## I2C Configuration
 
 ### Bus Setup
-- **Bus Speed**: 100 kHz (standard I2C)
-- **Master**: Center display (I2C master)
-- **Slave Address**: 0x12 (GPS unit)
-- **GPIO Pins**:
-  - SDA: GPIO15
-  - SCL: GPIO14
+
+This bus is **on-board only** — it connects the LC76G to its own ESP32-S3. It
+carries no node-to-node traffic. Inter-node traffic is ESP-NOW; the GPS unit is
+`OPENDASH_NODE_GPS` (logical id 3), not an address on any shared bus.
+
+- **Bus Speed**: 100 kHz (LC76G requires standard-mode I2C; 400 kHz does not work)
+- **Controller**: this board's own ESP32-S3 (peripheral port num 0)
+- **GPIO Pins**: SDA = GPIO15, SCL = GPIO16
 
 ### I2C Addresses
 - **Write Address**: 0x50 (7-bit) - for sending CASIC commands
@@ -192,6 +194,6 @@ The GPS unit requires no manual calibration. The LC76G module automatically cali
 ## References
 
 - [WaveShare ESP32-S3-Touch-AMOLED-1.75 Wiki](https://www.waveshare.com/wiki/ESP32-S3-Touch-AMOLED-1.75)
-- [Quectel LC26GABLC76G Series I2C Application Note v1.0](./quectel_lc26gablc76g_series_i2c_application_note_v1-0.pdf)
-- [OpenDash I2C Communication Protocol](./protocol.md)
-- [OpenDash Data Points Legend](./data-points.md)
+- Quectel LC26GAB/LC76G Series I2C Application Note v1.0 (datasheet not kept in-tree)
+- [OpenDash Protocol (ESP-NOW wire format)](protocol.html)
+- [OpenDash Data Points Legend](../docs/data-points.md)

@@ -81,7 +81,7 @@ opendash/
 │   ├── include/         ← Public API headers
 │   │   ├── opendash_common.h        — Node types, error codes
 │   │   ├── opendash_data_model.h    — ALL data point ID definitions
-│   │   ├── opendash_i2c_protocol.h  — Message format (frame structure)
+│   │   ├── opendash_protocol.h  — Message format (frame structure)
 │   │   ├── opendash_espnow.h        — ESP-NOW transport layer
 │   │   ├── opendash_uart.h          — MultiDisplay UART parser
 │   │   └── ...
@@ -191,7 +191,7 @@ Checksum = XOR of SYNC, CMD, LENGTH, and all PAYLOAD bytes.
 | `PROJECT_INDEX.md` | Central navigation reference |
 | `docs/architecture.md` | System-level architecture |
 | `docs/hardware.md` | Pin maps, board specs |
-| `docs/i2c-protocol.md` | Full protocol specification |
+| `docs/espnow-protocol.md` | Full protocol specification |
 | `docs/data-points.md` | Data point ID legend |
 | `UART_CONNECTION.md` | MultiDisplay serial protocol |
 | `BLUETOOTH_PAIRING.md` | HC-05/HC-06 pairing guide |

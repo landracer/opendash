@@ -52,7 +52,7 @@ Once in OTA mode the node:
 2. Advertises as `OpenDash-<NODE_NAME>-OTA`, e.g. `OpenDash-RELAY_8CH_B-OTA`.
 3. The center dash shows a flashing **BLE OTA** badge for that node (driven
    by the `STATUS_REPORT.flags.BLE_OTA` bit — see
-   [common/include/opendash_i2c_protocol.h](common/include/opendash_i2c_protocol.h)).
+   [common/include/opendash_protocol.h](common/include/opendash_protocol.h)).
 
 ---
 
@@ -197,5 +197,5 @@ soon as either arrives, instead of a blind sleep.
 ## 8. Related docs
 
 - [BLUETOOTH_PAIRING.md](BLUETOOTH_PAIRING.md) — companion-app pairing (not OTA).
-- [common/include/opendash_i2c_protocol.h](common/include/opendash_i2c_protocol.h) — `STATUS_REPORT.flags.BLE_OTA` bit definition.
+- [common/include/opendash_protocol.h](common/include/opendash_protocol.h) — `STATUS_REPORT.flags.BLE_OTA` bit definition.
 - [center/main/ui_manager.c](center/main/ui_manager.c) — dash-side BLE OTA banner + OTA Flash menu.

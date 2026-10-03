@@ -18,7 +18,7 @@
  *   - Thread-safe receive queue decouples WiFi callback from app logic
  *
  * @see esp_now.h — ESP-IDF ESP-NOW API
- * @see opendash_i2c_protocol.h — Message format (unchanged, reused as payload)
+ * @see opendash_protocol.h — Message format (unchanged, reused as payload)
  *
  * Licensed under Sovereign Individual License v1.0 — see LICENSE file
  */

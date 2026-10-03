@@ -1,9 +1,17 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # OpenDash GPS Unit Firmware — Intensive Build TODO
 
-> **⚠️ PARTIAL ARCHIVE:** This TODO was created before the GPS I2C protocol
-> was fully understood. Some items are completed, some are superseded by
-> the production v15L2 code. **The authoritative GPS reference is:**
+> **⛔ UNIT FROZEN — DO NOT DEVELOP.** The GPS/telemetry node was frozen on
+> 2026-09-29: the LC76G is a hard-fixed **1 Hz** receiver with no usable command
+> channel, and the abort criteria for the 10 Hz effort were met. The GNSS chip's
+> CASIC-over-I2C interface is *real* (it is a local chip-on-board bus) — what was
+> never viable is the **data rate**. See `wiki/GPS-LC76G-POSTMORTEM.md` before
+> reading anything below. Inter-node traffic in this project is ESP-NOW only;
+> this file predates that and its old I2C-node wiring steps are obsolete.
+>
+> **⚠️ PARTIAL ARCHIVE:** This TODO was created before the GNSS driver was
+> understood. Some items are completed, some were superseded by the production
+> v15L2 code. **The authoritative GNSS driver reference is:**
 > `wiki/LC76G-I2C-GPS-Driver-Guide.md` (Version 2.0.0, v15L2).
 >
 > I2C addresses corrected 2025-03: 0x28→**0x50** (write), 0x2A→**0x54** (read),
@@ -377,7 +385,7 @@
   - Handle OPENDASH_CMD_SYSTEM: ping/reboot
   
 - [ ] **TX Response Queueing**:
-  - Serialize message via `opendash_i2c_serialize()`
+  - Serialize message via `opendash_msg_serialize()`
   - Call `i2c_slave_write(slave_handle, tx_buffer, tx_len, &written_len, 100)`
   
 - [ ] **I2C Node Task (i2c_node_task)**:
@@ -646,15 +654,22 @@
 ### 8.1 Verify Hardware Integration
 - [ ] GPS data appears in logs (even if satellites = 0 initially)
 - [ ] IMU data updates with accelerometer readings
-- [ ] Display brightness responds to SET_BRIGHTNESS commands (if I2C node connected)
+- [ ] Display brightness responds to SET_BRIGHTNESS commands (over ESP-NOW)
 - [ ] Boot button LED indicators (if present) respond
 
-### 8.2 Verify OpenDash I2C Protocol
-- [ ] Connect center display as I2C master
-- [ ] Send SET_DATA_POINT commands — verify GPS updates UI
-- [ ] Send REQUEST_DATA commands — verify GPS node responds with float values
-- [ ] Send SYSTEM ping — verify status response
-- [ ] Send SET_BRIGHTNESS — verify display brightness changes
+### 8.2 Verify OpenDash Protocol (ESP-NOW — supersedes the old I2C checklist)
+
+> ⚠️ This unit is **frozen** (see `wiki/GPS-LC76G-POSTMORTEM.md`). These checks
+> are written against the current **ESP-NOW** stack. The historical wording here
+> said "connect Center as I2C master" — there is no such thing; Center is an
+> ESP-NOW peer, and the only I2C on this board is LC76G/QMI8658 local peripheral
+> wiring. Do not wire a bus to Center.
+
+- [ ] Center has this node's MAC in its peer table (`node_health_register_mac`)
+- [ ] Send `SET_DATA_POINT` — verify GPS updates UI
+- [ ] Send `REQUEST_DATA` — verify GPS replies with float values
+- [ ] Send `SYSTEM` — verify a `STATUS_REPORT` comes back
+- [ ] Send `SET_BRIGHTNESS` — verify display brightness changes
 
 ### 8.3 Test GPS Acquisition
 - [ ] Allow system to run for 1+ minute outdoors

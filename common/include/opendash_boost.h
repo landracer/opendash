@@ -31,7 +31,7 @@
  * Wire transport
  * ==============
  *   ALL boost frames travel over ESP-NOW (no I2C, no UART). The opcodes
- *   live in opendash_i2c_protocol.h purely because that header is the
+ *   live in opendash_protocol.h purely because that header is the
  *   shared wire-format catalogue (legacy filename) — the bytes go out
  *   on opendash_espnow_send().
  *

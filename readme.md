@@ -42,7 +42,7 @@ opendash/
 ├── docs/                        ← Architecture, hardware, protocols, setup
 │   ├── architecture.md          — System-level architecture & data flow
 │   ├── hardware.md              — Hardware specifications & pin mappings
-│   ├── i2c-protocol.md          — I2C inter-node communication protocol
+│   ├── espnow-protocol.md       — ESP-NOW inter-node protocol (no wired bus)
 │   ├── data-points.md           — Legend of all displayable data points
 │   ├── font-system-testing.md   — Font system implementation and testing
 │   └── setup-guide.md           — Development environment setup
@@ -50,7 +50,7 @@ opendash/
 ├── common/                      ← Shared libraries (all units include this)
 │   ├── include/                 — Public headers
 │   │   ├── opendash_common.h
-│   │   ├── opendash_i2c_protocol.h
+│   │   ├── opendash_protocol.h
 │   │   ├── opendash_data_model.h
 │   │   ├── opendash_obd2.h
 │   │   ├── opendash_display_config.h
@@ -189,7 +189,7 @@ The original design intended to use I2C for inter-node communication, but due to
 - **Programmable alarms** — Threshold-based warnings for any data point
 - **Drag-and-drop assets** — Convert images with LVGL tools, drop into `assets/`
 - **Display Mode System** — Center display supports multiple cycling data views (ENGINE, GPS, custom modes) with zero memory overhead. See [`center/README.md`](center/README.md) for customization guide.
-- **Future: Standard Layout Switcher** — Once multiple community-contributed layouts are available, end-users will be able to select from pre-built dashboard templates without coding. See [DISPLAY_MODE_REFACTORING.md](DISPLAY_MODE_REFACTORING.md) for technical roadmap.
+- **Future: Standard Layout Switcher** — Once multiple community-contributed layouts are available, end-users will be able to select from pre-built dashboard templates without coding. Not yet implemented — no design doc exists yet.
 
 ---
 
@@ -243,25 +243,24 @@ idf.py -p /dev/ttyUSB0 flash monitor
 | [**Quick Start Guide**](QUICKSTART.md) | **5-minute setup guide — start here!** |
 | [**Build Dependencies**](BUILD_DEPENDENCIES.md) | **Complete dependency installation guide** |
 | [**Compile Errors Resolution**](docs/archived/COMPILE_ERRORS_RESOLUTION.md) | **Troubleshooting compilation issues** |
-| [**Display Mode Refactoring**](DISPLAY_MODE_REFACTORING.md) | **Technical deep-dive: Center display architecture redesign** |
 | [`docs/vscode-setup.md`](docs/vscode-setup.md) | Visual Studio Code configuration guide |
 | [`docs/setup-guide.md`](docs/setup-guide.md) | Detailed development environment setup |
 | [`docs/architecture.md`](docs/architecture.md) | System architecture, data flow, and node roles |
 | [`docs/hardware.md`](docs/hardware.md) | Hardware specs, pin mappings, and wiring |
-| [`docs/i2c-protocol.md`](docs/i2c-protocol.md) | ESP-NOW communication protocol between nodes |
+| [`docs/espnow-protocol.md`](docs/espnow-protocol.md) | ESP-NOW communication protocol between nodes |
 | [`docs/data-points.md`](docs/data-points.md) | Full legend of displayable data points |
 | [`docs/font-system-testing.md`](docs/font-system-testing.md) | Font system implementation and testing |
 | [`center/README.md`](center/README.md) | **Center display project guide** — Display mode system, customization |
 | [`left/README.md`](left/README.md) | Left gauge pod guide |
 | [`right/README.md`](right/README.md) | Right gauge pod guide |
-| [`pod1/README.md`](pod1/README.md) | Pod 1 display and safety deployment unit |
-| [`pod2/README.md`](pod2/README.md) | Pod 2 display and safety deployment unit |
+| [`pod1/main/main.c`](pod1/main/main.c) | Pod 1 firmware (no separate README — see source header) |
+| [`pod2/main/main.c`](pod2/main/main.c) | Pod 2 firmware (no separate README — see source header) |
 | [`gps/README.md`](gps/README.md) | GPS/Telemetry unit guide |
-| [`mos-4ch-a/README.md`](mos-4ch-a/README.md) | MOS-4CH-A headless controller documentation |
-| [`mos-4ch-b/README.md`](mos-4ch-b/README.md) | MOS-4CH-B headless controller documentation |
-| [`relay-4ch-hd/README.md`](relay-4ch-hd/README.md) | Relay-4CH-HD headless relay controller documentation |
-| [`relay-8ch-a/README.md`](relay-8ch-a/README.md) | Relay-8CH-A headless relay controller documentation |
-| [`relay-8ch-b/README.md`](relay-8ch-b/README.md) | Relay-8CH-B headless relay controller documentation |
+| [`mos-4ch-a/main/main.c`](mos-4ch-a/main/main.c) | MOS-4CH-A headless controller documentation |
+| [`mos-4ch-b/main/main.c`](mos-4ch-b/main/main.c) | MOS-4CH-B headless controller documentation |
+| [`relay-4ch-hd/main/main.c`](relay-4ch-hd/main/main.c) | Relay-4CH-HD headless relay controller documentation |
+| [`relay-8ch-a/main/main.c`](relay-8ch-a/main/main.c) | Relay-8CH-A headless relay controller documentation |
+| [`relay-8ch-b/main/main.c`](relay-8ch-b/main/main.c) | Relay-8CH-B headless relay controller documentation |
 | [`wiki/`](wiki/) | **Wiki documentation** — Additional project documentation and integration guides |
 | [`wiki/system-overview.md`](wiki/system-overview.md) | **★ End-user system guide — start here for usage** |
 | [`wiki/relay-mos-controllers.md`](wiki/relay-mos-controllers.md) | **Relay & MOS FET controller documentation** |

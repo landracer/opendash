@@ -29,7 +29,7 @@ idf.py -p /dev/ttyACM0 flash monitor  # Flash + monitor combo
 ```
 
 ## ESP-NOW Protocol Rules
-### Frame Format (MUST match opendash_i2c_protocol.h)
+### Frame Format (MUST match opendash_protocol.h)
 ```
 | SYNC 0xAA | CMD 1B | LENGTH 1B | PAYLOAD 0-248B | CHECKSUM 1B |
 Checksum = XOR(SYNC, CMD, LENGTH, PAYLOAD[0], ..., PAYLOAD[n-1])
@@ -45,8 +45,8 @@ Checksum = XOR(SYNC, CMD, LENGTH, PAYLOAD[0], ..., PAYLOAD[n-1])
 
 ### API Stack (for node→center messages)
 1. Build payload bytes: `[dp_id_hi][dp_id_lo][float_byte0...float_byte3]` = 6 bytes
-2. Frame with: `opendash_i2c_build_msg(&msg, OPENDASH_CMD_DATA_RESPONSE, payload, 6)`
-3. Serialize to wire: `opendash_i2c_serialize(&msg, buf, sizeof(buf), &len)`
+2. Frame with: `opendash_msg_build(&msg, OPENDASH_CMD_DATA_RESPONSE, payload, 6)`
+3. Serialize to wire: `opendash_msg_serialize(&msg, buf, sizeof(buf), &len)`
 4. Transmit: `opendash_espnow_send(peer, buf, len)` or `opendash_espnow_broadcast(buf, len)`
 
 ### Reference Implementation
@@ -67,7 +67,7 @@ See `docs/data-points.md` for human-readable legend.
 
 ## Common Library
 `common/include/` headers are included by ALL nodes. Key files:
-- `opendash_i2c_protocol.h` — Frame builder, serializer, deserializer, checksums
+- `opendash_protocol.h` — Frame builder, serializer, deserializer, checksums
 - `opendash_espnow.h` — ESP-NOW init, send, broadcast, receive callbacks
 - `opendash_data_model.h` — Data point ID enum and lookup
 - `opendash_common.h` — Node types, error codes, shared macros

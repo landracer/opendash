@@ -1,6 +1,28 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # LC76G 10 Hz GPS Data Logging — Specification Breakout
 
+> ## ⛔ CLOSED 2026-09-29: THE PREMISE OF THIS DOCUMENT IS FALSE
+>
+> > ## ✅ CLOSED-FINAL 2026-09-30 (see post-mortem §7–§8): the LC76G module
+> > family IS spec'd as `$PAIR050`-rate-configurable (100–1000 ms, up to
+> > 10 Hz) per the official Quectel protocol spec — but iteration-5/6 proved
+> > this **board's I2C path never delivers commands to the parser**: spec-exact
+> > `$PAIR051`/`$PAIR050,100` with verified write-ACKs produce zero response.
+> > On this hardware, 10 Hz is unreachable — as this document's original
+> > closure claimed.
+>
+>
+> **The LC76G on this board cannot be rate-configured at all.** Every `$PAIR`
+> command referenced throughout this document (050/066/513/514/020) was proven
+> by live controlled experiments to be **silently ignored by the module** —
+> zero `$PAIR001` ACKs ever received in any session; the output rate never
+> changed from its 1 Hz default. The only command family the module ever
+> visibly reacted to is `$PQTM` (cold start), which is a reset, not a rate
+> setting. 10 Hz was never running in any firmware generation — the
+> "8.3 Hz verified" story below was aspiration, never measurement. Complete
+> evidence: `wiki/GPS-LC76G-POSTMORTEM.md`. **Do not build on this document;
+> development on this hardware is ended.**
+
 > **Board:** Waveshare ESP32-S3-Touch-AMOLED-1.75  
 > **Module:** Quectel LC76G (firmware LC76GABNR12A03S, 2024/04/14)  
 > **Protocol:** CASIC I2C (0x50/0x54/0x58) at 100 kHz  

@@ -96,7 +96,7 @@ typedef struct {
  *
  * Configures I2C CASIC communication with the LC76G module.
  * The I2C bus must already be initialized via display_init().
- * GPIO17 = RX (from LC76G), GPIO18 = TX (to LC76G).
+ * UART is NOT functional on this board — GPIO17/18 are I2C-routed only.
  *
  * @return ESP_OK on success.
  */
@@ -129,32 +129,24 @@ esp_err_t gps_handler_get_data(gps_data_t *data);
 esp_err_t gps_handler_get_debug(gps_debug_t *debug);
 
 /**
- * @brief Send a cold start command to the LC76G.
- *
- * Forces the module to clear all stored data and re-acquire satellites.
- *
- * @return ESP_OK on success.
- */
-esp_err_t gps_handler_send_cold_start(void);
-
-/**
- * @brief Send a warm start command to the LC76G ($PQTMWARM).
- *
- * Restarts satellite acquisition while keeping stored ephemeris.
- *
- * @return ESP_OK on success.
- */
-esp_err_t gps_handler_send_warm_start(void);
-
-/**
  * @brief Set GNSS fix output rate (1-10 Hz).
  *
- * Sends $PAIR050 via CASIC write protocol.
+ * iteration-5: sends the documented LC76G syntax $PAIR050,<ms>*<CS>
+ * (protocol spec §2.3.9; <ms> = 100–1000, default 1000 = 1 Hz).
  *
  * @param hz  Fix rate in Hz (1-10).
  * @return ESP_OK on success, ESP_ERR_INVALID_ARG if hz out of range.
  */
 esp_err_t gps_handler_set_rate_hz(uint8_t hz);
+
+/**
+ * @brief Query the module's fix interval (spec §2.3.10: $PAIR051 →
+ *        $PAIR001,051,<result> ACK + $PAIR051,<ms> echo).
+ *
+ * Diagnostic: proves the I2C command RX channel is parsed by the module and
+ * reports the effective interval.
+ */
+esp_err_t gps_handler_query_rate(void);
 
 /**
  * @brief Enable/disable GNSS constellations.

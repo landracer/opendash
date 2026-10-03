@@ -58,11 +58,11 @@ static void forward_md_data_to_center(const opendash_md_data_t *md)
     /* ... 13 more ... */
     #undef PUT
 
-    opendash_i2c_msg_t msg;
-    opendash_i2c_build_msg(&msg, OPENDASH_CMD_SET_DATA_BATCH, payload, off);
+    opendash_msg_t msg;
+    opendash_msg_build(&msg, OPENDASH_CMD_SET_DATA_BATCH, payload, off);
     uint8_t buf[OPENDASH_ESPNOW_MAX_DATA];
     uint16_t len = 0;
-    if (opendash_i2c_serialize(&msg, buf, &len) == OPENDASH_OK) {
+    if (opendash_msg_serialize(&msg, buf, &len) == OPENDASH_OK) {
         opendash_espnow_send(s_center_mac, buf, len);
     }
 }

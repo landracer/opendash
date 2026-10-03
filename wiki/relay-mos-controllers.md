@@ -239,7 +239,7 @@ The system implements several safeguards to prevent conflicts:
 | `common/include/opendash_relay.h` | Shared relay/MOS driver API |
 | `common/src/opendash_relay.c` | GPIO init, mask apply, channel control |
 | `common/include/opendash_common.h` | Node type definitions, `OPENDASH_NODE_IS_RELAY()` macro |
-| `common/include/opendash_i2c_protocol.h` | CMD_SET_RELAY, CMD_REQUEST_RELAY_STATUS, CMD_RELAY_STATUS, PARACHUTE_* opcodes |
+| `common/include/opendash_protocol.h` | CMD_SET_RELAY, CMD_REQUEST_RELAY_STATUS, CMD_RELAY_STATUS, PARACHUTE_* opcodes |
 | `common/include/opendash_boost.h` | Boost controller API |
 | `common/src/opendash_boost.c` | Boost controller implementation |
 | `common/include/opendash_parachute.h` | Parachute controller API |

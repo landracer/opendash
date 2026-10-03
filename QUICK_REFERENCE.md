@@ -108,7 +108,7 @@ void update_warnings_task(void *arg)
 - **[center/main/ui_manager.h](center/main/ui_manager.h)** — Added 4 new API functions
 - **[center/main/ui_manager.c](center/main/ui_manager.c)** — Complete rewrite with multi-screen & warnings  
 - **[common/include/opendash_ui_styles.h](common/include/opendash_ui_styles.h)** — Added warning box color defines
-- **[center/main/ui_manager_old.c](center/main/ui_manager_old.c)** — Backup of original (for reference)
+- **[archive/code-bak/ui_manager_old.c](archive/code-bak/ui_manager_old.c)** — Pre-refactor center UI, kept for reference only (not built)
 
 ---
 

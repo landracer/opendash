@@ -20,7 +20,7 @@
 #include "opendash_bt_ota.h"
 #include "opendash_identity.h"
 #include "opendash_espnow.h"
-#include "opendash_i2c_protocol.h"
+#include "opendash_protocol.h"
 
 #include "esp_log.h"
 #include "esp_ota_ops.h"
@@ -889,12 +889,12 @@ esp_err_t opendash_bt_ota_enter(opendash_node_t self, const uint8_t center_mac[6
             (uint8_t)(OPENDASH_STATUS_FLAG_RUNNING | OPENDASH_STATUS_FLAG_BLE_OTA),
             0x00,
         };
-        opendash_i2c_msg_t resp;
-        if (opendash_i2c_build_msg(&resp, OPENDASH_CMD_STATUS_REPORT,
+        opendash_msg_t resp;
+        if (opendash_msg_build(&resp, OPENDASH_CMD_STATUS_REPORT,
                                     status_payload, sizeof(status_payload)) == OPENDASH_OK) {
             uint8_t buf[OPENDASH_ESPNOW_MAX_DATA];
             uint16_t len = 0;
-            if (opendash_i2c_serialize(&resp, buf, &len) == OPENDASH_OK) {
+            if (opendash_msg_serialize(&resp, buf, &len) == OPENDASH_OK) {
                 opendash_espnow_send(center_mac, buf, len);
                 /* Give the radio ~50ms to actually drain before we kill WiFi. */
                 vTaskDelay(pdMS_TO_TICKS(50));

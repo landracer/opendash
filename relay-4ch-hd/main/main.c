@@ -43,7 +43,7 @@
 #include "opendash_common.h"
 #include "opendash_espnow.h"
 #include "opendash_bt_ota.h"
-#include "opendash_i2c_protocol.h"
+#include "opendash_protocol.h"
 #include "opendash_relay.h"
 
 static const char *TAG = "relay_4ch_hd";
@@ -96,11 +96,11 @@ static bool    s_center_mac_known = false;
 static void send_heartbeat_broadcast(void)
 {
     uint8_t payload[3] = { OPENDASH_NODE_RELAY_4CH, 0x01, 0x00 };
-    opendash_i2c_msg_t msg;
-    opendash_i2c_build_msg(&msg, OPENDASH_CMD_STATUS_REPORT, payload, sizeof(payload));
+    opendash_msg_t msg;
+    opendash_msg_build(&msg, OPENDASH_CMD_STATUS_REPORT, payload, sizeof(payload));
     uint8_t tx_buf[OPENDASH_ESPNOW_MAX_DATA];
     uint16_t len = 0;
-    if (opendash_i2c_serialize(&msg, tx_buf, &len) == OPENDASH_OK) {
+    if (opendash_msg_serialize(&msg, tx_buf, &len) == OPENDASH_OK) {
         opendash_espnow_broadcast(tx_buf, len);
     }
 }
@@ -109,7 +109,7 @@ static void send_heartbeat_broadcast(void)
  * @brief Process a single received ESP-NOW message.
  */
 static void dispatch_message(const opendash_espnow_event_t *evt,
-                              const opendash_i2c_msg_t *msg)
+                              const opendash_msg_t *msg)
 {
     /* Only latch on center-originated cmds (bit 7 clear). Slave broadcasts
      * (STATUS_REPORT 0x82, DATA_RESPONSE 0x81, etc.) use bit 7 set and must
@@ -127,10 +127,10 @@ static void dispatch_message(const opendash_espnow_event_t *evt,
             if (opendash_relay_get_state(i, &st) == ESP_OK && st.is_on) boot_mask |= (1u << i);
         }
         uint8_t bp[3] = { 0xCA, OPENDASH_NODE_RELAY_4CH, boot_mask };
-        opendash_i2c_msg_t bm;
-        opendash_i2c_build_msg(&bm, OPENDASH_CMD_RELAY_STATUS, bp, sizeof(bp));
+        opendash_msg_t bm;
+        opendash_msg_build(&bm, OPENDASH_CMD_RELAY_STATUS, bp, sizeof(bp));
         uint8_t bb[OPENDASH_ESPNOW_MAX_DATA]; uint16_t bl = 0;
-        if (opendash_i2c_serialize(&bm, bb, &bl) == OPENDASH_OK) {
+        if (opendash_msg_serialize(&bm, bb, &bl) == OPENDASH_OK) {
             opendash_espnow_send(s_center_mac, bb, bl);
         }
         ESP_LOGI(TAG, "Boot state announce: mask 0x%02X", boot_mask);
@@ -153,11 +153,11 @@ static void dispatch_message(const opendash_espnow_event_t *evt,
                 /* Immediate confirmation → center knows state without audit delay */
                 if (s_center_mac_known) {
                     uint8_t ack_pay[3] = { 0xCA, OPENDASH_NODE_RELAY_4CH, mask };
-                    opendash_i2c_msg_t ack_msg;
-                    opendash_i2c_build_msg(&ack_msg, OPENDASH_CMD_RELAY_STATUS, ack_pay, sizeof(ack_pay));
+                    opendash_msg_t ack_msg;
+                    opendash_msg_build(&ack_msg, OPENDASH_CMD_RELAY_STATUS, ack_pay, sizeof(ack_pay));
                     uint8_t ack_buf[OPENDASH_ESPNOW_MAX_DATA];
                     uint16_t ack_len = 0;
-                    if (opendash_i2c_serialize(&ack_msg, ack_buf, &ack_len) == OPENDASH_OK) {
+                    if (opendash_msg_serialize(&ack_msg, ack_buf, &ack_len) == OPENDASH_OK) {
                         opendash_espnow_send(s_center_mac, ack_buf, ack_len);
                     }
                 }
@@ -192,11 +192,11 @@ static void dispatch_message(const opendash_espnow_event_t *evt,
                 if (audit_st[i].is_on) actual_mask |= (1u << i);
             }
             uint8_t audit_pay[3] = { 0xCA, OPENDASH_NODE_RELAY_4CH, actual_mask };
-            opendash_i2c_msg_t audit_resp;
-            opendash_i2c_build_msg(&audit_resp, OPENDASH_CMD_RELAY_STATUS, audit_pay, sizeof(audit_pay));
+            opendash_msg_t audit_resp;
+            opendash_msg_build(&audit_resp, OPENDASH_CMD_RELAY_STATUS, audit_pay, sizeof(audit_pay));
             uint8_t audit_buf[OPENDASH_ESPNOW_MAX_DATA];
             uint16_t audit_len = 0;
-            if (opendash_i2c_serialize(&audit_resp, audit_buf, &audit_len) == OPENDASH_OK) {
+            if (opendash_msg_serialize(&audit_resp, audit_buf, &audit_len) == OPENDASH_OK) {
                 opendash_espnow_send(s_center_mac, audit_buf, audit_len);
                 ESP_LOGI(TAG, "Audit reply: mask 0x%02X", actual_mask);
             }
@@ -267,8 +267,8 @@ static void espnow_task(void *pvParameters)
 
         opendash_espnow_event_t evt;
         while (opendash_espnow_recv(&evt, 0)) {
-            opendash_i2c_msg_t msg;
-            opendash_err_t ret = opendash_i2c_deserialize(evt.data, evt.len, &msg);
+            opendash_msg_t msg;
+            opendash_err_t ret = opendash_msg_deserialize(evt.data, evt.len, &msg);
             if (ret == OPENDASH_OK) {
                 dispatch_message(&evt, &msg);
             }
