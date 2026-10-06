@@ -3,7 +3,8 @@ build/
 sdkconfig
 sdkconfig.old
 managed_components/
-dependencies.lock
+# dependencies.lock IS committed on purpose — it pins the exact managed-component
+# versions for reproducible builds. Do not re-add it to this file.
 
 # IDE files
 .vscode/
