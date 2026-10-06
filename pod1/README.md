@@ -28,7 +28,7 @@ BLE OTA works on this node but is **not hardened**: the full sdkconfig recipe
 (2M PHY, PPCP intervals, `BT_CTRL_PINNED_TO_CORE_1`, ACL buffers) and the
 slave-side suspend sequence (`ui_manager_suspend()` + `display_pause_for_ota()`
 before `opendash_bt_ota_enter()`) that LEFT/RIGHT use are **not yet applied**
-here. See TODO §1.2 and [`wiki/ota-bluetooth.md`](../wiki/ota-bluetooth.md).
+here. See TODO §1.4 and [`wiki/ota-bluetooth.md`](../wiki/ota-bluetooth.md).
 
 ## Source of truth
 

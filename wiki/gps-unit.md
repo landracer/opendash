@@ -195,5 +195,5 @@ The GPS unit requires no manual calibration. The LC76G module automatically cali
 
 - [WaveShare ESP32-S3-Touch-AMOLED-1.75 Wiki](https://www.waveshare.com/wiki/ESP32-S3-Touch-AMOLED-1.75)
 - Quectel LC26GAB/LC76G Series I2C Application Note v1.0 (datasheet not kept in-tree)
-- [OpenDash Protocol (ESP-NOW wire format)](protocol.html)
+- [OpenDash Protocol (ESP-NOW wire format)](../docs/espnow-protocol.md)
 - [OpenDash Data Points Legend](../docs/data-points.md)

@@ -1692,7 +1692,8 @@ the elite enhancements:
 
 ### 14.6 Grok-GPS-new.c Failure Analysis
 
-A second Grok attempt (`gps/main/grok-GPS-new.c`, 497 lines) was generated
+A second Grok attempt (`grok-GPS-new.c`, 497 lines, now kept only under
+`archive/gps-old-code/grok-GPS-new.c`) was generated
 from this guide. While structurally better than the first attempt
 (grok-GPS-i2c.c), it still contains critical errors:
 

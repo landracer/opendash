@@ -7,7 +7,7 @@
 > bootstrap entry relabelled `0.0.1`) is pre-baseline history: the 0.x-beta labels were
 > *internal codenames*, never publicly versioned, all folded into the 0.1.0 baseline.
 > Going forward: **semver** — minor = features, patch = fixes; v1.0.0 gates on the boost
-> clean-room rewrite (TODO §6.0) + full-fleet BLE OTA hardening (TODO §1.2).
+> clean-room rewrite (TODO §6.0) + full-fleet BLE OTA hardening (TODO §1.4).
 > Firmware single source of truth: `OPENDASH_VERSION_*` in
 > [`common/include/opendash_common.h`](common/include/opendash_common.h).
 
@@ -172,7 +172,7 @@ Systematic comparison of `ENTER_BT_OTA` handling across all nodes:
 | relay/mos | N/A (no RGB DMA) | Partial | N/A | N/A | Works reliably as-is |
 
 GPS / POD1 / POD2 work in practice (no RGB DMA contention) but are at risk
-of intermittent disconnects under high CPU load. Hardening tracked in TODO §1.2.
+of intermittent disconnects under high CPU load. Hardening tracked in TODO §1.4 (renumbered).
 
 ### Known issues — targeted for v0.5.0
 

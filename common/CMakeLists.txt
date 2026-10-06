@@ -24,10 +24,25 @@
 # Generated fonts are shared by ALL displays (center, left, right, gps, pods).
 # ─────────────────────────────────────────────────────────────────────────────
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Step 0: Pre-generated asset gate
+#
+# The generated LVGL C sources under fonts/generated/ and images/generated/
+# are COMMITTED to the repo. CI sets OD_PREGENERATED_ASSETS=1 to skip the
+# converters entirely — the runner then needs neither Node nor Pillow nor
+# ImageMagick and builds straight from the committed generated sources.
+# Local builds leave it unset and regenerate on every configure (source of
+# truth for local work remains the .ttf/.png originals).
+# ─────────────────────────────────────────────────────────────────────────────
+if(DEFINED ENV{OD_PREGENERATED_ASSETS})
+    set(OD_PREGENERATED_ASSETS ON)
+    message(STATUS "OD_PREGENERATED_ASSETS set — using committed generated fonts/images (converters skipped)")
+endif()
+
 # Check if Python3 is available
 find_package(Python3 COMPONENTS Interpreter)
 
-if(Python3_FOUND)
+if(Python3_FOUND AND NOT OD_PREGENERATED_ASSETS)
     # Run font converter script before build
     execute_process(
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_LIST_DIR}/fonts/convert_fonts.py
@@ -61,7 +76,7 @@ endif()
 # Images are automatically scaled to fit display resolution.
 # ─────────────────────────────────────────────────────────────────────────────
 
-if(Python3_FOUND)
+if(Python3_FOUND AND NOT OD_PREGENERATED_ASSETS)
     # Run image converter script before build
     execute_process(
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_LIST_DIR}/images/convert_images.py

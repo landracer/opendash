@@ -259,7 +259,7 @@ problem. OTA works reliably without special mitigation. Typical transfer time
 is well under 2 minutes for ~1 MB images.
 
 Full sdkconfig hardening (2M PHY, PPCP, suspend sequence) is tracked in
-TODO §1.2 but is low urgency — field failures have not been observed on these
+TODO §1.4 but is low urgency — field failures have not been observed on these
 nodes.
 
 ### Relay and MOS nodes (headless)

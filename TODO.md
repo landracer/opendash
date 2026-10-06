@@ -39,9 +39,9 @@
 | ESP-NOW protocol | 39 opcodes defined in `opendash_protocol.h` (master + slave + boost families), batched (DATA_BATCH 0x88 / SET_DATA_BATCH 0x0C), 4 priority channels, polling eliminated |
 | Sensor source | MultiDisplay (HC-05/HC-06 BT @ 115200, 95-byte SERIALOUT_BINARY @ ~100 Hz, consumed at 5 Hz) |
 | Working displays | center (4.3" RGB), left/right (2.8C round RGB), gps + pod1/pod2 (1.75" AMOLED) |
-| BLE OTA | Working: pod1, pod2, left, right. **Fragile:** gps, pod1, pod2 still missing the full sdkconfig recipe + slave-side suspend sequence — see §1.2 |
+| BLE OTA | Working: pod1, pod2, left, right. **Fragile:** gps, pod1, pod2 still missing the full sdkconfig recipe + slave-side suspend sequence — see §1.4 |
 | Active investigations | center RGB tearing (TEARING.md), GPS/POD OTA hardening, boost-controller wire-up |
-| Git state | Clean tree; Phase-0 baseline committed on main (parachute restored, docs truth pass, junk archived). Push pending boost clean-room (§6.0). |
+| Git state | Clean tree, pushed to origin/main. Host unit tests + full-fleet CI landed (see §1.8). Boost clean-room (§6.0) still gates v1.0.0. |
 
 ---
 
@@ -105,7 +105,7 @@
 - [ ] **POD2:** mirror POD1 fixes
 - [ ] Re-measure POD1/POD2 OTA throughput after recipe applied (LEFT/RIGHT hit ~9.1 KB/s post-fix)
 
-### 1.3 Center RGB Display Tearing — CLOSED (residual shimmer is physical)
+### 1.5 Center RGB Display Tearing — CLOSED (residual shimmer is physical)
 
 > Canonical log: [TEARING.md](TEARING.md). Long-run capture script at
 > [scripts/tearing_capture.sh](scripts/tearing_capture.sh).
@@ -131,7 +131,7 @@
 - [ ] **H1 refinement:** try `bounce_buffer_size_px = 10 * LCD_H_RES` (half)
 - [ ] **Last resort:** `num_fbs = 3` triple-buffer (+375 KB PSRAM)
 
-### 1.4 GT911 Touch Not Detected (Left/Right)
+### 1.6 GT911 Touch Not Detected (Left/Right)
 
 - [x] GT911 hardware reset via TCA9554 EXIO2 before I2C probe
 - [x] Probe both GT911 addresses: 0x5D and 0x14
@@ -142,7 +142,7 @@
 - [ ] Test touch across all board revisions
 - [ ] Apply equivalent fix to center/ (different hardware, different touch init)
 
-### 1.5 Bad ETX Frame Loss on MD UART (~15–20%)
+### 1.7 Bad ETX Frame Loss on MD UART (~15–20%)
 
 > Per CHANGELOG: confirmed **not** timing-related — it's electrical noise /
 > byte corruption on the BT UART link. Parser handles it via STX re-scan.
@@ -153,6 +153,27 @@
 - [ ] Track consecutive good frames to increase sync confidence
 - [ ] Checksum/CRC plausibility on parsed fields
 
+### 1.8 CI + Host Unit Tests — IN PROGRESS
+
+> Verification layer added 2026-10-05. This is the honest status of the
+> automated safety net (CI runs on every push/PR to main).
+
+- [x] `.github/workflows/build.yml`: `idf.py build` matrix over ALL 12 node
+      projects (esp32s3 displays + esp32 controllers), firmware artifacts
+      uploaded per node
+- [x] `OD_PREGENERATED_ASSETS=1` in CI: committed generated fonts/images are
+      used as-is, runner needs no Node/Pillow/ImageMagick
+- [x] `dependencies.lock` committed for every project (reproducible component
+      versions across runners)
+- [x] `docs-lint` CI job = `scripts/check_docs.sh` (broken-link check,
+      license-header coverage, pod display_init sync invariant)
+- [x] Host unit tests (`test/`): native CMake + Unity — protocol codec
+      round-trips, channel config invariants, node-health rate math,
+      parachute config sanitize/clamp, DP domain partitioning. No hardware,
+      no ESP-IDF required; runs in CI and locally
+- [ ] Extend host tests to live-behavior simulators (batch fan-out replay)
+      as new regressions land
+
 ---
 
 ## 2. Per-Node Status
@@ -161,7 +182,7 @@
 
 - [x] LVGL 9.2 + PSRAM-routed `lv_malloc_core` ([center/main/lv_mem_psram.c](center/main/lv_mem_psram.c))
 - [x] ESP-NOW master with 4 priority channels + dispatcher
-- [x] Display tearing mitigations (see §1.3 for active work)
+- [x] Display tearing mitigations (see §1.5 — closed, residual is physical)
 - [x] Drag-race demo data generator
 - [x] Multi-mode UI: ENGINE, GPS, MD, RELAY, BMS, OBD, CONFIG
 - [x] OTA console command: `ota left|right|gps|pod1|pod2`
@@ -226,7 +247,7 @@
 - [x] SD card data logging — `sd_logger.c` wired in, 5 Hz snapshots, SDMMC 1-line
 - [x] GPS UI: 4 modes (GPS, LAP, GFORCE, DEBUG) — speed/heading/sats/coords rendered
 - [x] PCF85063 RTC sync
-- [ ] **BLE OTA hardening** (see §1.2) — full recipe + suspend sequence
+- [ ] **BLE OTA hardening** (see §1.4) — full recipe + suspend sequence
 - [ ] 10 Hz update rate activation (`$PAIR050,100` after first fix)
 - [ ] **Parachute deployment system** — zero code anywhere; design + implement
 - [ ] GPS → RTC time sync on valid fix (gps_handler.c)
@@ -241,7 +262,7 @@
 - [x] Receive SET_DATA_POINT from center
 - [x] Broadcast IMU snapshot (intended for parachute deployment voting)
 - [x] BLE OTA functional (proven Apr–May 2026)
-- [ ] **BLE OTA hardening** (see §1.2) — full recipe + suspend sequence on both
+- [ ] **BLE OTA hardening** (see §1.4) — full recipe + suspend sequence on both
 - [ ] Listen for `SET_SCREEN_LAYOUT` (0x02)
 
 ### 2.6 MOS-4CH-A / MOS-4CH-B — MOSFET Output Nodes (Boost Controller Targets)
@@ -457,7 +478,7 @@
 - [x] Comprehensive docs: [UART_CONNECTION.md](UART_CONNECTION.md); MultiDisplay's
       `SERIAL_PROTOCOL.md` is upstream-only and is **not** vendored in this repo
       (referenced for lineage, not as a live link)
-- [ ] Frame timing validation (§1.5)
+- [ ] Frame timing validation (§1.7)
 - [ ] HC-05 AT-command auto-connect (currently relies on pre-paired modules)
 
 ### 4.4 CAN Bus / OBD2
@@ -607,7 +628,7 @@
 - [x] Client `ble_ota.py`: 512 B default chunks, server-paced flow control, auto-RESUME
 - [x] LEFT/RIGHT OTA proven (RIGHT 4 m 31 s @ 9.1 KB/s with 2M PHY)
 - [x] POD1/POD2 OTA proven (pre-recipe; works but fragile)
-- [ ] **GPS / POD1 / POD2: apply full hardening recipe** (see §1.2)
+- [ ] **GPS / POD1 / POD2: apply full hardening recipe** (see §1.4)
 - [ ] Sub-5-min target verification on LEFT (post-rebuild measurement)
 - [ ] HTTP OTA over WiFi SoftAP (alternative path, higher throughput)
 - [ ] Per-node version reporting on BLE advert

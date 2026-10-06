@@ -66,9 +66,9 @@ conflicts and better reliability.
 
 I2C remains only as a **local peripheral** bus (touch controller, IMU, GNSS
 receiver). Those pins are fixed in silicon and are unrelated to inter-node
-traffic. The only surviving I2C code is therefore `peripheral_i2c_init()`
-(`common/src/opendash_i2c_master.c`), which initializes a local controller —
-it does not carry node traffic.
+traffic. The I2C code that remains in the tree initializes those on-board
+peripheral controllers (called from each node's own `display_init`/handler
+bring-up) — it does not carry node traffic.
 
 ## Data Flow
 
@@ -100,11 +100,16 @@ it does not carry node traffic.
 ### Data Flow Steps
 
 1. **Center** unit acts as the ESP-NOW master and system coordinator
-2. **GPS unit** continuously reads GNSS and IMU data, stores latest readings
-3. **GPS unit** pushes position, speed, and g-force on change (no polling — see
+2. **GPS unit** (⛔ frozen — read-only 1 Hz data pipe) reads GNSS and IMU
+   data, stores latest readings
+3. **GPS unit** pushes position, speed, and g-force (no polling — see
    `docs/espnow-protocol.md` §4)
-4. **Center** reads OBD2/CAN data directly (onboard CAN transceiver)
+4. **Engine data arrives via LEFT**: the LEFT pod ingests the MultiDisplay
+   serial frame and forwards it as two `DATA_BATCH` frames (MD-domain +
+   OBD-domain ids) to Center. Direct CAN (ECU/VESC/OBD2-ELM327) is
+   *planned*, not built — see `wiki/vesc-integration.md` and `DATAFLOW.md`
 5. **Center** distributes relevant data to Left and Right gauge pods
+   (re-batched as `SET_DATA_BATCH`)
 6. **Left/Right** render their configured data points
 7. **BMS node** pushes battery data on change
 8. **SD card logging** happens on the Center unit (primary) and GPS unit (backup)
@@ -169,7 +174,10 @@ internally whether the window has elapsed.
 | `gps_task` | 8 | 0 | GNSS read/parse — above touch/IMU/UI so GPS is never starved |
 | `imu_task` | 5 | 0 | QMI8658 motion sampling |
 | `gps_broadcast` | 4 | 0 | Reads sensors + handles inbound ESP-NOW messages |
-| `parachute_task` | 6 | 0 | Safety monitor — highest priority for immediate response |
+
+The parachute/squib actuator task does **not** run on the GPS unit — actuation
+lives on the MOS-4CH nodes (`mos-4ch-a/b`, which host
+`opendash_parachute_actuator.c`); pod1/pod2 only contribute IMU votes.
 
 ## Configuration System
 

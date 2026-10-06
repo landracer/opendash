@@ -21,7 +21,7 @@ idf.py -p /dev/ttyACM0 flash monitor
 
 ## BLE OTA — ⚠️ fragile
 
-Mirror of POD1's gap (TODO §1.2): full sdkconfig recipe + pre-OTA suspend
+Mirror of POD1's gap (TODO §1.4): full sdkconfig recipe + pre-OTA suspend
 sequence not yet applied. LEFT/RIGHT hold the working reference implementation.
 
 ## Source of truth

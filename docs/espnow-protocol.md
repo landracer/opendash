@@ -24,9 +24,9 @@ header wins and this file has a bug:
 | Priority channels, retries, quarantine | `common/include/channel_config.h`, `common/src/channel_management.c` |
 | Rate-based health | `common/include/node_health.h` |
 | Logical node identity | `opendash_node_t` in `common/include/opendash_common.h` |
-| Data point IDs | `common/include/opendash_data_points.h`, `docs/data-points.md` |
+| Data point IDs | `common/include/opendash_data_model.h`, `docs/data-points.md` |
 | Transport init / peers | `common/src/opendash_espnow.c` |
-| End-to-end message journey | `docs/DATAFLOW.md` |
+| End-to-end message journey | `DATAFLOW.md` (repo root) |
 
 ---
 
@@ -90,9 +90,18 @@ The dispatcher task runs at priority 4; channel task stack is 4096.
   offline timeout - it is command-driven.
 * A send to a node marked `online == false` is forced to `max_retries = 0`, so
   a dead peer can never block a worker task.
-* `channel_mgr_send_to_node()` routes automatically via `opcode_to_channel()`.
-  Boost and parachute config/live-data opcodes route to `CHANNEL_CRITICAL`, so
-  an operator command can never queue behind telemetry backlog.
+* **As-built routing rule: a frame travels on its owning node's channel** —
+  the static `NODE_DEFAULT_CHANNEL[]` table (`node_definitions.h`) assigned at
+  registration: GPS/BMS → CRITICAL, pods → MEDIUM, relay/MOS → LOW, and the
+  master consumes from the matching per-channel worker tasks. There is no
+  opcode→channel lookup table. The documented exceptions are real code paths:
+  `OPENDASH_CMD_SET_RELAY` overrides to `CHANNEL_CONTROL` on the dispatcher,
+  boost telemetry opcodes (`0x90–0x94`) are intercepted straight to the
+  registered aux-RX callback and never enter a channel queue, and
+  safety-critical parachute frames (config/arm/deploy/pull) go out through
+  the force-send path (`espnow_master_send_raw_force` →
+  `channel_mgr_force_send_to_node`), which ignores quarantine/pause back-off
+  and retries until `CHANNEL_FORCE_SEND_DEADLINE_MS`.
 * `CHANNEL_MSG_*` envelope tags (distinct from `OPENDASH_CMD_*` opcodes):
   `0x01 DATA_POINT`, `0x02 STATUS_REPORT`, `0x03 RELAY_CMD`, `0x04 SYSTEM_CMD`,
   `0x05 CONFIG`, `0x06 ANNOUNCE`, `0x07 BATCH_DP`.
@@ -204,12 +213,16 @@ to drive the Device Management UI - e.g. show "OTA-MODE" instead of "ONLINE".
 ## 8. Rules when changing this protocol
 
 1. **Add a DP, not a new opcode**, if the data is just another value. Add a
-   `DP_ID_*` in `opendash_data_points.h` and route it through
-   `opendash_disp_submit()` so a pod that is offline at send time gets it when
-   it reconnects.
-2. **Add a new opcode** only for a new *kind* of exchange. Register it in
-   `opcode_to_channel()` in `channel_management.c` or it will default-route and
-   a command will sit behind telemetry backlog.
+   `DP_ID_*` in `common/include/opendash_data_model.h` and deliver it through
+   `master_dp_deliver()` on the master (fan-out re-batches it as
+   `SET_DATA_POINT`/`SET_DATA_BATCH` to the pods) so a pod that is offline at
+   send time gets it when it reconnects.
+2. **Add a new opcode** only for a new *kind* of exchange. It then routes on
+   its sender/owner node's default channel (`NODE_DEFAULT_CHANNEL[]` in
+   `node_definitions.h`); if the exchange needs command-grade latency,
+   extend the dispatcher's opcode override in `espnow_master.c` (the
+   `SET_RELAY → CHANNEL_CONTROL` pattern) or the aux-RX intercept path — do
+   not let a safety command sit behind telemetry backlog.
 3. Never widen `CHANNEL_QUEUE_ITEM_SIZE` without checking it still covers the
    largest serialized packet; too large starves internal RAM and ESP-NOW task
    creation fails.

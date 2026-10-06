@@ -1,20 +1,27 @@
-# OpenDash build-smoke CI (STARTER — first CI the repo has ever had)
+# OpenDash build-smoke CI
 #
 # What this does: on every push/PR to main (and manual runs), it spins up a
 # clean Linux container with ESP-IDF, checks out the repo, and runs
-# `idf.py build` for each display node. That's it — no hardware needed.
+# `idf.py build` for EVERY node project in the fleet. No hardware needed.
 # It answers one question automatically: "did my change break the build
 # on some node I didn't test locally?"
 #
-# Notes / known follow-ups:
-#  - Local fleet is pinned to an IDF v6.1 *dev snapshot* (see
-#    BUILD_DEPENDENCIES.md); CI uses the v6.1 release line. If a build
-#    only fails in CI, suspect a dev-vs-release IDF delta, not your code.
-#  - The font/image pipeline (Node + Python, see BUILD_DEPENDENCIES.md)
-#    must work headless in the container; if a node fails for that
-#    reason, add the missing setup steps below.
-#  - `dependencies.lock` is committed, so component versions are
-#    reproducible across runners.
+# Matrix covers all twelve node families: the six ESP32-S3 display nodes
+# (esp32s3 target) and the five classic-ESP32 controller nodes + openDstream
+# (esp32 target — WROOM-32E boards).
+#
+# Notes:
+#  - Local fleet is pinned to an IDF v6.1 *dev snapshot*
+#    (v6.1-dev-2441-gffb63db38b, see BUILD_DEPENDENCIES.md); CI uses the
+#    v6.1 release line. If a build only fails in CI, suspect a
+#    dev-vs-release IDF delta, not your code.
+#  - The font/image converters (Node + Python, see BUILD_DEPENDENCIES.md)
+#    are SKIPPED in CI via OD_PREGENERATED_ASSETS=1: the generated LVGL C
+#    sources under common/fonts/generated and common/images/generated are
+#    committed, so CI builds straight from them and the runner needs
+#    neither Node nor Pillow nor ImageMagick.
+#  - `dependencies.lock` is committed for every project, so component
+#    versions resolve identically on every runner.
 name: build-smoke
 
 on:
@@ -23,13 +30,33 @@ on:
     branches: [main]
   pull_request:
 
+concurrency:
+  group: build-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false          # keep building other nodes when one fails
       matrix:
-        node: [center, left, right, gps, pod1, pod2]
+        # each include entry = one matrix job (project dir + its IDF target,
+        # read from that project's sdkconfig.defaults CONFIG_IDF_TARGET)
+        include:
+          - { node: center,       target: esp32s3 }
+          - { node: left,         target: esp32s3 }
+          - { node: right,        target: esp32s3 }
+          - { node: gps,          target: esp32s3 }
+          - { node: pod1,         target: esp32s3 }
+          - { node: pod2,         target: esp32s3 }
+          - { node: openDstream,  target: esp32   }
+          - { node: mos-4ch-a,    target: esp32   }
+          - { node: mos-4ch-b,    target: esp32   }
+          - { node: relay-4ch-hd, target: esp32   }
+          - { node: relay-8ch-a,  target: esp32   }
+          - { node: relay-8ch-b,  target: esp32   }
+    env:
+      OD_PREGENERATED_ASSETS: "1"   # see note above — skip converters in CI
     name: build ${{ matrix.node }}
     steps:
       - uses: actions/checkout@v4
@@ -38,5 +65,45 @@ jobs:
         uses: espressif/esp-idf-ci-action@v1
         with:
           esp_idf_version: v6.1
-          target: esp32s3
+          target: ${{ matrix.target }}
           path: ${{ matrix.node }}
+
+      - name: Upload firmware artifacts (${{ matrix.node }})
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ matrix.node }}
+          path: |
+            ${{ matrix.node }}/build/*.bin
+            ${{ matrix.node }}/build/*.elf
+            ${{ matrix.node }}/build/flasher_args.json
+          if-no-files-found: warn
+          retention-days: 30
+
+  # ---------------------------------------------------------------------------
+  # docs-lint — cheap always-on docs guard. Fails the build on a broken
+  # relative markdown link, a missing license header on a tracked source
+  # file, or a doc referencing a file that does not exist.
+  # ---------------------------------------------------------------------------
+  docs-lint:
+    runs-on: ubuntu-latest
+    name: docs-lint
+    steps:
+      - uses: actions/checkout@v4
+      - name: Link / license / structure checks
+        run: bash scripts/check_docs.sh
+
+  # ---------------------------------------------------------------------------
+  # unit-tests — host-side (no hardware, no ESP-IDF) C unit tests for the
+  # pure-logic core: protocol codec, channel routing, node health math,
+  # parachute config sanitization, DP domain partitioning. See test/.
+  # ---------------------------------------------------------------------------
+  unit-tests:
+    runs-on: ubuntu-latest
+    name: unit-tests (host)
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and run the host test harness
+        run: |
+          cmake -S test -B test/build -DCMAKE_BUILD_TYPE=Debug
+          cmake --build test/build -j
+          ctest --test-dir test/build --output-on-failure

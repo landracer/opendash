@@ -302,7 +302,7 @@ never publicly versioned — all folded into the baseline (see
   version response all read that one define. Bump the numbers there, nowhere else.
 - **Scheme:** semver — minor = features, patch = fixes. 0.x is the public beta line.
 - **v1.0.0 (GA) gates:** boost-controller clean-room rewrite (GPL-3.0 lineage —
-  required before public distribution) + full-fleet BLE OTA hardening (TODO §1.2).
+  required before public distribution) + full-fleet BLE OTA hardening (TODO §1.4).
 
 ---
 
