@@ -13,8 +13,31 @@
 
 ## [Unreleased]
 
-_No entries yet. Next release after baseline: **v0.2.0** (feature release). Format: Keep a_
-_Changelog + SemVer._
+> Next release after baseline: **v0.2.0** (feature release). Format: Keep a_Changelog + SemVer.
+
+### Added
+
+- **Host unit tests** (`test/`): native CMake + vendored Unity suites covering the
+  wire codec (SYNC/checksum/truncation/round-trip/252-byte boundary), the data
+  store + MD-vs-ECU domain id partitioning, the node-health rate/heartbeat state
+  machine (instant-ONLINE, windowed OFFLINE, ACK upgrade, boot grace), and the
+  parachute config default/sanitize/NVS round-trip. Runs in CI with zero hardware.
+- **CI from zero to real**: `.github/workflows/build.yml` — `idf.py build` matrix
+  across all 12 node projects (esp32s3 displays + esp32 controllers), firmware
+  artifacts uploaded per node; `docs-lint` job (`scripts/check_docs.sh`: broken
+  links, license-header coverage, pod display_init drift invariant); `unit-tests`
+  job. `OD_PREGENERATED_ASSETS=1` lets CI build from committed generated
+  fonts/images (no Node/Pillow/ImageMagick on runners).
+- **`dependencies.lock` committed fleet-wide** and un-ignored — component versions
+  now resolve identically on every runner and every dev box.
+- `docs/history/` for superseded diagnosis docs; canon/history boundary is now
+  explicit.
+
+### Fixed
+
+- Every `xTaskCreate*` call site now checks its return value and cleans up on
+  failure (bt_ota worker, MD UART RX, SD logger flush, ota_serial_cmd,
+  boost_live push) — previously silent on failure.
 
 ## [0.1.0] — 2026-10-02 — BASELINE (first public version)
 

@@ -280,6 +280,9 @@ Every documentation file in the project, grouped by purpose.
 | [**docs/archived/IMPLEMENTATION_COMPLETE.md**](docs/archived/IMPLEMENTATION_COMPLETE.md) | Status: center alignment + auto font conversion |
 | [**docs/archived/IMPLEMENTATION_SUMMARY.md**](docs/archived/IMPLEMENTATION_SUMMARY.md) | All implementation work summary |
 | [**CHANGELOG.md**](CHANGELOG.md) | Version history |
+| [**docs/history/**](docs/history/) | Superseded diagnosis/assessment docs (retained as history, not canon) |
+| [**test/**](test/README.md) | Host unit-test harness (Unity/ctest) for codec, data model, health, parachute |
+| [**scripts/check_docs.sh**](scripts/check_docs.sh) | docs-lint enforced in CI (links, license headers, pod drift) |
 | [**wiki/pod1-pod2.md**](wiki/pod1-pod2.md) | Pod 1 and Pod 2 documentation |
 
 ---

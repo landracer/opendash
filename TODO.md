@@ -749,7 +749,7 @@
 - [x] [PER_NODE_DISPLAY_CONFIG_SPEC.md](PER_NODE_DISPLAY_CONFIG_SPEC.md) — layout system spec
 - [x] [boost-controller-opendash.md](boost-controller-opendash.md) — boost spec
 - [x] [TEARING.md](TEARING.md) — center tearing investigation log
-- [x] [BLE_OTA.md](BLE_OTA.md) + [BLE_OTA_ASSESSMENT.md](BLE_OTA_ASSESSMENT.md) — OTA recipe + deep assessment
+- [x] [BLE_OTA.md](BLE_OTA.md) + [docs/history/BLE_OTA_ASSESSMENT.md](docs/history/BLE_OTA_ASSESSMENT.md) — OTA recipe + deep assessment
 - [x] [UART_CONNECTION.md](UART_CONNECTION.md) — MD UART protocol
 - [x] [BLUETOOTH_PAIRING.md](BLUETOOTH_PAIRING.md) — HC-05/HC-06 pairing
 - [x] [FEATURES_AND_SENSORS.md](FEATURES_AND_SENSORS.md) — sensor capability matrix

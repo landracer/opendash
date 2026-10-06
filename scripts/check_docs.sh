@@ -68,6 +68,8 @@ for md, p in stale:
 # ── 2. license header on every tracked source file ──────────────────────────
 tracked = subprocess.run(['git', 'ls-files', '*.c', '*.h'],
                         capture_output=True, text=True).stdout.split()
+# Exception: vendored third-party sources carry their own licenses (Unity = MIT)
+tracked = [f for f in tracked if not f.startswith('test/unity/')]
 unlicensed = [f for f in tracked
               if 'Sovereign Individual License'
               not in open(f, encoding='utf-8', errors='ignore').read()]
