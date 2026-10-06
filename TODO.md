@@ -168,12 +168,12 @@
 >
 > Round 2 (same day, after the node_health honesty fix): controllers are
 > being re-flashed one at a time so they carry the honest-silence firmware.
-> mos-4ch-b re-flashed + heartbeat-verified (searching). mos-4ch-a has since
-> gone DEAF on the rig — no sync answer, no bytes, both cable and ritual
-> re-checked; it is now the odd board out (MOS-B flashed fine on the same
-> rig minutes later). Still to re-flash: mos-4ch-a (needs diagnosis or
-> replacement), relay-8ch-a, relay-8ch-b, relay-4ch-hd. Displays will get
-> the honesty firmware over the same bench route afterwards.
+> mos-4ch-b re-flashed + heartbeat-verified (searching). mos-4ch-a refused
+> the first two attempts (total silence, rig proven good by MOS-B flashing
+> fine between them) but succeeded on attempt 3 — the deafness was TRANSIENT
+> (connector seating / strap ritual), not board death. Remaining round 2:
+> relay-8ch-a, relay-8ch-b, relay-4ch-hd, then the six displays (they still
+> run round-1 pre-honesty firmware).
 
 - [x] `.github/workflows/build.yml`: `idf.py build` matrix over ALL 12 node
       projects (esp32s3 displays + esp32 controllers), firmware artifacts
