@@ -55,10 +55,10 @@ idf.py set-target esp32s3
 idf.py build
 ```
 
-#### Left/Right Gauges (2.8" Round LCD)
+#### Left / Right Gauges (2.8" Round LCD)
 
 ```bash
-cd left-right/
+cd left/          # or right/ — separate projects since the pod split
 source ~/esp/esp-idf/export.sh
 idf.py set-target esp32s3
 idf.py build

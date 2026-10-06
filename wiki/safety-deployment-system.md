@@ -5,6 +5,10 @@
 > tag-verified on `center`, `right`, `pod1`, `pod2`. Autonomous rollover
 > auto-deploy is opt-in (`AUTO_DETECT`, default OFF); manual deploy is always
 > available.
+>
+> **Verification:** after any change to this subsystem, run the full bench suite
+> in [`docs/safety-deployment-test-checklist.md`](../docs/safety-deployment-test-checklist.md)
+> (dummy loads only); its condensed pre-race quick-check gates every race session.
 
 The deployment system fires a rollover-recovery parachute (or any one-shot
 pyro/solenoid charge) on a race car. It is **distributed** and **interlocked**:

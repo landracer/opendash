@@ -2,8 +2,8 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # OpenDash Common Component — CMakeLists.txt
 #
-# This is an ESP-IDF component that provides shared code used by all three
-# display projects (center, left-right, gps). It is included via the
+# This is an ESP-IDF component that provides shared code used by all display
+# node projects (center, left, right, gps, pods). It is included via the
 # EXTRA_COMPONENT_DIRS mechanism in each project's top-level CMakeLists.txt.
 #
 # IMPORTANT: Any changes to this component automatically affect ALL displays.
@@ -21,7 +21,7 @@
 # Step 1: Convert TrueType fonts to LVGL C format (pre-build step)
 #
 # This runs once during CMake configuration for ANY display project.
-# Generated fonts are shared by ALL displays (center, left-right, gps).
+# Generated fonts are shared by ALL displays (center, left, right, gps, pods).
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Check if Python3 is available
@@ -57,7 +57,7 @@ endif()
 # Step 1b: Convert images (JPG/PNG) to LVGL C format (pre-build step)
 #
 # This runs once during CMake configuration for ANY display project.
-# Generated images are shared by ALL displays (center, left-right, gps).
+# Generated images are shared by ALL displays (center, left, right, gps, pods).
 # Images are automatically scaled to fit display resolution.
 # ─────────────────────────────────────────────────────────────────────────────
 

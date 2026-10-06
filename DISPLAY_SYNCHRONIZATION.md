@@ -23,9 +23,9 @@ opendash/
 
 ### 1. Common Component System
 
-All three display projects include the `common` directory via `EXTRA_COMPONENT_DIRS`:
+All display node projects include the `common` directory via `EXTRA_COMPONENT_DIRS`:
 
-**center/CMakeLists.txt, left-right/CMakeLists.txt, gps/CMakeLists.txt:**
+**center/CMakeLists.txt, left/CMakeLists.txt, right/CMakeLists.txt, gps/CMakeLists.txt:**
 ```cmake
 set(EXTRA_COMPONENT_DIRS "${CMAKE_CURRENT_LIST_DIR}/../common")
 ```

@@ -28,6 +28,8 @@
 
 > **Shared code** lives in [`common/`](./common/) — ESP-NOW protocol, data models, OBD2 PIDs, display configuration, and the pre-flight checklist system.
 >
+> **🤖 AI agents & new contributors — start here:** [`agent/opendash.agent.md`](./agent/opendash.agent.md) is the orientation playbook (critical rules, architecture primer, workflow, common mistakes). Editor auto-load variants — [`agent/opendash.instructions.md`](./agent/opendash.instructions.md) and [`.claude/agents/opendash.agent.md`](./.claude/agents/opendash.agent.md) — defer to that canonical file.
+>
 > **Detailed project roadmap:** [`TODO.md`](./TODO.md) | **Central reference:** [`PROJECT_INDEX.md`](./PROJECT_INDEX.md)
 >
 > **Additional documentation:** The project includes extensive documentation in the [`wiki/`](./wiki/) directory with integration guides and technical details.
@@ -306,10 +308,13 @@ never publicly versioned — all folded into the baseline (see
 
 ## 🤝 Contributing
 
-This is a proprietary project — all rights reserved. The codebase is designed for clarity and maintainability:
+This is a proprietary project distributed **source-available / private** under the
+[Sovereign Individual License v1.0](./LICENSE) — all rights reserved; it is **not** a
+public open-source release (see the release-gate notice below). The codebase is designed
+for clarity and maintainability:
 
 1. **All code is thoroughly annotated** — Every function, register write, and API call includes explanations referencing the ESP-IDF API docs
-2. **Consistent structure** — All three display projects follow the same code layout
+2. **Consistent structure** — Every node project (center, left, right, gps, pods, relay/MOS controllers) follows the same code layout
 3. **Modular design** — Add new data sources, screens, or features without touching core code
 4. **Documentation first** — Read the docs before diving into code
 
@@ -317,7 +322,7 @@ This is a proprietary project — all rights reserved. The codebase is designed 
 
 ## 📄 License
 
-Copyright © 2024–2026 **uknowmelast** & **Axiom** (AI Co-Architect).
+Copyright © 2024–2026 **OpenDash** & **landracer**.
 All rights reserved. See [`LICENSE`](./LICENSE) for details.
 
 > **Release-gate notice:** the boost-controller subsystem descends from GPL-3.0
@@ -328,6 +333,5 @@ All rights reserved. See [`LICENSE`](./LICENSE) for details.
 ---
 
 <p align="center">
-  <strong>Built for racers, by racers. 🏎️💨</strong><br>
-  <sub>Designed by uknowmelast • Architected with Axiom</sub>
+  <strong>Built for racers, by racers. 🏎️💨</strong>
 </p>

@@ -1,6 +1,11 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # OpenDash Center Display — Quick Reference
 
+> **Last updated:** 2026-10-03 (v0.1.0 baseline) — API signatures verified against
+> [`center/main/ui_manager.h`](center/main/ui_manager.h). Full feature docs:
+> [SCREEN_ENHANCEMENTS.md](SCREEN_ENHANCEMENTS.md). Working on the repo as an agent?
+> Read [agent/opendash.agent.md](agent/opendash.agent.md) first.
+
 ## Warning Boxes Quick Start
 
 ### Trigger Red Warning (Critical)
@@ -72,7 +77,8 @@ ui_manager_next_screen();
 
 ---
 
-## Typical Integration Pattern
+## Typical Integration Pattern (pseudocode — in shipped code the threshold
+## checks live on the ESP-NOW datapoint path, see DATAFLOW.md)
 
 ```c
 void update_warnings_task(void *arg)
@@ -103,36 +109,24 @@ void update_warnings_task(void *arg)
 
 ---
 
-## Files Modified
+## Where This Lives in the Code (v0.1.0)
 
-- **[center/main/ui_manager.h](center/main/ui_manager.h)** — Added 4 new API functions
-- **[center/main/ui_manager.c](center/main/ui_manager.c)** — Complete rewrite with multi-screen & warnings  
-- **[common/include/opendash_ui_styles.h](common/include/opendash_ui_styles.h)** — Added warning box color defines
-- **[archive/code-bak/ui_manager_old.c](archive/code-bak/ui_manager_old.c)** — Pre-refactor center UI, kept for reference only (not built)
+- **[center/main/ui_manager.h](center/main/ui_manager.h)** — warning-box + screen APIs (`ui_manager_warning_box_trigger/clear`, `ui_manager_next_screen`, `ui_manager_get_current_screen`)
+- **[center/main/ui_manager.c](center/main/ui_manager.c)** — multi-screen UI + warning-box implementation
+- **[common/include/opendash_ui_styles.h](common/include/opendash_ui_styles.h)** — warning colors (`COLOR_WARNING_BOX_RED` / `COLOR_WARNING_BOX_ORANGE`), palette, unit converters
 
----
-
-## Build Status
-
-✅ **Successfully Compiled** — February 17, 2026  
-Binary size: 2.86 MB (26% of partition)  
-All LVGL v9 APIs verified
+> In shipped code the warning triggers are driven by datapoint thresholds at the
+> ESP-NOW fan-out path, not a standalone poll loop like the sketch above —
+> see [DATAFLOW.md](DATAFLOW.md).
 
 ---
 
-## Next Steps
+## Going Further
 
-1. **Test on Hardware**
-   ```bash
-   cd opendash/center
-   idf.py -p /dev/ttyUSB0 flash monitor
-   ```
-
-2. **Integrate Data Sources** — Connect OBD2, GPS, BMS data to warning triggers
-
-3. **Add Boot Button Handler** — Hook GPIO0 to `ui_manager_next_screen()` for hardware switching
-
-4. **Customize Colors** — Edit color defines in `opendash_ui_styles.h` if needed
+1. **Build & flash:** `cd center && idf.py build && idf.py -p /dev/ttyACM0 flash monitor`
+2. **Data sources:** what actually flows today (MultiDisplay → LEFT → ESP-NOW) is documented in [DATAFLOW.md](DATAFLOW.md); planned CAN/VESC work in `wiki/vesc-integration.md`
+3. **Boot button:** GPIO0 already cycles screens via `ui_manager_next_screen()`
+4. **Customize colors:** edit the defines in `common/include/opendash_ui_styles.h`
 
 ---
 

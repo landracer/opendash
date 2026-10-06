@@ -47,12 +47,20 @@ pip3 install Pillow
 cd common/fonts && npm install && cd ../..
 ```
 
-### 3. Clone the Repository
+### 3. Obtain the Source
+
+OpenDash is distributed **source-available / private** under the
+[Sovereign Individual License v1.0](LICENSE) — it is not a public repository. Access is
+granted by the maintainer on a per-individual basis. If you have been granted access to
+the private repository, clone it with your own credentials:
 
 ```bash
-git clone https://github.com/landracer/opendash.git
+git clone git@github.com:landracer/opendash.git
 cd opendash
 ```
+
+> To request access, contact the maintainer. See [`LICENSE`](LICENSE) for exactly what
+> you may do with the source once you have it.
 
 ### 4. Open in VS Code
 
@@ -228,7 +236,7 @@ idf.py build
 ## Getting Help
 
 - **Documentation:** Check the `docs/` folder
-- **Issues:** [GitHub Issues](https://github.com/landracer/opendash/issues)
+- **Access / issues:** Contact the maintainer (this is a private, source-available project — see [`LICENSE`](LICENSE))
 - **Hardware:** [Waveshare Wiki](https://www.waveshare.com/)
 - **ESP-IDF:** [Espressif Docs](https://docs.espressif.com/projects/esp-idf/en/release-v6.1/)
 

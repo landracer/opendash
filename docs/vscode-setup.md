@@ -61,7 +61,7 @@ If you already have ESP-IDF v6.1 installed:
 
 ### Step 4: Open the OpenDash Workspace
 
-VS Code workspace allows you to work on all three display projects simultaneously.
+VS Code workspace allows you to work on all display projects simultaneously.
 
 1. **File → Open Workspace from File**
 2. Navigate to the OpenDash repository
@@ -99,7 +99,7 @@ Each display can be built independently:
 
 **Build Outputs:**
 - Center: `center/build/opendash_center.bin`
-- Left/Right: `left-right/build/opendash_leftright.bin`
+- Left: `left/build/*.bin` · Right: `right/build/*.bin`
 - GPS: `gps/build/opendash_gps.bin`
 
 ### Flashing to Device

@@ -7,7 +7,7 @@
  * A background FreeRTOS task drains a queue and writes to the log file
  * in batches to minimize flash wear and maximize throughput.
  *
- * Copyright (c) 2024-2026 uknowmelast & Axiom
+ * Copyright (c) 2024-2026 landracer
  * All rights reserved.
  */
 

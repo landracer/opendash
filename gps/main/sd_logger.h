@@ -22,7 +22,7 @@
  * CSV format:
  *   timestamp_ms,gps_speed,heading,latitude,longitude,altitude,sats,hdop,fix,g_lat,g_long,g_vert,rpm,coolant,boost,afr
  *
- * Copyright (c) 2024-2026 uknowmelast & Axiom
+ * Copyright (c) 2024-2026 landracer
  * All rights reserved.
  */
 

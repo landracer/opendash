@@ -18,7 +18,7 @@
  *   12345,0x0101,RPM,4523.00
  *   12346,0x0102,COOLANT_TEMP,92.30
  *
- * Copyright (c) 2024-2026 uknowmelast & Axiom
+ * Copyright (c) 2024-2026 landracer
  * All rights reserved.
  */
 

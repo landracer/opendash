@@ -302,7 +302,7 @@ if (fuel_level < 10) {
 ### Compatibility
 - LVGL v9.2+ API (uses `lv_timer_get_user_data()`, `lv_obj_add_flag()`, etc.)
 - ESP-IDF v6.1+ (uses FreeRTOS task APIs)
-- Works with all three display nodes (center, left, right) — inherit from common
+- Works with all display nodes (center, left, right, pods) — inherit from common
 
 ---
 

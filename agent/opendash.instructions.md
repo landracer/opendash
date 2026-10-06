@@ -1,6 +1,10 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # OpenDash Agent Instructions
 
+> **Last updated:** 2026-10-03 (v0.1.0 baseline). Canonical playbook:
+> [`agent/opendash.agent.md`](opendash.agent.md) — this file is the editor auto-load
+> digest; where the two disagree, the playbook wins.
+
 ## Absolute Prohibitions
 1. **NEVER delete, truncate, overwrite, or recreate any existing file.**
 2. **NEVER remove working code** from the codebase without explicit user consent (a signed-off request naming the specific function or block).
@@ -38,10 +42,12 @@ Checksum = XOR(SYNC, CMD, LENGTH, PAYLOAD[0], ..., PAYLOAD[n-1])
 ### Command Directions
 | From | To | CMD | Purpose |
 |------|----|-----|---------|
-| Center | Nodes | SET_DATA_POINT (0x01) | Push display values |
-| Center | Nodes | SYSTEM/PING (0x07+0x04) | Node discovery |
-| Nodes | Center | DATA_RESPONSE (0x81) | Push sensor readings |
-| Nodes | Center | STATUS_REPORT (0x82) | Respond to PING |
+| Center | Nodes | SET_DATA_POINT (0x01) | Push single display value |
+| Center | Nodes | SET_DATA_BATCH (0x0C) | Fan-out batched values (one packet, many DPs) |
+| Center | Nodes | SYSTEM (0x07) | Time sync, reboot (PING subcmd defined but NOT used for discovery — no polling) |
+| Nodes | Center | DATA_RESPONSE (0x81) | Push single sensor reading |
+| Nodes | Center | DATA_BATCH (0x88) | Push batched frame (e.g. a whole MD UART frame) |
+| Nodes | Center | STATUS_REPORT (0x82) | Self-announce on first contact / status push |
 
 ### API Stack (for node→center messages)
 1. Build payload bytes: `[dp_id_hi][dp_id_lo][float_byte0...float_byte3]` = 6 bytes
@@ -56,8 +62,10 @@ GPS node `gps/main/main.c` function `send_data_point()` lines ~91-110 is the can
 See `common/include/opendash_data_model.h` for the canonical ID list.
 See `docs/data-points.md` for human-readable legend.
 
-### ID Ranges
-- 0x0001–0x00FF: MultiDisplay/ECU (RPM, boost, EGT, temps, pressures)
+### ID Ranges (MD/OBD domain split — v0.1.0, see DATAFLOW.md §4)
+- 0x0100–0x01FF: ECU/OBD2 domain (standard PID values — coolant, speed, EGTs, trims…)
+- 0x0117 `MD_RPM`: MD-domain RPM (predates the split — do not treat as an ECU id)
+- 0x0800–0x08FF: **MD domain** (MultiDisplay-native: `MD_LAMBDA`, `MD_BOOST`, `MD_OIL_TEMP/PRESS`, `MD_GEAR`…) — never mix with ECU ids; id-based widget binding makes cross-domain feed structurally impossible
 - 0x0200–0x02FF: GPS (speed, heading, lat, lon, satellites)
 - 0x0300–0x03FF: IMU (G-forces, pitch, roll, yaw)
 - 0x0400–0x04FF: rAtTrax BMS (pack V/I, SOC, cells, temp, power)
@@ -75,7 +83,7 @@ See `docs/data-points.md` for human-readable legend.
 
 ## Multi-Node Awareness
 When editing ANY file, consider:
-1. Does this affect the common/ library? → Impacts ALL 4+ nodes
+1. Does this affect the common/ library? → Impacts all 12 node families (+ external BMS)
 2. Does this change message format? → Must update sender AND receiver
 3. Does this change data point IDs? → Must update data_model AND all consumers
 4. Does this affect WiFi/ESP-NOW channel? → Must match ALL nodes AND rAtTrax-BMS
@@ -85,7 +93,7 @@ When editing ANY file, consider:
 - BMS uses **Arduino framework on PlatformIO**, NOT ESP-IDF
 - BMS must reimplement the protocol framing in Arduino C++ (no access to common/ headers)
 - BMS broadcasts on WiFi channel 1 — this CANNOT diverge
-- Center auto-discovers BMS when it responds to PING with STATUS_REPORT
+- Center registers BMS in its peer table when BMS self-announces with STATUS_REPORT (event-driven — there is no discovery polling)
 - Center transparently forwards ALL properly-framed DATA_RESPONSE data points — no BMS-specific code needed in center
 
 ## Adding a New Data Point

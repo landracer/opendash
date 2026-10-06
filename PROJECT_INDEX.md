@@ -5,7 +5,9 @@
 > Start here to understand the project, then follow links to detailed documents.
 >
 > **Last updated:** 2026-10-02 (v0.1.0 baseline pass). Convention: bump this line
-> on every documentation pass — every doc in this repo carries one.
+> on every documentation pass on a *core reference* doc (this index, the readme,
+> CHANGELOG, QUICKSTART, and the top-level design docs). Not every wiki/ doc carries
+> one yet — rollout is in progress; do not assume absence means the doc is stale.
 
 ---
 
@@ -198,6 +200,8 @@ Every documentation file in the project, grouped by purpose.
 | [**BUILD_DEPENDENCIES.md**](BUILD_DEPENDENCIES.md) | Install ESP-IDF, Node.js, Python, ImageMagick |
 | [**docs/setup-guide.md**](docs/setup-guide.md) | Full dev environment setup walkthrough |
 | [**docs/vscode-setup.md**](docs/vscode-setup.md) | VS Code workspace, build, flash, monitor config |
+| [**agent/opendash.agent.md**](agent/opendash.agent.md) | **AI-agent / contributor playbook** (canonical) — critical rules, architecture primer, task workflow |
+| [**agent/opendash.instructions.md**](agent/opendash.instructions.md) | Editor auto-load instructions — defers to the canonical playbook above |
 
 ### Architecture & Design
 
@@ -242,6 +246,7 @@ Every documentation file in the project, grouped by purpose.
 | [**wiki/relay-mos-controllers.md**](wiki/relay-mos-controllers.md) | Relay + MOS FET board behavior |
 | [**wiki/boost-controller.md**](wiki/boost-controller.md) | N75 boost subsystem |
 | [**wiki/safety-deployment-system.md**](wiki/safety-deployment-system.md) | Parachute/rollover deployment subsystem |
+| [**docs/safety-deployment-test-checklist.md**](docs/safety-deployment-test-checklist.md) | **Bench/track verification checklist for the deployment subsystem — run it before trusting a live-squib circuit** |
 | [**wiki/warning-system.md**](wiki/warning-system.md) | Alarm / warning routing |
 | [**wiki/obd2-integration.md**](wiki/obd2-integration.md) | CAN + UART OBD2 intake |
 | [**wiki/vesc-integration.md**](wiki/vesc-integration.md) | VESC ESC intake (planned) |

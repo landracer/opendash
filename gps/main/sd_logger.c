@@ -13,7 +13,7 @@
  *   SDMMC D0   = GPIO3  (was MISO)
  *   (GPIO41 unused in SDMMC mode — no CS needed)
  *
- * Copyright (c) 2024-2026 uknowmelast & Axiom
+ * Copyright (c) 2024-2026 landracer
  * All rights reserved.
  */
 
