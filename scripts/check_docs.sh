@@ -13,6 +13,18 @@
 #      DISPLAY_SYNCHRONIZATION.md). pod1/pod2 MUST be identical; left/right
 #      are documented-identical page-set exceptions, so their hash is only
 #      printed. Any NEW unique hash (node not in the expected table) fails.
+#
+# WHY these checks exist (plain language, for new contributors):
+#   - The docs are the contract. A markdown link that goes nowhere or a doc
+#     naming a file that no longer exists is documentation LYING about the
+#     tree. This check is dumb and byte-exact on purpose — same idea as
+#     checksumming a backup instead of eyeballing it. Don't argue with it.
+#   - License headers keep provenance provable on every file. (Vendored
+#     Unity is exempt — it carries its own MIT license.)
+#   - pod1/pod2 share one schematic; if their display_init.c drifts, one pod
+#     behaves differently at speed and no unit test would ever catch that.
+#
+# Run locally (same thing CI runs):   bash scripts/check_docs.sh
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 cd "$(dirname "$0")/.."

@@ -3,6 +3,17 @@
  * @file stubs.c — host-test fake implementations (virtual clock, fake
  *                semaphore, in-memory NVS). Single-threaded by design:
  *                tests exercise logic, not concurrency.
+ *
+ * READ THIS FIRST if you have never seen the trick. The firmware modules
+ * under test call ESP-IDF APIs (NVS read/write, esp_timer clock, FreeRTOS
+ * mutexes). On a PC there is no NVS chip and no FreeRTOS — so we write our
+ * OWN tiny replacements with the same function names and link those in
+ * instead. node_health.c cannot tell the difference: it calls
+ * nvs_get_blob() and gets a RAM array; it calls esp_timer_get_time() and
+ * gets a counter the TEST controls, so "advance 45 seconds" is one function
+ * call instead of 45 seconds of waiting. The mutex fakes do nothing at all
+ * because a single-threaded program has nothing to lock. That is the whole
+ * trick: real logic, fake wires.
  */
 #include "esp_err.h"
 #include "esp_timer.h"

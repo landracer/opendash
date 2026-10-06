@@ -1,6 +1,13 @@
 /* Licensed under Sovereign Individual License v1.0 — see LICENSE file */
 /**
- * @file test_node_health.c — rate-based health state machine (no heartbeats).
+ * @file test_node_health.c — node health state machine, on the host.
+ *
+ * HOW TO READ THIS FILE: node_health.c is the real firmware code, compiled
+ * into a plain Linux program together with fake NVS and a TEST-CONTROLLED
+ * virtual clock (stubs/stubs.c). od_stub_clock_advance_ms(61000) is how we
+ * make "61 seconds passed" happen in zero wall-clock seconds. Every
+ * node_health_rx()/ack()/evaluate() call below is the exact same function
+ * center calls on the vehicle.
  *
  * Invariants under test (docs/espnow-protocol.md §4):
  *   - ANY data ⇒ immediate ONLINE
@@ -8,6 +15,15 @@
  *   - ACK upgrades OFFLINE ⇒ DEGRADED (radio alive)
  *   - heartbeat-mode nodes stay ONLINE once heard ("ZERO false offlines")
  *   - AWAITING + never heard + boot grace expired ⇒ OFFLINE
+ *
+ * TRUTH NOTE (recorded, not hidden): "stays ONLINE once heard" is what the
+ * code does TODAY. nack() is a no-op, so a heartbeat-mode node that was
+ * heard once has NO path back to OFFLINE while center stays up — and the
+ * NVS restore path re-instates was_online nodes as instantly ONLINE at
+ * boot. Net effect on the bench: a powered-off controller can still read
+ * as active on center. Changing that semantic is a fleet decision (it
+ * trades false-OFFLINEs for true-OFFLINEs); when it changes, the test
+ * below is the specification to update.
  */
 #include "unity.h"
 #include "node_health.h"

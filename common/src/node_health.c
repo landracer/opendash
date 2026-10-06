@@ -312,6 +312,12 @@ void node_health_evaluate(void)
         if (r->state == NODE_STATE_UNKNOWN && !r->mac_known) continue;
 
         /* ── Heartbeat-timeout mode (reactive nodes: relay, MOS, pods) ─── */
+        /* TRUTH (bench 2026-10-06): despite the name, this mode never times
+         * out. nack() below is a no-op, so once last_rx/last_ack is set the
+         * node has NO path back to OFFLINE for as long as center runs — and
+         * load_nvs_registry() re-instantiates was_online nodes as ONLINE at
+         * boot. That is why a powered-off controller can still show active.
+         * See test/test_node_health.c TRUTH NOTE before changing this. */
         if (NODE_EXPECTED_FREQ_HZ[i] <= NODE_HEALTH_HEARTBEAT_MODE_HZ) {
             /*
              * PHILOSOPHY: These nodes send infrequent broadcasts (30-45s).
