@@ -174,7 +174,14 @@ esp_err_t boost_client_init(void)
 
     espnow_master_set_aux_rx_callback(on_rx_frame);
 
-    xTaskCreatePinnedToCore(boost_live_push_task, "boost_live", 4096, NULL, 4, NULL, 0);
+    if (xTaskCreatePinnedToCore(boost_live_push_task, "boost_live", 4096, NULL, 4, NULL, 0)
+            != pdPASS) {
+        /* Init failed before s_initialized: deregister the callback and leave
+         * the client uninitialized so a later call can retry cleanly. */
+        espnow_master_set_aux_rx_callback(NULL);
+        ESP_LOGE(TAG, "boost_live task creation failed");
+        return ESP_ERR_NO_MEM;
+    }
 
     /* Ask the slave to dump its current state so the UI can render fresh. */
     boost_client_request_pull_all();

@@ -235,8 +235,12 @@ static void ota_worker_ensure_started(void)
     }
     if (!s_ota_worker && s_ota_queue) {
         /* Pin to core 1 (APP_CPU). NimBLE host task lives on core 0. */
-        xTaskCreatePinnedToCore(ota_worker_task, "ota_flash", 4096, NULL,
-                                5, &s_ota_worker, 1);
+        BaseType_t tret = xTaskCreatePinnedToCore(ota_worker_task, "ota_flash", 4096, NULL,
+                                                5, &s_ota_worker, 1);
+        if (tret != pdPASS) {
+            s_ota_worker = NULL;
+            ESP_LOGE(TAG, "OTA worker task creation failed — OTA disabled");
+        }
     }
 }
 

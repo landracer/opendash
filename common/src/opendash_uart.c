@@ -772,7 +772,11 @@ bool opendash_uart_init(void)
 
     s_status = OPENDASH_UART_WAITING;
 
-    xTaskCreate(uart_rx_task, "md_uart_rx", 4096, NULL, 5, &s_uart_task);
+    if (xTaskCreate(uart_rx_task, "md_uart_rx", 4096, NULL, 5, &s_uart_task) != pdPASS) {
+        ESP_LOGE(TAG, "md_uart_rx task creation failed");
+        s_uart_task = NULL;
+        return false;
+    }
 
     ESP_LOGI(TAG, "Multidisplay UART ready (RX=GPIO%d, TX=%s, KEY=%s, %d baud)",
              rx_pin,

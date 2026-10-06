@@ -395,12 +395,14 @@ void app_main(void)
     boost_client_init();
     ESP_LOGI(TAG, "Boost client running");
 
-    xTaskCreate(ota_serial_cmd_task,
+    if (xTaskCreate(ota_serial_cmd_task,
                 "ota_serial_cmd",
                 4096,
                 NULL,
                 4,
-                NULL);
+                NULL) != pdPASS) {
+        ESP_LOGE(TAG, "ota_serial_cmd task creation failed — serial OTA commands disabled");
+    }
 
     ESP_LOGI(TAG, "OpenDash Center Display initialization complete");
     ESP_LOGI(TAG, "System ready - displaying baseline UI");

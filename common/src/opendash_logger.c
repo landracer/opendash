@@ -262,7 +262,15 @@ esp_err_t opendash_logger_start(void)
     s_active  = true;
 
     /* Spawn flush task on CPU 0 at low priority */
-    xTaskCreatePinnedToCore(logger_task, "od_logger", 4096, NULL, 2, &s_task, 0);
+    if (xTaskCreatePinnedToCore(logger_task, "od_logger", 4096, NULL, 2, &s_task, 0) != pdPASS) {
+        s_task   = NULL;
+        s_active = false;
+        vQueueDelete(s_queue);
+        s_queue = NULL;
+        fclose(s_file);
+        s_file = NULL;
+        return ESP_ERR_NO_MEM;
+    }
 
     ESP_LOGI(TAG, "Logging session %lu started → %s",
              (unsigned long)s_session, path);
