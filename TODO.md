@@ -158,9 +158,11 @@
 > Verification layer added 2026-10-05. CI runs on every push/PR to main.
 > 2026-10-06: all six bench displays (center/left/right/gps/pod1/pod2)
 > re-flashed via `od-flash.py` (identity-gated, tag-verified) with firmware
-> built from the current tree. Relay/MOS controller boards are NOT currently
-> connected to the bench FTDI — their firmware builds are verified (local +
-> CI) but not bench-flashed yet.
+> built from the current tree. 2026-10-06: mos-4ch-a bench-flashed via the
+> shared FTDI (BOOT+power-on into download mode, --force flash, hash-verified,
+> manual power-cycle, heartbeat tag confirmed — running quiet, `Center:
+> searching` until bench ESP-NOW pairing). Remaining: mos-4ch-b, relay-8ch-a,
+> relay-8ch-b, relay-4ch-hd (swap boards on the same FTDI, same procedure).
 
 - [x] `.github/workflows/build.yml`: `idf.py build` matrix over ALL 12 node
       projects (esp32s3 displays + esp32 controllers), firmware artifacts
