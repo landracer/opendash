@@ -1,0 +1,42 @@
+# OpenDash build-smoke CI (STARTER — first CI the repo has ever had)
+#
+# What this does: on every push/PR to main (and manual runs), it spins up a
+# clean Linux container with ESP-IDF, checks out the repo, and runs
+# `idf.py build` for each display node. That's it — no hardware needed.
+# It answers one question automatically: "did my change break the build
+# on some node I didn't test locally?"
+#
+# Notes / known follow-ups:
+#  - Local fleet is pinned to an IDF v6.1 *dev snapshot* (see
+#    BUILD_DEPENDENCIES.md); CI uses the v6.1 release line. If a build
+#    only fails in CI, suspect a dev-vs-release IDF delta, not your code.
+#  - The font/image pipeline (Node + Python, see BUILD_DEPENDENCIES.md)
+#    must work headless in the container; if a node fails for that
+#    reason, add the missing setup steps below.
+#  - `dependencies.lock` is committed, so component versions are
+#    reproducible across runners.
+name: build-smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false          # keep building other nodes when one fails
+      matrix:
+        node: [center, left, right, gps, pod1, pod2]
+    name: build ${{ matrix.node }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up ESP-IDF and build ${{ matrix.node }}
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v6.1
+          target: esp32s3
+          path: ${{ matrix.node }}
