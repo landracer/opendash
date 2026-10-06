@@ -158,13 +158,13 @@
 > Verification layer added 2026-10-05. CI runs on every push/PR to main.
 > 2026-10-06: all six bench displays (center/left/right/gps/pod1/pod2)
 > re-flashed via `od-flash.py` (identity-gated, tag-verified) with firmware
-> built from the current tree. 2026-10-06: mos-4ch-a, mos-4ch-b, relay-8ch-a
-> AND relay-8ch-b bench-flashed via the shared FTDI (BOOT+power-on into
+> built from the current tree — ALL 11 FIRMWARE NODES NOW CURRENT (6 displays
+> 2026-10-06 via by-id ACM ports; mos-4ch-a, mos-4ch-b, relay-8ch-a,
+> relay-8ch-b, relay-4ch-hd same day via the shared FTDI: BOOT+power-on into
 > download mode, --force flash, hash-verified, manual power-cycle, heartbeat
-> tag confirmed). Bench state: all four run quiet; MOS-A/B + relay-8ch-a
-> report `Center: searching`, relay-8ch-b reports `Center: ONLINE` (its
-> ESP-NOW reach to center verified on this bench). Last remaining board:
-> relay-4ch-hd (same procedure).
+> tag confirmed). Bench state: MOS-A/B + relay-8ch-a + relay-4ch-hd report
+> `Center: searching`; relay-8ch-b reports `Center: ONLINE` (its ESP-NOW
+> reach to center verified on this bench). Fleet bring-up COMPLETE.
 
 - [x] `.github/workflows/build.yml`: `idf.py build` matrix over ALL 12 node
       projects (esp32s3 displays + esp32 controllers), firmware artifacts

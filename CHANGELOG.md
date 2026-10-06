@@ -39,6 +39,15 @@
   failure (bt_ota worker, MD UART RX, SD logger flush, ota_serial_cmd,
   boost_live push) — previously silent on failure.
 
+### Verified on hardware
+
+- **Fleet bring-up complete (2026-10-06)**: all 11 firmware nodes flashed with
+  baseline-tree firmware and boot-verified by firmware tag — 6 displays via
+  per-board USB-serial (by-id resolved) and all 5 relay/MOS controllers via
+  the shared FT232R (download mode via BOOT+power-on; controller boards have
+  no auto-reset line). relay-8ch-b heartbeat additionally proves the live
+  ESP-NOW round-trip to center (`Center: ONLINE`).
+
 ## [0.1.0] — 2026-10-02 — BASELINE (first public version)
 
 > Squashes the entire 2026 beta era (internal codenames v0.2.0-beta → v0.9.0-beta; see
