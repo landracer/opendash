@@ -180,13 +180,18 @@ static const uint8_t NODE_EXPECTED_FREQ_HZ[OPENDASH_NODE_COUNT] = {
 #define NODE_HEALTH_ACK_ALIVE_MS        500
 
 /**
- * Heartbeat-timeout mode: max silence before declaring OFFLINE (ms).
- * Used for reactive nodes (relay/MOS/pods) that only send heartbeats
- * every ~30-45s or respond to commands.  120s allows for 1+ fully missed
- * heartbeat cycles.  Only after 2 minutes of total radio silence will a
- * heartbeat-mode node be declared OFFLINE.
+ * Heartbeat-mode honesty thresholds (reactive nodes: relay/MOS/pods).
+ * These nodes broadcast roughly every 30-45s. Silence for longer than
+ * DEGRADED_MS (~2 missed heartbeats) means we have NOT heard from them —
+ * they are DEGRADED (honest unknown), and after OFFLINE_MS (~4 missed
+ * heartbeats) they are declared OFFLINE. Any later rx/ACK restores them.
+ *
+ * History: this used to be "once ONLINE, forever ONLINE" (zero false
+ * offlines, guaranteed false onlines — a powered-off board read as
+ * active). Fleet decision 2026-10-06: honest state beats comfortable lie.
  */
-#define NODE_HEALTH_HEARTBEAT_TIMEOUT_MS 120000
+#define NODE_HEALTH_HEARTBEAT_DEGRADED_MS 90000   /* ~2 missed heartbeats */
+#define NODE_HEALTH_HEARTBEAT_OFFLINE_MS  180000  /* ~4 missed heartbeats */
 
 /**
  * Heartbeat-timeout mode: threshold below which we use timeout instead of

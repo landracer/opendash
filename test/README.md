@@ -24,7 +24,7 @@ Set `OD_VERBOSE_LOG=1` to see the code-under-test's log output while running.
 |-------|----------|
 | `test_protocol.c` | Frame codec: SYNC/checksum/truncation handling, round-trips, 252-byte boundary |
 | `test_data_model.c` | Store set/get/update/overflow + cross-domain id partitioning (MD_* never aliases ECU ids) |
-| `test_node_health.c` | Rate/heartbeat state machine: instant-ONLINE, windowed OFFLINE, ACK upgrade, boot grace |
+| `test_node_health.c` | Health state machine: instant-ONLINE on any rx; freq-mode windowed OFFLINE; heartbeat-mode honest silence (DEGRADED ~2 missed, OFFLINE ~4); NVS restore comes back AWAITING |
 | `test_parachute.c` | Deploy config defaults, hostile-config clamping (NaN/negative/oversize), NVS round-trip |
 
 ## Rules

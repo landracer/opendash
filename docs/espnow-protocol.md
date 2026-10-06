@@ -106,17 +106,32 @@ The dispatcher task runs at priority 4; channel task stack is 4096.
   `0x01 DATA_POINT`, `0x02 STATUS_REPORT`, `0x03 RELAY_CMD`, `0x04 SYSTEM_CMD`,
   `0x05 CONFIG`, `0x06 ANNOUNCE`, `0x07 BATCH_DP`.
 
-## 4. Node health (no heartbeats)
+## 4. Node health (state machine)
 
-`node_health.h` is the primary online/offline detector. It is rate-based, not
-heartbeat-based:
+`node_health.h` is the primary online/offline detector. Every node is judged
+by **silence since the last rx/ACK**, in one of two modes chosen per node
+from `NODE_EXPECTED_FREQ_HZ`:
+
+- **Frequency-ratio mode** (LEFT 50 pps, BMS 40 pps): 1-second windows count
+  packets; any data keeps ONLINE, 2 silent windows → DEGRADED, 3 → OFFLINE.
+- **Honest heartbeat mode** (GPS, pods, relay/MOS; table value `1`): nodes
+  broadcast only every ~30-45 s, so silence is judged on heartbeat
+  timescales — ~2 missed heartbeats (90 s) → DEGRADED, ~4 (180 s) → OFFLINE.
+  Any later rx/ACK restores ONLINE.
 
 ```c
-#define NODE_HEALTH_WINDOW_MS        1000   // measurement window
-#define NODE_HEALTH_OFFLINE_WINDOWS  3      // 3 missed windows = ~3 s silence
-#define NODE_HEALTH_DEGRADED_RATIO   0.25f  // < 25% of expected rate = DEGRADED
-#define NODE_HEALTH_MISSED_RATIO     0.05f  // < 5% in a window = missed
-#define NODE_HEALTH_ONLINE_WINDOWS   2      // good windows to re-upgrade
+#define NODE_HEALTH_WINDOW_MS           1000   // measurement window
+#define NODE_HEALTH_OFFLINE_WINDOWS     3      // 3 missed windows = ~3 s silence
+#define NODE_HEALTH_DEGRADED_RATIO      0.25f  // < 25% of expected rate = DEGRADED
+#define NODE_HEALTH_MISSED_RATIO        0.05f  // < 5% in a window = missed
+#define NODE_HEALTH_ONLINE_WINDOWS      2      // good windows to re-upgrade
+#define NODE_HEALTH_HEARTBEAT_DEGRADED_MS 90000   // ~2 missed heartbeats
+#define NODE_HEALTH_HEARTBEAT_OFFLINE_MS  180000  // ~4 missed heartbeats
+```
+
+NVS restore always comes back **AWAITING** (a stored MAC is not proof of
+life; the old instant-ONLINE restore was removed 2026-10-06 because it made
+powered-off boards read as active).
 
 ## 5. Opcode map
 

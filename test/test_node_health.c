@@ -13,17 +13,12 @@
  *   - ANY data ⇒ immediate ONLINE
  *   - freq-mode node: 3 consecutive silent windows ⇒ OFFLINE; 2 ⇒ DEGRADED
  *   - ACK upgrades OFFLINE ⇒ DEGRADED (radio alive)
- *   - heartbeat-mode nodes stay ONLINE once heard ("ZERO false offlines")
- *   - AWAITING + never heard + boot grace expired ⇒ OFFLINE
- *
- * TRUTH NOTE (recorded, not hidden): "stays ONLINE once heard" is what the
- * code does TODAY. nack() is a no-op, so a heartbeat-mode node that was
- * heard once has NO path back to OFFLINE while center stays up — and the
- * NVS restore path re-instates was_online nodes as instantly ONLINE at
- * boot. Net effect on the bench: a powered-off controller can still read
- * as active on center. Changing that semantic is a fleet decision (it
- * trades false-OFFLINEs for true-OFFLINEs); when it changes, the test
- * below is the specification to update.
+ *   - heartbeat-mode node: honest silence — ~2 missed heartbeats ⇒ DEGRADED,
+ *     ~4 ⇒ OFFLINE; being heard again restores ONLINE (fleet decision
+ *     2026-10-06, replacing the old "once heard, ONLINE forever" sticky rule
+ *     that showed powered-off boards as active)
+ *   - AWAITING + never heard + boot grace expired ⇒ OFFLINE; NVS restore
+ *     always comes back AWAITING (a stored MAC is not proof of life)
  */
 #include "unity.h"
 #include "node_health.h"
@@ -89,17 +84,28 @@ void test_freq_mode_online_degraded_offline_online(void)
     TEST_ASSERT_TRUE(node_health_is_alive(OPENDASH_NODE_LEFT));
 }
 
-void test_heartbeat_mode_stays_online_once_heard(void)
+void test_heartbeat_mode_honest_timeout(void)
 {
     node_health_register_mac(OPENDASH_NODE_RIGHT, MAC_RIGHT);
     node_health_rx(OPENDASH_NODE_RIGHT, -70);   /* one announcement */
     TEST_ASSERT_EQUAL(NODE_STATE_ONLINE, node_health_get_state(OPENDASH_NODE_RIGHT));
 
-    /* Long silence — heartbeat-mode must NOT false-offline */
-    od_stub_clock_advance_ms(10000);
+    /* Silence past ~2 missed heartbeats -> honest DEGRADED, not "active". */
+    od_stub_clock_advance_ms(NODE_HEALTH_HEARTBEAT_DEGRADED_MS + 1000);
     node_health_evaluate();
-    od_stub_clock_advance_ms(10000);
+    TEST_ASSERT_EQUAL(NODE_STATE_DEGRADED, node_health_get_state(OPENDASH_NODE_RIGHT));
+    TEST_ASSERT_TRUE(node_health_is_alive(OPENDASH_NODE_RIGHT)); /* degraded = alive */
+
+    /* Silence past ~4 missed heartbeats -> honest OFFLINE. This is the case
+     * the old sticky-ONLINE rule could never show: a powered-off board. */
+    od_stub_clock_advance_ms(NODE_HEALTH_HEARTBEAT_OFFLINE_MS
+                             - NODE_HEALTH_HEARTBEAT_DEGRADED_MS + 1000);
     node_health_evaluate();
+    TEST_ASSERT_EQUAL(NODE_STATE_OFFLINE, node_health_get_state(OPENDASH_NODE_RIGHT));
+    TEST_ASSERT_FALSE(node_health_is_alive(OPENDASH_NODE_RIGHT));
+
+    /* Heard again -> ONLINE immediately (rx refreshes the silence clock). */
+    node_health_rx(OPENDASH_NODE_RIGHT, -60);
     TEST_ASSERT_EQUAL(NODE_STATE_ONLINE, node_health_get_state(OPENDASH_NODE_RIGHT));
 }
 
@@ -139,7 +145,7 @@ int main(void)
     UNITY_BEGIN();
     RUN_TEST(test_init_then_awaiting_after_register);
     RUN_TEST(test_freq_mode_online_degraded_offline_online);
-    RUN_TEST(test_heartbeat_mode_stays_online_once_heard);
+    RUN_TEST(test_heartbeat_mode_honest_timeout);
     RUN_TEST(test_never_seen_node_goes_offline_after_grace);
     RUN_TEST(test_find_by_mac_and_bounds);
     return UNITY_END();

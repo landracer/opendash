@@ -38,6 +38,12 @@
 - Every `xTaskCreate*` call site now checks its return value and cleans up on
   failure (bt_ota worker, MD UART RX, SD logger flush, ota_serial_cmd,
   boost_live push) — previously silent on failure.
+- **Node health honesty fix**: heartbeat-mode nodes (GPS, pods, relay/MOS) no
+  longer stay ONLINE forever once heard, and NVS restore no longer marks
+  never-heard-on-this-boot nodes as instantly ONLINE. A node now goes
+  DEGRADED after ~2 missed heartbeats (90 s silence) and OFFLINE after ~4
+  (180 s); any later rx/ACK restores it. This was the mechanism behind
+  powered-off controllers still reading "active" on center.
 
 ### Verified on hardware
 

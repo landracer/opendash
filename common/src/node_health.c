@@ -6,7 +6,9 @@
  * Multi-layered online/offline detection with NVS persistence.
  * See node_health.h for architecture documentation.
  *
- * ZERO POLLING.  ZERO PINGING.  ZERO FALSE OFFLINES.
+ * ZERO POLLING.  ZERO PINGING.  HONEST SILENCE: a node we stopped hearing
+ * goes DEGRADED then OFFLINE on heartbeat timescales (see the 2026-10-06
+ * honesty comment in node_health_evaluate).
  */
 
 #include "node_health.h"
@@ -90,32 +92,22 @@ static void load_nvs_registry(void)
 
         esp_err_t err = nvs_get_blob(s_nvs, key, &rec, &len);
         if (err == ESP_OK && len == sizeof(rec)) {
-            /* Node was known from previous boot */
+            /* Node was known from previous boot. TRUTH (2026-10-06): a
+             * stored MAC is NOT proof of life. Every restored node comes
+             * back AWAITING and must be heard on THIS boot (rx/ACK) to
+             * reach ONLINE; never-heard nodes fall to OFFLINE when the
+             * boot grace expires. (The old code restored was_online
+             * heartbeat nodes as instantly ONLINE — a lie that showed
+             * powered-off boards as active. was_online is kept in the
+             * record for logs only.) */
             node_health_record_t *r = &s_records[i];
             memcpy(r->mac, rec.mac, 6);
             r->mac_known = true;
             r->prev_state = NODE_STATE_UNKNOWN;
-
-            /*
-             * Heartbeat-mode nodes that were previously ONLINE start
-             * immediately as ONLINE — no waiting for re-discovery.
-             * This gives near-zero startup time for known nodes.
-             * Frequency-mode nodes (LEFT, BMS) start AWAITING since
-             * they will confirm within 1-2 seconds anyway.
-             */
-            if (rec.was_online &&
-                NODE_EXPECTED_FREQ_HZ[i] <= NODE_HEALTH_HEARTBEAT_MODE_HZ &&
-                NODE_EXPECTED_FREQ_HZ[i] > 0) {
-                r->state = NODE_STATE_ONLINE;
-                r->good_windows = NODE_HEALTH_ONLINE_WINDOWS;
-                ESP_LOGI(TAG, "NVS: %s restored (MAC=" MACSTR ", was ONLINE) → instant ONLINE",
-                         NODE_NAMES[i], MAC2STR(rec.mac));
-            } else {
-                r->state = NODE_STATE_AWAITING;
-                ESP_LOGI(TAG, "NVS: %s restored (MAC=" MACSTR ", was %s)",
-                         NODE_NAMES[i], MAC2STR(rec.mac),
-                         rec.was_online ? "ONLINE" : "OFFLINE");
-            }
+            r->state = NODE_STATE_AWAITING;
+            ESP_LOGI(TAG, "NVS: %s restored (MAC=" MACSTR ", was %s) -> AWAITING until heard",
+                     NODE_NAMES[i], MAC2STR(rec.mac),
+                     rec.was_online ? "ONLINE" : "OFFLINE");
         } else {
             /* Never seen this node */
             s_records[i].state = NODE_STATE_UNKNOWN;
@@ -312,39 +304,37 @@ void node_health_evaluate(void)
         if (r->state == NODE_STATE_UNKNOWN && !r->mac_known) continue;
 
         /* ── Heartbeat-timeout mode (reactive nodes: relay, MOS, pods) ─── */
-        /* TRUTH (bench 2026-10-06): despite the name, this mode never times
-         * out. nack() below is a no-op, so once last_rx/last_ack is set the
-         * node has NO path back to OFFLINE for as long as center runs — and
-         * load_nvs_registry() re-instantiates was_online nodes as ONLINE at
-         * boot. That is why a powered-off controller can still show active.
-         * See test/test_node_health.c TRUTH NOTE before changing this. */
+        /* Honest silence model (fleet decision 2026-10-06): these nodes
+         * broadcast only every ~30-45s, so absence of traffic is judged on
+         * heartbeat timescales, not 1-second windows. A node we have NEVER
+         * heard on this boot goes OFFLINE when the boot grace expires; a
+         * node we HAVE heard goes DEGRADED after ~2 missed heartbeats and
+         * OFFLINE after ~4. Any later rx/ACK (which refreshes the silence
+         * clock) restores it. Occasional RF dropout may flicker DEGRADED —
+         * accepted trade for never lying "active" about a dead board. */
         if (NODE_EXPECTED_FREQ_HZ[i] <= NODE_HEALTH_HEARTBEAT_MODE_HZ) {
-            /*
-             * PHILOSOPHY: These nodes send infrequent broadcasts (30-45s).
-             * ESP-NOW broadcasts have NO retry — missed = gone.  We CANNOT
-             * rely on absence of heartbeats to declare offline, because
-             * RF conditions can cause multiple consecutive missed broadcasts.
-             *
-             * RULE: Once a heartbeat-mode node is ONLINE, it stays ONLINE.
-             * The ONLY way it goes OFFLINE is:
-             *   1) Boot grace expires and it was NEVER heard from, OR
-             *   2) A direct NACK proves its radio is dead (handled in nack())
-             *
-             * This guarantees ZERO false offlines for these nodes.
-             */
+            uint32_t last_activity = (r->last_rx_ms > r->last_ack_ms)
+                                     ? r->last_rx_ms : r->last_ack_ms;
 
-            /* If we've ever heard from it, it's alive until proven dead */
-            if (r->last_rx_ms > 0 || r->last_ack_ms > 0) {
-                if (r->state != NODE_STATE_ONLINE) {
-                    transition_state(r, NODE_STATE_ONLINE);
-                }
-            }
-
-            /* Boot grace: never seen at all → wait, then offline */
-            if (r->last_rx_ms == 0 && r->last_ack_ms == 0 &&
-                r->state == NODE_STATE_AWAITING) {
-                if ((now - s_boot_time_ms) >= NODE_HEALTH_BOOT_GRACE_MS) {
+            if (last_activity == 0) {
+                /* Never heard on this boot: honest AWAITING until grace. */
+                if (r->state == NODE_STATE_AWAITING &&
+                    (now - s_boot_time_ms) >= NODE_HEALTH_BOOT_GRACE_MS) {
                     transition_state(r, NODE_STATE_OFFLINE);
+                }
+            } else {
+                uint32_t silence = now - last_activity;
+                if (silence >= NODE_HEALTH_HEARTBEAT_OFFLINE_MS) {
+                    if (r->state != NODE_STATE_OFFLINE)
+                        transition_state(r, NODE_STATE_OFFLINE);
+                } else if (silence >= NODE_HEALTH_HEARTBEAT_DEGRADED_MS) {
+                    if (r->state == NODE_STATE_ONLINE ||
+                        r->state == NODE_STATE_AWAITING)
+                        transition_state(r, NODE_STATE_DEGRADED);
+                } else {
+                    if (r->state != NODE_STATE_ONLINE)
+                        transition_state(r, NODE_STATE_ONLINE);
+                    r->missed_windows = 0;
                 }
             }
 
