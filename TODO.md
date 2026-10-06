@@ -153,10 +153,14 @@
 - [ ] Track consecutive good frames to increase sync confidence
 - [ ] Checksum/CRC plausibility on parsed fields
 
-### 1.8 CI + Host Unit Tests — IN PROGRESS
+### 1.8 CI + Host Unit Tests — DONE (bench fleet re-flashed to match 2026-10-06)
 
-> Verification layer added 2026-10-05. This is the honest status of the
-> automated safety net (CI runs on every push/PR to main).
+> Verification layer added 2026-10-05. CI runs on every push/PR to main.
+> 2026-10-06: all six bench displays (center/left/right/gps/pod1/pod2)
+> re-flashed via `od-flash.py` (identity-gated, tag-verified) with firmware
+> built from the current tree. Relay/MOS controller boards are NOT currently
+> connected to the bench FTDI — their firmware builds are verified (local +
+> CI) but not bench-flashed yet.
 
 - [x] `.github/workflows/build.yml`: `idf.py build` matrix over ALL 12 node
       projects (esp32s3 displays + esp32 controllers), firmware artifacts
