@@ -165,6 +165,15 @@
 > tag confirmed). Bench state: MOS-A/B + relay-8ch-a + relay-4ch-hd report
 > `Center: searching`; relay-8ch-b reports `Center: ONLINE` (its ESP-NOW
 > reach to center verified on this bench). Fleet bring-up COMPLETE.
+>
+> Round 2 (same day, after the node_health honesty fix): controllers are
+> being re-flashed one at a time so they carry the honest-silence firmware.
+> mos-4ch-b re-flashed + heartbeat-verified (searching). mos-4ch-a has since
+> gone DEAF on the rig — no sync answer, no bytes, both cable and ritual
+> re-checked; it is now the odd board out (MOS-B flashed fine on the same
+> rig minutes later). Still to re-flash: mos-4ch-a (needs diagnosis or
+> replacement), relay-8ch-a, relay-8ch-b, relay-4ch-hd. Displays will get
+> the honesty firmware over the same bench route afterwards.
 
 - [x] `.github/workflows/build.yml`: `idf.py build` matrix over ALL 12 node
       projects (esp32s3 displays + esp32 controllers), firmware artifacts
