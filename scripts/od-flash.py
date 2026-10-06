@@ -16,15 +16,16 @@ node, verified by BOTH:
      bootloader / unresponsive (allowed for first-flash recovery, but
      a confirmation is required).
 
-TRUTH NOTE (bench, 2026-10-06, mos-4ch-a): the shared-FTDI controller boards
-have NO auto-reset wired — RTS/DTR pulses do nothing there, and esptool only
-syncs when the board is manually put in download mode (hold BOOT, power-on).
-After a successful flash the board only reboots into the new firmware when
-the operator power-cycles it BY HAND; only then does it emit its
-banner/heartbeat for the post-flash tag check. Bench procedure for every
+TRUTH NOTE (bench, 2026-10-06, mos-4ch-a/mos-4ch-b/relay boards): these
+controller boards have NO auto-reset wired — RTS/DTR pulses do nothing there,
+and esptool only syncs when the board is manually put in download mode (hold
+BOOT, power-on). After a successful flash the board only reboots into the new
+firmware when the operator power-cycles it BY HAND; only then does it emit
+its banner/heartbeat for the post-flash tag check. Bench procedure for every
 relay/mos node: operator puts board in download mode -> od-flash.py <node>
 --no-monitor --force -> operator power-cycles the board -> od-flash.py
-<node> --probe-only must see the tag.
+<node> --probe-only must see the tag. (If a flash is ever interrupted, the
+board is bricked-but-recoverable: BOOT+power-on again and re-flash.)
 
 Usage:
     od-flash.py <node>                    # build + flash + monitor
