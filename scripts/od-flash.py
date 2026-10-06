@@ -16,6 +16,16 @@ node, verified by BOTH:
      bootloader / unresponsive (allowed for first-flash recovery, but
      a confirmation is required).
 
+TRUTH NOTE (bench, 2026-10-06, mos-4ch-a): the shared-FTDI controller boards
+have NO auto-reset wired — RTS/DTR pulses do nothing there, and esptool only
+syncs when the board is manually put in download mode (hold BOOT, power-on).
+After a successful flash the board only reboots into the new firmware when
+the operator power-cycles it BY HAND; only then does it emit its
+banner/heartbeat for the post-flash tag check. Bench procedure for every
+relay/mos node: operator puts board in download mode -> od-flash.py <node>
+--no-monitor --force -> operator power-cycles the board -> od-flash.py
+<node> --probe-only must see the tag.
+
 Usage:
     od-flash.py <node>                    # build + flash + monitor
     od-flash.py <node> --no-monitor       # build + flash
@@ -26,7 +36,8 @@ Nodes: center | left | right | gps | pod1 | pod2
        mos-4ch-a | mos-4ch-b | relay-4ch-hd | relay-8ch-a | relay-8ch-b
 
 SHARED FTDI FLASHER: every relay/MOS node is flashed individually through
-the single FTDI FT232R on /dev/ttyUSB1 (swap the board, flash, repeat).
+the single FTDI FT232R (currently enumerated /dev/ttyUSB0; swap the board,
+flash, repeat).
 They therefore all resolve to the SAME port; the running-firmware TAG probe
 is what tells you WHICH board is currently attached. A brand-new (never
 flashed) board is silent and will need --force on its first flash.
