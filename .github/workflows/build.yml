@@ -71,7 +71,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends imagemagick nodejs npm python3-pil
 
-      - name: Generate LVGL font/image C sources (source of truth: ttf/png)
+      - name: Generate LVGL font and image C sources from ttf and png originals
         run: |
           (cd common/fonts && npm install --no-audit --no-fund)
           python3 common/fonts/convert_fonts.py
