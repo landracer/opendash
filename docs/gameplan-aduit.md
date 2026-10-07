@@ -98,22 +98,20 @@ then gets deleted or hard-guarded per the plan's "hard-fail guard" item.
 
 | Item | Verdict | Evidence / note |
 |---|---|---|
-| P0.1 | ⏳ NOT STARTED (design settled: Option A de-facto, see §3); hard-fail guard `if(NOT FONT_SOURCES) FATAL_ERROR` still to add | `common/CMakeLists.txt:112-113` globs `FONT_SOURCES`/`IMAGE_SOURCES` with no emptiness check today |
-| P0.2 | ✅ superseded by evidence — see §3 Correction 1 (CI runs, red since 2026-10-06; earliest recorded run 2026-10-06T07:14Z). Badge rule: `readme.md` gets no CI badge until first green run | `gh run list` output captured above |
-| P0.3 | ⏳ NOT STARTED. History blobs confirmed for `build_mosA/` + `build_odsh/` (ninja + compile_commands ≈ 53 MB + dup libs). `dash-pods/opendash.FCStd` 104,348,715 B and `gps/time` 98,667,859 B both still tracked at HEAD — matches plan; plan's step-4 PNG correction = −9 MB (not −60 MB, see §2) | `git ls-files`, blob table |
-| P0.4 | ✅ NOT-STARTED confirmed: no size guard, **no `.repo-size-allowlist` file exists**, root `.gitignore` has **no** `*.FCStd` and no `*.log` pattern (only the `tearing-logs/` dir; `*.bin` globally ignored already). `scripts/` today: `apply_license_notice.py`, `check_docs.sh`, `od-flash.py`, `tearing_capture.sh` | `ls scripts/`, `.gitignore` at HEAD |
-| P0.5 | ⏳ NOT STARTED — fleet-clean.sh not yet in scripts/ (planned); 12 stale build dirs ≈ 2.9 GB confirmed; tearing-logs/ = 284K (keep) | du table §2 |
-| P0.6 | ✏️ **The "39 opcodes" claim is TRUE.** `grep -c '#define OPENDASH_CMD_' common/include/opendash_protocol.h` = **39 exactly**. The game-plan's "header greps 42 OPENDASH_CMD_ tokens" counted token *mentions* — the 3 extras are comment references (protocol.h lines 98, 190, 202). So TODO.md's "39 opcodes" needs NO wording fix; what lands is the self-verifying docs-lint rule (derive count from `#define` lines, diff TODO.md) and the PROJECT_INDEX "Last updated" bump (currently 2026-10-02) | both greps re-run 2026-10-07 |
+| P0.1 | ✅ DONE 2026-10-07 (`4a7a7c4`): workflow now installs the converter toolchain on the runner and generates sources before the IDF container build; `OD_PREGENERATED_ASSETS` deleted from CMake + docs; `if(NOT FONT_SOURCES/IMAGE_SOURCES) FATAL_ERROR` guard live | commits 4a7a7c4 |
+| P0.2 | ✅ superseded by evidence — see §3 Correction 1 (CI runs, red since 2026-10-06). Badge rule: `readme.md` gets no CI badge until first green run | `gh run list` |
+| P0.3 | ✅ HEAD-side DONE (`a5f889b` + `f73a74c`): FCStd + gps/time + 26 PNGs untracked — tracked content 213 MB → **10.0 MB**. HISTORY REWRITE still ⏳ OPEN pending D2 (clone still pays full 252 MB .git until it happens) | `git ls-files` |
+| P0.4 | ✅ DONE (`a5f889b`): check_docs.sh check 4 = >5 MB guard + `.repo-size-allowlist` (empty by design, WHY-per-entry culture); `*.FCStd`/`*.f3d`/`*.log`/`gps/time` ignores added | check_docs.sh diff |
+| P0.5 | ✅ DONE (`a5f889b`): scripts/fleet-clean.sh landed (dry-run default, --force acts, venv report-only, tearing-logs kept) — executed with --force, tree 5.3 GB → ~2.4 GB | script + du |
+| P0.6 | ✏️ **The "39 opcodes" claim was TRUE** (`#define OPENDASH_CMD_` = 39 exactly; the plan's "42" counted comment references). ✅ DONE: check_docs.sh check 5 now DERIVES the count from the header and diffs TODO.md — self-verifying forever after; PROJECT_INDEX bumped | both greps |
 
 ## 5. PHASE 1 line-by-line verdicts (code claims; bench work still pending)
 
-| Item | Verdict | Evidence |
-|---|---|---|
-| P1.1 | ✅ stale comments confirmed verbatim: `mos-4ch-a/main/main.c:375` + `:120`; `mos-4ch-b/main/main.c:374` + `:120` — "Firing (channel energize) is NOT wired yet — actuator stays inhibited" while `parachute_fire()` (mos-a `main.c:156`) genuinely energizes and is called live from `OPENDASH_CMD_PARACHUTE_DEPLOY` (mos-a `:406`) | sed of dispatch block 2026-10-07 |
-| P1.2 | ✅ claim "only the config *store* is tested" is TRUE — `test/test_parachute.c` (4 tests) covers defaults/sanitize/NVS round-trip only; the fire-verdict (enabled ∧ mask≠0 ∧ armed, LATCH vs PULSE, idempotent lockout) lives untested inside the MOS mains. `common/src/opendash_parachute.c` + `opendash_parachute_actuator.c` exist as the move targets | file reads |
-| P1.3 | ✏️ premise sharpened: the learn-the-center-MAC machinery exists (`mos-4ch-a/main/main.c:92-93` `s_center_mac`; learn block in `dispatch_message()` ≈`:211-263`), BUT it is **not a gate at all today**: ANY sender of a whitelisted control opcode is *latched as the center*, and every mismatch **re-latches** ("Center MAC re-synced", `:263`). RAM-only, no NVS. So P1.3 is a from-scratch policy feature (persist + gate + button re-pair), not an "extension" of a pin — an attacker frame today *becomes* the pinned center. The plan's wording ("extend it into a policy gate") understates this | dispatch_message read 2026-10-07 |
-| P1.4 | ✅ confirmed: `common/src/opendash_espnow.c:177` `bcast_peer.encrypt = false;` and `:256` `peer.encrypt = false;` — both peer paths unencrypted, exactly as the plan claims | grep |
-| P1.5 | ⏳ decision D4 pending owner (auto-DISARM vs survive; `node_health.c` heartbeat exists; 2026-10-06 "honest silence" commits in `git log`) | git log |
+| P1.1 | ✅ FIXED 2026-10-07 (`4db839a`): both MOS mains now describe the real behavior — "Firing IS wired: parachute_fire() energizes the selected channels ONLY when enabled ∧ channel_mask≠0 ∧ armed (idempotent — latches once, never re-fires); LATCH holds until disarm/reboot, PULSE auto-off after pulse_ms. Disarm safe-resets fired channels." Remaining `inhibited` mentions (mos-a :120/:684, mos-b :120/:679) verified ACCURATE — they describe the optional shared-GPIO actuator path (parachute_gpio.h -1), not the channel fire path | diff reviewed line-by-line by owner |
+| P1.2 | ✅ claim "only the config *store* is tested" is TRUE — `test/test_parachute.c` (4 tests) covers defaults/sanitize/NVS round-trip only; the fire-verdict (enabled ∧ mask≠0 ∧ armed, LATCH vs PULSE, idempotent lockout) lives untested inside the MOS mains. `common/src/opendash_parachute.c` + `opendash_parachute_actuator.c` exist as the move targets. ⏳ table-test still to write | file reads |
+| P1.3 | ✏️ premise sharpened: the learn-the-center-MAC machinery exists (`mos-4ch-a/main/main.c:92-93` `s_center_mac`; learn block in `dispatch_message()` ≈`:211-263`), BUT it is **not a gate at all today**: ANY sender of a whitelisted control opcode is *latched as the center*, and every mismatch **re-latches** ("Center MAC re-synced", `:263`). RAM-only, no NVS. **D4 consequence (owner ruling, §7): the trust set is NOT center-only** — a DEPLOY legitimately originated by the GPS/IMU-bearing node must survive center absence, so the future policy gate pins a ROSTER (center + designated IMU/trigger nodes), per-class, NVS-persisted, button re-pair. Today an attacker frame *becomes* the pinned center — this is the from-scratch feature | dispatch_message read 2026-10-07 |
+| P1.4 | ✅ confirmed: `common/src/opendash_espnow.c:177` `bcast_peer.encrypt = false;` and `:256` `peer.encrypt = false;` — both peer paths unencrypted, exactly as the plan claims. D3 ratified (see §7): single fleet PMK/LMK, compile-time dev default, NVS override — deliberately NOT fancy | grep |
+| P1.5 | ✏️ **OWNER OVERRULED the plan's recommendation** — see §7 D4: arm is a persistent intent state; no auto-DISARM on center silence; disarm only when its own criteria are met. The plan's "(b) auto-DISARM 30 s" is DEAD; the doc paragraph must now explain why silence ≠ disarm, and P1.3's roster design carries the deploy-without-center capability | owner decision 2026-10-07 |
 | P1.6 | ⏳ deferred until P1.3/P1.4 land | — |
 
 ## 6. PHASES 2–6 line-by-line verdicts
@@ -136,37 +134,45 @@ then gets deleted or hard-guarded per the plan's "hard-fail guard" item.
 
 ---
 
-## 7. Owner decisions (D1–D7) — status snapshot
+## 7. Owner decisions (D1–D7) — RATIFIED 2026-10-07
 
-| # | Decision | Game-plan rec | Ledger status |
+| # | Decision | Game-plan rec | Owner ruling (governs now) |
 |---|---|---|---|
-| D1 | CI assets: converters-in-CI (A) vs LFS-commit (B) | A | **A confirmed as de-facto reality** (§3) — awaiting owner ratification to make it law |
-| D2 | History rewrite authorization | yes, after P0.1 | OPEN |
-| D3 | LMK strategy (one fleet dev key now) | yes | OPEN |
-| D4 | Auto-disarm on center silence | auto-DISARM 30 s | OPEN |
-| D5 | App-signing now, secure boot later | yes | OPEN |
-| D6 | BLE OTA: button-gate + risk register | yes | OPEN |
-| D7 | Guards: 5 MB file / 1,500 line | as proposed | OPEN |
+| D1 | CI assets: converters-in-CI (A) vs LFS-commit (B) | A | **A — ratified** ("seems that answers itself; what is best for this project"). Landed in `4a7a7c4`: converters are a real CI stage with real toolchain. |
+| D2 | History rewrite authorization | yes, once, after P0.1 | **UNDECIDED — no rewrite performed.** Note: the team is gone, so "everyone must re-clone" now means *one person, one machine* — the coordination cost the plan feared no longer exists. Not urgent: HEAD-side untracking already cut tracked content 213 MB → 10 MB; the rewrite would only shrink the 252 MB `.git` itself. Owner may still flip this OPEN item shut later. |
+| D3 | LMK strategy | one fleet dev key now | **Yes, deliberately simple.** The RF specialist bailed; owner wants "blanketed basic encryption, not fancy": ONE fleet-wide PMK/LMK, compile-time dev default, NVS override, no key-rotation ceremony beyond the documented re-flash. Do not gold-plate. |
+| D4 | Auto-disarm on center silence | auto-DISARM 30 s | **OVERRULED — arm is persistent intent.** Owner: if the system was armed, center silence (cockpit event, radio loss) is exactly when a deploy might still be needed; a deploy-capable trigger must therefore survive center absence (GPS/IMU from another module keeps the path alive). Disarm happens only when its own criteria are met — never merely for silence. Consequence for P1.3: trust = ROSTER (center + designated IMU/trigger nodes), not center-only; today NO node evaluates deploy criteria peer-to-peer when center is offline — that gap is now an explicit P1.x design item. |
+| D5 | OTA provenance: signing vs secure boot | app-signing now | **OPEN — owner asked "how complex? an md5 sum?"** Answer recorded: md5 is the WRONG tool — an unkeyed hash proves integrity, never *authenticity* (an attacker just recomputes it). The right primitive already ships in ESP-IDF: `CONFIG_APP_SIGNING` = keyed HMAC digest (espsecure/`esp_app_format`), same one-fleet-key philosophy as D3. Complexity is moderate: keyfile + one config block + the same re-flash ritual already scheduled in P1.4. Recommendation: that, nothing more; until adopted it goes in the accepted-risk register, not silence. |
+| D6 | BLE OTA access | button-gate + register | **Ratified: all OTA staged through the verified first-party app** — `/home/sysadmin/Documents/multidisplay-app/multidisplay-unified` (Qt6 desktop + Android; its `OpenDashBridge` is the one OpenDash client in existence). Physical button-gate stays as the on-vehicle gate. Third-party/foreign BLE clients are out of model by definition. |
+| D7 | Guards: 5 MB file / 1,500 line | as proposed | **Ratified with clarification:** these are *repo* guards, not firmware-size limits — the app being unfinished doesn't weaken them (that is exactly why they run pre-final); the 1,500-line rule GRANDFATHERS existing files behind a shrink-only allow-list, so nothing is blocked by today's sizes. 5 MB blocks the next 100 MB blob, which is the whole point. |
 
 ## 8. Change log (code/doc changes made while executing — append-only)
 
 | Date | Commit | Changed | Plan item |
 |---|---|---|---|
 | 2026-10-07 | `d7ecc0d` | ledger opened (this file + game-plan indexed into readme/PROJECT_INDEX); full plan audit run against HEAD `aab09fb` | all lines verified, see §1–§6 |
+| 2026-10-07 | `4db839a` | MOS-A/B stale fire-path comments reconciled to describe the real interlock (owner-review diff) | P1.1 |
+| 2026-10-07 | `4a7a7c4` | converters-in-CI workflow (runner toolchain + generate step + raw docker build), CMake hard-fail guards, OD_PREGENERATED_ASSETS deleted everywhere, CHANGELOG/TODO wording corrected | P0.1/D1 |
+| 2026-10-07 | `a5f889b` | untracked 26 PNGs + FCStd (HEAD side); ignores + allow-list + size guard + opcode self-verify + fleet-clean.sh landed | P0.4/P0.5/P0.6 |
+| 2026-10-07 | `f73a74c` | gps/time finally untracked (extensionless — needed its own ignore line after a `git add -A` re-picked it up) | P0.3-step-4 |
+| 2026-10-07 | — | fleet-clean --force executed locally; tracked content 213 MB → 10.0 MB; first-green-run link pending the post-push Actions run (then readme badge per P0.2) | P0.5, P0.2 |
 
-## 9. Next actions (from the plan's Week-1 quick-start, ledger-adjusted)
+## 9. Next actions (ledger-adjusted, post-Phase-0)
 
-1. `fix(mos): reconcile stale fire-path comments…` — P1.1 (exact line refs in §5)
-2. `ci: prove the build from a pristine clone` — P0.1 Option A **plus §3
-   Correction-2 constraint** (tools must exist inside the action's build
-   container; plain runner apt step insufficient) + CMake hard-fail guard
-3. `chore(repo): untrack generated PNG previews; add .FCStd/*.log ignores + size
-   guard` — P0.4 + P0.3-step-4 (−9 MB, per §2 correction)
-4. feat(scripts): add fleet-clean.sh — P0.5
-5. `test(parachute): fire-verdict truth table` — P1.2
-6. Coordinated history rewrite — P0.3 (after D2)
-7. P0.6: add opcode-count self-verify to `check_docs.sh`; bump PROJECT_INDEX
-   "Last updated" per convention
+1. Owner line-by-line review of `4db839a` (safety-critical comment diff — P1.1)
+2. Watch the post-push Actions run; capture the first-green-run link into §8,
+   then readme gets its CI badge (P0.2 closeout)
+3. `test(parachute)`: fire-verdict truth table moved into common/ — P1.2; the
+   verdict function must also carry the D4 rule (silence never disarms)
+4. P1.3 policy-gate design doc first: ROSTER per D4 (center + designated
+   IMU/trigger peers), NVS-persisted, boot-button re-pair, per-class opcode
+   gates, ctrl_rejected counter — then bench proof with the second ESP32
+5. P1.4 LMK rollout runbook (wiki/ota-bluetooth style) → two-board dry run →
+   full-fleet one-sitting re-flash; keeps the D3 simplicity bar
+6. D5: owner call on app-signing vs accepted-risk register (plain-language
+   answer already in §7)
+7. Then Phase 3 (fuzz + coverage gate) and Phase 4 (ui_manager split,
+   gauge-pair dedupe, 1,500-line grandfather list) per plan order
 
 ---
 
