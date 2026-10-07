@@ -248,7 +248,7 @@ already in production firmware:
 3. `display_pause_for_ota()` — calls `esp_lcd_panel_del(s_panel)` to tear down
    the bounce-buffer DMA entirely (blanking the backlight is not enough)
 4. BT stack pinned to CPU1 (`CONFIG_BT_CTRL_PINNED_TO_CORE_1=y`)
-5. 2M PHY + correct PPCP keys in `sdkconfig.defaults`
+5. 2M PHY + correct PPCP keys in `sdkconfig`
 
 You don't need to do anything special — this all happens automatically when
 the node receives `ENTER_BT_OTA`. Just trigger and flash.
@@ -276,7 +276,7 @@ size <1 MB, transfer <90 s. Trigger via CENTER console: `ota mos_4ch_a`,
 - Full GATT protocol + troubleshooting: [`../BLE_OTA.md`](../BLE_OTA.md)
 - Android OTA options: [`./ota-android-plan.md`](./ota-android-plan.md)
 - CHANGELOG entry for this work: [`../CHANGELOG.md`](../CHANGELOG.md) v0.4.0-beta + v0.4.1-beta
-- sdkconfig reference: `left/sdkconfig.defaults` or `right/sdkconfig.defaults`, BLE OTA section
+- sdkconfig reference: `left/sdkconfig` or `right/sdkconfig`, BLE OTA section
 
 ---
 
@@ -436,6 +436,6 @@ laptop$  python3 ble_ota.py --node right --chunk-size 512 right/build/opendash_l
 
 - Source: [`common/src/opendash_bt_ota.c`](../common/src/opendash_bt_ota.c)
 - Client: [`ble_ota.py`](../ble_ota.py)
-- Sdkconfig keys: see `right/sdkconfig.defaults` BLE OTA section
+- Sdkconfig keys: see `right/sdkconfig` BLE OTA section
 - Root-cause writeup: [`BLE_OTA.md`](../BLE_OTA.md)
 - Changelog entry: [`CHANGELOG.md`](../CHANGELOG.md) v0.4.0-beta

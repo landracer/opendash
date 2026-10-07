@@ -114,13 +114,13 @@ idf.py build
 
 1. **"Font undeclared" errors**: Ensure that the `opendash_font_config.h` file includes declarations for all font sizes you're using.
 
-2. **Build failures with large fonts**: Make sure `CONFIG_LV_FONT_FMT_TXT_LARGE=y` is set in your `sdkconfig.defaults` file.
+2. **Build failures with large fonts**: Make sure `CONFIG_LV_FONT_FMT_TXT_LARGE=y` is set in your `sdkconfig` file.
 
 3. **Font files not generated**: Verify that the font source files exist in the `ttf/` directory and that Node.js and lv_font_conv are properly installed.
 
 ### Required Configuration Settings
 
-Ensure these settings are in your `sdkconfig.defaults` files:
+Ensure these settings are in your `sdkconfig` files:
 ```
 CONFIG_LV_FONT_FMT_TXT_LARGE=y
 ```

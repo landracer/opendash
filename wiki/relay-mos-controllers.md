@@ -148,11 +148,11 @@ python3 -m esptool --chip esp32 --port /dev/ttyUSB0 --baud 460800 \
 ### Brownout Protection
 
 All FTDI-powered boards have `CONFIG_ESP_BROWNOUT_DET=n` in their
-`sdkconfig.defaults`. The FTDI USB 5V rail cannot supply enough current
+`sdkconfig`. The FTDI USB 5V rail cannot supply enough current
 for ESP32 + relay/MOS driver board, causing brownout reboot loops without
 this setting.
 
-After modifying sdkconfig.defaults, you must regenerate:
+After modifying sdkconfig, you must regenerate:
 ```bash
 rm sdkconfig && idf.py fullclean && idf.py build
 ```

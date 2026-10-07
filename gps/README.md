@@ -83,7 +83,7 @@ idf.py -p /dev/ttyACM0 flash monitor
 ```
 gps/
 ├── CMakeLists.txt                # Main project CMake file
-├── sdkconfig.defaults            # ESP-IDF configuration defaults
+├── sdkconfig            # ESP-IDF configuration defaults
 ├── INTENSIVE_TODO.md             # Build TODO (partially archived)
 ├── README.md                     # This file
 └── main/

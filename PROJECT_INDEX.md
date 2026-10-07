@@ -125,7 +125,7 @@ opendash/
 │   │   ├── display_init.c/h    ST7262 RGB panel, touch, LVGL init
 │   │   └── ui_manager.c/h      Multi-screen UI (ENGINE, GPS, custom modes)
 │   ├── partitions.csv          Flash partition table
-│   ├── sdkconfig.defaults      Build config
+│   ├── sdkconfig      Build config
 │   └── README.md               Center-specific documentation
 │
 ├── left/                       ── Left Gauge Pod ────────────────────────
@@ -135,7 +135,7 @@ opendash/
 │   │   └── ui_manager.c/h      Round gauge UI (arc, primary, secondary, odo)
 │   ├── partitions.csv          Custom partition table (2MB app partitions)
 │   ├── display.ini             Legacy pin reference
-│   ├── sdkconfig.defaults      Build config
+│   ├── sdkconfig      Build config
 │   └── README.md               Left pod documentation
 │
 ├── right/                      ── Right Gauge Pod ───────────────────────
@@ -149,7 +149,7 @@ opendash/
 │   │   ├── imu_handler.c/h     QMI8658 IMU driver
 │   │   └── assets/             Converted images (C arrays)
 │   ├── CMakeLists.txt
-│   ├── sdkconfig.defaults
+│   ├── sdkconfig
 │   └── README.md               Pod 1 documentation
 │
 ├── pod2/                       ── Pod 2 Display Unit ───────────────────
@@ -160,7 +160,7 @@ opendash/
 │   │   ├── imu_handler.c/h     QMI8658 IMU driver
 │   │   └── assets/             Converted images (C arrays)
 │   ├── CMakeLists.txt
-│   ├── sdkconfig.defaults
+│   ├── sdkconfig
 │   └── README.md               Pod 2 documentation
 │
 ├── gps/                        ── GPS / Telemetry Unit ──────────────────
@@ -171,7 +171,7 @@ opendash/
 │   │   ├── gps_handler.c/h     LC76G GPS I2C driver (v15L2 PRODUCTION)
 │   │   ├── imu_handler.c/h     QMI8658 accelerometer + gyro
 │   │   └── parachute.c/h       Gyro-triggered parachute deployment
-│   ├── sdkconfig.defaults
+│   ├── sdkconfig
 │   ├── INTENSIVE_TODO.md       Detailed phased build TODO (partially archived)
 │   └── README.md               GPS unit documentation (I2C, NOT UART)
 │

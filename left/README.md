@@ -136,7 +136,7 @@ This project uses the **new ESP-IDF I2C driver APIs** exclusively:
 left/
 ├── CMakeLists.txt              # Project-level CMake (includes ../common)
 ├── partitions.csv              # Custom partition table (2 MB app partitions)
-├── sdkconfig.defaults          # ESP32-S3 + PSRAM + LVGL config
+├── sdkconfig          # ESP32-S3 + PSRAM + LVGL config
 ├── display.ini                 # Legacy pin mapping reference
 ├── README.md                   # This file
 └── main/

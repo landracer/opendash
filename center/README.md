@@ -53,7 +53,7 @@ idf.py -p /dev/ttyUSB0 flash monitor
 ```
 center/
 ├── CMakeLists.txt                # Main project CMake file
-├── sdkconfig.defaults            # ESP-IDF configuration defaults
+├── sdkconfig            # ESP-IDF configuration defaults
 ├── README.md                     # This file
 └── main/
     ├── CMakeLists.txt            # Main component CMake file

@@ -84,7 +84,7 @@
 - [x] Field-run: captured during visible tearing — core0 idle min 90.3% /
       core1 min 46.2% across 268 samples ⇒ **not CPU-bound**; see TEARING.md §5.
       Residual flicker root-caused to non-boundary-gated FB swap (Fix C applied).
-- [ ] Roll the same two Kconfig knobs into the other nodes' sdkconfig.defaults
+- [ ] Roll the same two Kconfig knobs into the other nodes. sdkconfig
       when their telemetry is needed
 
 ### 1.4 BLE OTA Fragility on GPS / POD1 / POD2
@@ -333,7 +333,7 @@
 > the OpenDash network and forwards parsed data over USB CDC-ACM to the host PC
 > running the multidisplay-app Qt application.
 
-- [x] Project scaffold: `CMakeLists.txt`, `main/CMakeLists.txt`, `sdkconfig.defaults`
+- [x] Project scaffold: `CMakeLists.txt`, `main/CMakeLists.txt`, `sdkconfig`
 - [x] ESP-IDF v6.1 target: ESP32 (original WROOM-32)
 - [x] USB CDC-ACM bridge: UART1 @ 115200 baud, DP:hex_id:value\n text protocol
 - [x] ESP-NOW slave: receives DATA_BATCH (0x88) and SET_DATA_POINT frames

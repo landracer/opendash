@@ -41,7 +41,7 @@ pod3/main/display_init.c/h (copy unchanged — same CO5300/CST9217 board)
 pod3/main/ui_manager.c/h   (copy unchanged — same 6 screens)
 pod3/main/imu_handler.c/h  (copy unchanged)
 pod3/main/idf_component.yml, dependencies.lock, partitions.csv,
-pod3/sdkconfig, pod3/sdkconfig.defaults   (copy unchanged)
+pod3/sdkconfig, pod3/sdkconfig   (copy unchanged)
 ```
 
 Note: pod1 has **no** `splash_podN.h` — it compiles via the `__has_include`

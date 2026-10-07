@@ -71,7 +71,7 @@ opendash/
 │   │   ├── ui_manager.c/h       — LVGL screen/widget management
 │   │   └── assets/              — Converted images (C arrays)
 │   ├── CMakeLists.txt
-│   ├── sdkconfig.defaults
+│   ├── sdkconfig
 │   └── README.md
 │
 ├── left/                        ← Left gauge pod (ESP32-S3-LCD-2.8C)
@@ -81,14 +81,14 @@ opendash/
 │   │   └── ui_manager.c/h       — Round gauge UI
 │   ├── display.ini              — Hardware pin reference
 │   ├── CMakeLists.txt
-│   ├── sdkconfig.defaults
+│   ├── sdkconfig
 │   └── README.md
 │
 ├── right/                       ← Right gauge pod (same hardware)
 │   ├── main/                    — Mirrors left's gauge pages (node 0x11); no UART — all data via Center's ESP-NOW relay
 │   ├── display.ini
 │   ├── CMakeLists.txt
-│   ├── sdkconfig.defaults
+│   ├── sdkconfig
 │   └── README.md
 │
 ├── pod1/                        ← Pod 1 display unit (ESP32-S3-Touch-AMOLED-1.75)
@@ -99,7 +99,7 @@ opendash/
 │   │   ├── imu_handler.c/h      — QMI8658 IMU driver
 │   │   └── assets/              — Converted images (C arrays)
 │   ├── CMakeLists.txt
-│   ├── sdkconfig.defaults
+│   ├── sdkconfig
 │   └── README.md
 │
 ├── pod2/                        ← Pod 2 display unit (ESP32-S3-Touch-AMOLED-1.75)
@@ -110,7 +110,7 @@ opendash/
 │   │   ├── imu_handler.c/h      — QMI8658 IMU driver
 │   │   └── assets/              — Converted images (C arrays)
 │   ├── CMakeLists.txt
-│   ├── sdkconfig.defaults
+│   ├── sdkconfig
 │   └── README.md
 │
 ├── gps/                         ← ESP32-S3-Touch-AMOLED-1.75 project
@@ -123,7 +123,7 @@ opendash/
     │   ├── parachute.c/h        — Gyro-triggered parachute deployment
     │   └── assets/
     ├── CMakeLists.txt
-    ├── sdkconfig.defaults
+    ├── sdkconfig
     └── README.md
 
 ├── rAtTrax_BMS_Logger/          ← External ESP-NOW node (separate repo)
