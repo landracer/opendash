@@ -56,4 +56,11 @@ mos-4ch-a-pre-restore-*/
 docs/pdf/
 *.pdf
 
+# Repo hygiene guard rails (A+ program P0.4): CAD binaries and raw log dumps
+# never enter git — size enforcement lives in scripts/check_docs.sh check 4.
+# (tearing-logs/ above stays dir-specific; these patterns are global.)
+*.FCStd
+*.f3d
+*.log
+
 test/build/

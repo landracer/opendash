@@ -1,0 +1,8 @@
+# Licensed under Sovereign Individual License v1.0 — see LICENSE file
+# Repo size guard allow-list — enforced by scripts/check_docs.sh (check 4).
+# Format: <tracked-path><whitespace><one-line WHY> — the WHY is mandatory,
+# same culture as every .gitignore comment in this repo. Empty by design:
+# adding an entry is an owner-level decision (A+ program decision D7).
+#
+# Example (do not delete this example, it is the format documentation):
+#   some/dir/asset.bin  WHY: needed at runtime by <node>; no external home.

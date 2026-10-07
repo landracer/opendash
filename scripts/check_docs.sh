@@ -13,6 +13,11 @@
 #      DISPLAY_SYNCHRONIZATION.md). pod1/pod2 MUST be identical; left/right
 #      are documented-identical page-set exceptions, so their hash is only
 #      printed. Any NEW unique hash (node not in the expected table) fails.
+#   4. Repo size guard (A+ P0.4): tracked file > 5 MB unless allow-listed in
+#      .repo-size-allowlist (every entry needs a one-line WHY); tracked
+#      *.FCStd/*.f3d/*.log or gps/time-style log blobs fail outright.
+#   5. Opcode count self-verify (A+ P0.6): the OPENDASH_CMD_* #define count in
+#      opendash_protocol.h must match the count TODO.md claims.
 #
 # WHY these checks exist (plain language, for new contributors):
 #   - The docs are the contract. A markdown link that goes nowhere or a doc
@@ -98,6 +103,44 @@ p1 = open('pod1/main/display_init.c', 'rb').read()
 p2 = open('pod2/main/display_init.c', 'rb').read()
 if p1 != p2:
     fail.append('DRIFT         pod1/main/display_init.c != pod2/main/display_init.c (must stay identical)')
+
+# ── 4. repo size guard (A+ P0.4) ───────────────────────────────────────────
+# WHY: what a repo forces on every clone is a guarantee, not a preference.
+# Any tracked file > 5 MB needs an allow-list entry WITH a one-line WHY
+# (same culture as .gitignore comments); CAD binaries and raw log dumps
+# never belong in git at all — external drive / Release asset instead.
+MAX_BYTES = 5 * 1024 * 1024
+allow = set()
+if os.path.exists('.repo-size-allowlist'):
+    for line in open('.repo-size-allowlist', encoding='utf-8'):
+        line = line.strip()
+        if not line or line.startswith('#'):
+            continue
+        allow.add(os.path.normpath(line.split(maxsplit=1)[0]))
+tracked_all = [p.decode() for p in
+               subprocess.run(['git', 'ls-files', '-z'], capture_output=True, check=True).stdout.split(b'\x00')
+               if p]
+for f in tracked_all:
+    if f in allow:
+        continue
+    try:
+        if os.path.isfile(f) and os.path.getsize(f) > MAX_BYTES:
+            fail.append(f'SIZE          {f} is {os.path.getsize(f) // (1024*1024)} MB (> 5 MB; needs an allow-list entry with WHY, or untrack it)')
+    except OSError:
+        pass
+for f in tracked_all:
+    if f.endswith(('.FCStd', '.f3d')) or f.endswith('.log') or f == 'gps/time':
+        fail.append(f'BINARY LOG    {f} — CAD binaries/log dumps do not belong in git (external drive or GitHub Release asset)')
+
+# ── 5. opcode count self-verify (A+ P0.6) ───────────────────────────────────
+# WHY: doc counts must be DERIVED from the code, never hand-counted. If the
+# protocol header's opcode count no longer matches what TODO.md claims,
+# the docs drift is caught here, on every push, forever.
+proto = open('common/include/opendash_protocol.h', encoding='utf-8', errors='ignore').read()
+n_opcode = len(re.findall(r'#\s*define\s+OPENDASH_CMD_', proto))
+todo_txt = open('TODO.md', encoding='utf-8', errors='ignore').read()
+if f'{n_opcode} opcodes' not in todo_txt:
+    fail.append(f'OPCODE COUNT  opendash_protocol.h defines {n_opcode} OPENDASH_CMD_* opcodes but TODO.md does not say "{n_opcode} opcodes" — fix the doc, not this check')
 
 if fail:
     print()

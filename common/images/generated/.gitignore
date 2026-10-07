@@ -2,6 +2,7 @@
 *.c
 *.h
 *.bin
+*.png
 
 # Keep this directory but not the generated content
 !.gitignore
