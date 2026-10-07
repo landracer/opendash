@@ -59,8 +59,11 @@ docs/pdf/
 # Repo hygiene guard rails (A+ program P0.4): CAD binaries and raw log dumps
 # never enter git — size enforcement lives in scripts/check_docs.sh check 4.
 # (tearing-logs/ above stays dir-specific; these patterns are global.)
+# gps/time is the 98 MB UART log untracked in P0.3-step-4 — it has no file
+# extension, so it needs its own line; content lives in the GPS postmortem docs.
 *.FCStd
 *.f3d
 *.log
+gps/time
 
 test/build/
