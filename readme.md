@@ -248,7 +248,7 @@ idf.py -p /dev/ttyUSB0 flash monitor
 | [**PROJECT INDEX**](PROJECT_INDEX.md) | **★ Central glossary & index — maps the entire project** |
 | [**Quick Start Guide**](QUICKSTART.md) | **5-minute setup guide — start here!** |
 | [**Build Dependencies**](BUILD_DEPENDENCIES.md) | **Complete dependency installation guide** |
-| [**Compile Errors Resolution**](docs/archived/COMPILE_ERRORS_RESOLUTION.md) | **Troubleshooting compilation issues** |
+| [**Compile Errors Resolution**](docs/history/COMPILE_ERRORS_RESOLUTION.md) | **Troubleshooting compilation issues** |
 | [`docs/vscode-setup.md`](docs/vscode-setup.md) | Visual Studio Code configuration guide |
 | [`docs/setup-guide.md`](docs/setup-guide.md) | Detailed development environment setup |
 | [`docs/architecture.md`](docs/architecture.md) | System architecture, data flow, and node roles |

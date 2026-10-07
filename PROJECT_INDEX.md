@@ -276,12 +276,12 @@ Every documentation file in the project, grouped by purpose.
 
 | Document | What You'll Learn |
 |---|---|
-| [**docs/archived/COMPILE_ERRORS_RESOLUTION.md**](docs/archived/COMPILE_ERRORS_RESOLUTION.md) | Common compile error fixes |
-| [**docs/archived/FONT_ISSUE_INVESTIGATION.md**](docs/archived/FONT_ISSUE_INVESTIGATION.md) | Font include path debugging |
-| [**docs/archived/RESOLUTION_SUMMARY.md**](docs/archived/RESOLUTION_SUMMARY.md) | Auto-gen font/lib compile-error resolutions |
+| [**docs/history/COMPILE_ERRORS_RESOLUTION.md**](docs/history/COMPILE_ERRORS_RESOLUTION.md) | Common compile error fixes |
+| [**docs/history/FONT_ISSUE_INVESTIGATION.md**](docs/history/FONT_ISSUE_INVESTIGATION.md) | Font include path debugging |
+| [**docs/history/RESOLUTION_SUMMARY.md**](docs/history/RESOLUTION_SUMMARY.md) | Auto-gen font/lib compile-error resolutions |
 | [**SCREEN_ENHANCEMENTS.md**](SCREEN_ENHANCEMENTS.md) | Center display multi-screen + warning boxes |
-| [**docs/archived/IMPLEMENTATION_COMPLETE.md**](docs/archived/IMPLEMENTATION_COMPLETE.md) | Status: center alignment + auto font conversion |
-| [**docs/archived/IMPLEMENTATION_SUMMARY.md**](docs/archived/IMPLEMENTATION_SUMMARY.md) | All implementation work summary |
+| [**docs/history/IMPLEMENTATION_COMPLETE.md**](docs/history/IMPLEMENTATION_COMPLETE.md) | Status: center alignment + auto font conversion |
+| [**docs/history/IMPLEMENTATION_SUMMARY.md**](docs/history/IMPLEMENTATION_SUMMARY.md) | All implementation work summary |
 | [**CHANGELOG.md**](CHANGELOG.md) | Version history |
 | [**docs/history/**](docs/history/) | Superseded diagnosis/assessment docs (retained as history, not canon) |
 | [**test/**](test/README.md) | Host unit-test harness (Unity/ctest) for codec, data model, health, parachute |
