@@ -168,12 +168,16 @@
 >
 > Round 2 (same day, after the node_health honesty fix): controllers are
 > being re-flashed one at a time so they carry the honest-silence firmware.
-> mos-4ch-b AND mos-4ch-a re-flashed + heartbeat-verified (both searching).
-> MOS-A refused the first two attempts (total silence, rig proven good by
-> MOS-B flashing fine between them) but succeeded on attempt 3 — the
-> deafness was TRANSIENT (connector seating / strap ritual), not board
-> death. Remaining round 2: relay-8ch-a, relay-8ch-b, relay-4ch-hd, then
-> the six displays (they still run round-1 pre-honesty firmware).
+> mos-4ch-b, mos-4ch-a and relay-8ch-a re-flashed + heartbeat-verified —
+> interesting: both boards flashed while center was running report
+> `Center: ONLINE` (relay-8ch-a, relay-8ch-b round1, and now relay-8ch-a
+> too), which corroborates the honesty theory for why round-1 boards read
+> 'active' while powered off. MOS-A refused the first two attempts (total
+> silence, rig proven good by MOS-B flashing fine between them) but
+> succeeded on attempt 3 — the deafness was TRANSIENT (connector seating /
+> strap ritual), not board death. Remaining round 2: relay-8ch-b,
+> relay-4ch-hd, then the six displays (they still run round-1 pre-honesty
+> firmware).
 
 - [x] `.github/workflows/build.yml`: `idf.py build` matrix over ALL 12 node
       projects (esp32s3 displays + esp32 controllers), firmware artifacts
