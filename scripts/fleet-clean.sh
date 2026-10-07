@@ -40,9 +40,13 @@ for f in */sdkconfig.old; do
 done
 
 # 3) Stray binaries/elfs outside build dirs (tracked ones are NOT touched —
-#    git ls-files check keeps this honest)
-for f in $(git ls-files --others --ignored --exclude-standard | grep -E '\.(bin|elf)$' || true); do
-    case "$f" in */build/*) continue;; esac
+#    git ls-files check keeps this honest). Exclusions: regenerable dependency
+#    trees (managed_components/, node_modules/) are OFF-LIMITS — even though
+#    ignored, they are not ours to prune. (Found live 2026-10-07: the first
+#    --force run pruned some lvgl test .bin files inside managed_components;
+#    regenerable, so no harm — and now prevented.)
+for f in $(git ls-files --others --ignored --exclude-standard | grep -E '\.(bin|elf)$' | grep -vE 'managed_components/|node_modules/' || true); do
+    case "$f" in */build/*|build/*) continue;; esac
     if [ $FORCE -eq 1 ]; then rm -f "$f"; echo "  deleted  $f (ignored stray binary)";
     else echo "  would delete $f (ignored stray binary)"; fi
 done
