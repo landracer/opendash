@@ -372,7 +372,10 @@ static void dispatch_message(const opendash_espnow_event_t *evt,
         /* ────────────────────────────────────────────────────────────────
          * Parachute / Deployment System — center→MOS (0x27..0x29)
          * Config is NVS-persisted here; ARM is transient (reboot = DISARMED).
-         * Firing (channel energize) is NOT wired yet — actuator stays inhibited.
+         * Firing IS wired: parachute_fire() energizes the selected channels ONLY
+         * when enabled ∧ channel_mask≠0 ∧ armed (idempotent — latches once and
+         * never re-fires); LATCH holds until disarm/reboot, PULSE auto-off after
+         * pulse_ms. Disarm safe-resets fired channels (parachute_disarm_reset).
          * ──────────────────────────────────────────────────────────────── */
         case OPENDASH_CMD_PARACHUTE_SET_CONFIG: {
             if (msg->length < sizeof(opendash_parachute_config_t)) break;
