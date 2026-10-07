@@ -166,17 +166,17 @@
 > `Center: searching`; relay-8ch-b reports `Center: ONLINE` (its ESP-NOW
 > reach to center verified on this bench). Fleet bring-up COMPLETE.
 >
-> Round 2 (same day, after the node_health honesty fix): ALL FIVE CONTROLLERS
-> re-flashed + heartbeat-verified on the honest-silence firmware: mos-4ch-a,
-> mos-4ch-b (both `Center: searching`), relay-8ch-a, relay-8ch-b,
-> relay-4ch-hd (all three `Center: ONLINE`). MOS-A refused the first two
-> attempts (total silence, rig proven good by MOS-B flashing fine between
-> them) but succeeded on attempt 3 — the deafness was TRANSIENT (connector
-> seating / strap ritual), not board death. Note: relay boards reach center,
-> MOS boards don't (on this bench layout) — worth a config comparison
-> someday. Remaining round 2: the six displays (they still run round-1
-> pre-honesty firmware; own ACM ports, no swaps needed — center is the one
-> that hosts node_health.c, so it matters most).
+> Round 2 (same day, after the node_health honesty fix): FLEET CURRENT ON
+> THE HONEST-SILENCE FIRMWARE — all 5 controllers (mos-4ch-a/b, relay-8ch-a,
+> relay-8ch-b, relay-4ch-hd, one at a time on the shared FTDI) and all 6
+> displays (batch-flashed on their own ACM ports, no swaps) rebuilt,
+> hash-verified, and re-probed announcing their own tags.
+> Bench state: MOS-A/B report `Center: searching`, all three relays report
+> `Center: ONLINE` — relay boards reach center on this bench layout, MOS
+> boards don't; worth a config comparison someday. MOS-A refused the first
+> two flash attempts (total silence, rig proven good by MOS-B flashing fine
+> between them) but succeeded on attempt 3 — TRANSIENT (connector seating /
+> strap ritual), not board death. FLEET BRING-UP ROUNDS 1+2 COMPLETE.
 
 - [x] `.github/workflows/build.yml`: `idf.py build` matrix over ALL 12 node
       projects (esp32s3 displays + esp32 controllers), firmware artifacts
