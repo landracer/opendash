@@ -25,24 +25,26 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Step 0: Pre-generated asset gate
+# Step 0: Asset-generation truth (A+ program P0.1 / owner decision D1, 2026-10-07)
 #
 # The generated LVGL C sources under fonts/generated/ and images/generated/
-# are COMMITTED to the repo. CI sets OD_PREGENERATED_ASSETS=1 to skip the
-# converters entirely — the runner then needs neither Node nor Pillow nor
-# ImageMagick and builds straight from the committed generated sources.
-# Local builds leave it unset and regenerate on every configure (source of
-# truth for local work remains the .ttf/.png originals).
+# are NOT COMMITTED — the nested "do not commit" .gitignore files are
+# deliberate. The single source of truth is common/fonts/ttf/*.ttf +
+# common/images/source/*.png. Generation runs at every CMake configure on
+# local builds (Steps 1/1b below) and, in CI, in the workflow's runner-side
+# "Generate assets" step whose output the IDF build container mounts.
+# (The previous version of this comment claimed the generated sources were
+# COMMITTED and gated by an OD_PREGENERATED_ASSETS env skip — FALSE: that env
+# never reached the CI build container, so converters ran unguarded everywhere
+# and every display-node CI build failed. docs/gameplan-aduit.md §3.)
+# Step 2 now hard-fails configure when either generated source set is empty,
+# so a broken generation step can never again produce a silently broken tree.
 # ─────────────────────────────────────────────────────────────────────────────
-if(DEFINED ENV{OD_PREGENERATED_ASSETS})
-    set(OD_PREGENERATED_ASSETS ON)
-    message(STATUS "OD_PREGENERATED_ASSETS set — using committed generated fonts/images (converters skipped)")
-endif()
 
 # Check if Python3 is available
 find_package(Python3 COMPONENTS Interpreter)
 
-if(Python3_FOUND AND NOT OD_PREGENERATED_ASSETS)
+if(Python3_FOUND)
     # Run font converter script before build
     execute_process(
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_LIST_DIR}/fonts/convert_fonts.py
@@ -76,7 +78,7 @@ endif()
 # Images are automatically scaled to fit display resolution.
 # ─────────────────────────────────────────────────────────────────────────────
 
-if(Python3_FOUND AND NOT OD_PREGENERATED_ASSETS)
+if(Python3_FOUND)
     # Run image converter script before build
     execute_process(
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_LIST_DIR}/images/convert_images.py
@@ -111,6 +113,21 @@ endif()
 
 file(GLOB FONT_SOURCES "${CMAKE_CURRENT_LIST_DIR}/fonts/generated/*.c")
 file(GLOB IMAGE_SOURCES "${CMAKE_CURRENT_LIST_DIR}/images/generated/*.c")
+
+# Hard-fail guard (A+ program P0.1): if the converters produced no sources,
+# fail HERE with WHY — never silently link against missing fonts/images.
+if(NOT FONT_SOURCES)
+    message(FATAL_ERROR
+        "common/fonts/generated/*.c is empty — the font converter did not run or "
+        "failed (needs Node + lv_font_conv; see BUILD_DEPENDENCIES.md). "
+        "Refusing to configure with empty FONT_SOURCES.")
+endif()
+if(NOT IMAGE_SOURCES)
+    message(FATAL_ERROR
+        "common/images/generated/*.c is empty — the image converter did not run or "
+        "failed (needs ImageMagick + Pillow; see BUILD_DEPENDENCIES.md). "
+        "Refusing to configure with empty IMAGE_SOURCES.")
+endif()
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Step 3: Register component with all sources

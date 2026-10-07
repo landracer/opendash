@@ -15,11 +15,15 @@
 #    (v6.1-dev-2441-gffb63db38b, see BUILD_DEPENDENCIES.md); CI uses the
 #    v6.1 release line. If a build only fails in CI, suspect a
 #    dev-vs-release IDF delta, not your code.
-#  - The font/image converters (Node + Python, see BUILD_DEPENDENCIES.md)
-#    are SKIPPED in CI via OD_PREGENERATED_ASSETS=1: the generated LVGL C
-#    sources under common/fonts/generated and common/images/generated are
-#    committed, so CI builds straight from them and the runner needs
-#    neither Node nor Pillow nor ImageMagick.
+#  - The generated LVGL C sources are NOT committed (nested "do not commit"
+#    .gitignore files — deliberate, single source of truth is the .ttf/.png
+#    originals). The "Generate assets" step below installs the real converter
+#    toolchain on the runner and runs both converters BEFORE the IDF build
+#    container starts; the container mounts the generated sources. (The old
+#    mechanism — an OD_PREGENERATED_ASSETS job env meant to skip converters
+#    because "assets are committed" — was doubly false: nothing was committed,
+#    and the env never reached the build container anyway. Owner decision D1:
+#    converters-in-CI is the ratified mode. docs/gameplan-aduit.md §3.)
 #  - `dependencies.lock` is committed for every project, so component
 #    versions resolve identically on every runner.
 name: build-smoke
@@ -55,18 +59,31 @@ jobs:
           - { node: relay-4ch-hd, target: esp32   }
           - { node: relay-8ch-a,  target: esp32   }
           - { node: relay-8ch-b,  target: esp32   }
-    env:
-      OD_PREGENERATED_ASSETS: "1"   # see note above — skip converters in CI
     name: build ${{ matrix.node }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up ESP-IDF and build ${{ matrix.node }}
-        uses: espressif/esp-idf-ci-action@v1
-        with:
-          esp_idf_version: v6.1
-          target: ${{ matrix.target }}
-          path: ${{ matrix.node }}
+      # D1 ratified 2026-10-07: converters are part of CI (Option A). Install
+      # the real toolchain on the runner, then generate the LVGL C sources from
+      # the ttf/png sources before the IDF build container ever runs.
+      - name: Install asset-converter toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends imagemagick nodejs npm python3-pil
+
+      - name: Generate LVGL font/image C sources (source of truth: ttf/png)
+        run: |
+          (cd common/fonts && npm install --no-audit --no-fund)
+          python3 common/fonts/convert_fonts.py
+          python3 common/images/convert_images.py
+
+      - name: Build ${{ matrix.node }} (ESP-IDF v6.1)
+        run: |
+          docker run -t -e IDF_TARGET="${{ matrix.target }}" \
+            -v "$GITHUB_WORKSPACE:/app/$GITHUB_REPOSITORY" \
+            -w "/app/$GITHUB_REPOSITORY/${{ matrix.node }}" \
+            espressif/idf:v6.1 \
+            /bin/bash -c 'git config --global --add safe.directory "*" && idf.py build'
 
       - name: Upload firmware artifacts (${{ matrix.node }})
         uses: actions/upload-artifact@v4

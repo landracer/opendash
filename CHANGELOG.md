@@ -26,8 +26,12 @@
   across all 12 node projects (esp32s3 displays + esp32 controllers), firmware
   artifacts uploaded per node; `docs-lint` job (`scripts/check_docs.sh`: broken
   links, license-header coverage, pod display_init drift invariant); `unit-tests`
-  job. `OD_PREGENERATED_ASSETS=1` lets CI build from committed generated
-  fonts/images (no Node/Pillow/ImageMagick on runners).
+  job. Assets (2026-10-07 correction): CI installs the converter toolchain on
+  the runner and generates the LVGL font/image C sources from the `.ttf`/`.png`
+  sources before the IDF build — generated sources are deliberately NOT
+  committed. The earlier mechanism claimed here ("committed generated
+  fonts/images" via `OD_PREGENERATED_ASSETS=1`) was false — see
+  [docs/gameplan-aduit.md](docs/gameplan-aduit.md) §3.
 - **`dependencies.lock` committed fleet-wide** and un-ignored — component versions
   now resolve identically on every runner and every dev box.
 - `docs/history/` for superseded diagnosis docs; canon/history boundary is now

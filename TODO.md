@@ -181,8 +181,14 @@
 - [x] `.github/workflows/build.yml`: `idf.py build` matrix over ALL 12 node
       projects (esp32s3 displays + esp32 controllers), firmware artifacts
       uploaded per node
-- [x] `OD_PREGENERATED_ASSETS=1` in CI: committed generated fonts/images are
-      used as-is, runner needs no Node/Pillow/ImageMagick
+- [x] CI asset generation, honestly (2026-10-07 rework): the workflow installs
+      the converter toolchain (Node + lv_font_conv, Pillow, ImageMagick) on the
+      runner and runs `convert_fonts.py` + `convert_images.py` before the IDF
+      container build; generated C sources stay uncommitted. The earlier claim
+      here ("`OD_PREGENERATED_ASSETS=1` … committed generated fonts/images")
+      was FALSE — that env never reached the CI build container, and the
+      converters had been running unguarded all along
+      (see [docs/gameplan-aduit.md](docs/gameplan-aduit.md) §3)
 - [x] `dependencies.lock` committed for every project (reproducible component
       versions across runners)
 - [x] `docs-lint` CI job = `scripts/check_docs.sh` (broken-link check,
