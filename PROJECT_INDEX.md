@@ -4,7 +4,8 @@
 > **Central reference for the entire OpenDash codebase.**
 > Start here to understand the project, then follow links to detailed documents.
 >
-> **Last updated:** 2026-10-02 (v0.1.0 baseline pass). Convention: bump this line
+> **Last updated:** 2026-10-07 (A+ program ledger opened — game-plan + audit
+> ledger indexed below). Convention: bump this line
 > on every documentation pass on a *core reference* doc (this index, the readme,
 > CHANGELOG, QUICKSTART, and the top-level design docs). Not every wiki/ doc carries
 > one yet — rollout is in progress; do not assume absence means the doc is stale.
@@ -202,6 +203,8 @@ Every documentation file in the project, grouped by purpose.
 | [**docs/vscode-setup.md**](docs/vscode-setup.md) | VS Code workspace, build, flash, monitor config |
 | [**agent/opendash.agent.md**](agent/opendash.agent.md) | **AI-agent / contributor playbook** (canonical) — critical rules, architecture primer, task workflow |
 | [**agent/opendash.instructions.md**](agent/opendash.instructions.md) | Editor auto-load instructions — defers to the canonical playbook above |
+| [**docs/A_PLUS_GAMEPLAN.md**](docs/A_PLUS_GAMEPLAN.md) | Roadmap-to-A+ program master game-plan (Phases P0–P6, decisions D1–D7, risk register) |
+| [**docs/gameplan-aduit.md**](docs/gameplan-aduit.md) | Live audit ledger for the game-plan — per-claim verdicts, corrected numbers, append-only change log |
 
 ### Architecture & Design
 

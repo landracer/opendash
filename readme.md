@@ -32,6 +32,10 @@
 >
 > **Detailed project roadmap:** [`TODO.md`](./TODO.md) | **Central reference:** [`PROJECT_INDEX.md`](./PROJECT_INDEX.md)
 >
+> **A+ improvement program:** master game-plan [`docs/A_PLUS_GAMEPLAN.md`](./docs/A_PLUS_GAMEPLAN.md),
+> live line-by-line audit ledger [`docs/gameplan-aduit.md`](./docs/gameplan-aduit.md) (append-only — every
+> program change is logged there with its evidence)
+>
 > **Additional documentation:** The project includes extensive documentation in the [`wiki/`](./wiki/) directory with integration guides and technical details.
 
 ---
