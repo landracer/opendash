@@ -152,7 +152,7 @@ then gets deleted or hard-guarded per the plan's "hard-fail guard" item.
 
 | Date | Commit | Changed | Plan item |
 |---|---|---|---|
-| 2026-10-07 | — | ledger opened; full plan audit run against HEAD `aab09fb` | — |
+| 2026-10-07 | `d7ecc0d` | ledger opened (this file + game-plan indexed into readme/PROJECT_INDEX); full plan audit run against HEAD `aab09fb` | all lines verified, see §1–§6 |
 
 ## 9. Next actions (from the plan's Week-1 quick-start, ledger-adjusted)
 
