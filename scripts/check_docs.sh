@@ -18,6 +18,8 @@
 #      *.FCStd/*.f3d/*.log or gps/time-style log blobs fail outright.
 #   5. Opcode count self-verify (A+ P0.6): the OPENDASH_CMD_* #define count in
 #      opendash_protocol.h must match the count TODO.md claims.
+#   6. Every .github/workflows/*.yml must parse as YAML (zero-jobs failure
+#      guard — a malformed workflow silently runs no jobs at all).
 #
 # WHY these checks exist (plain language, for new contributors):
 #   - The docs are the contract. A markdown link that goes nowhere or a doc
@@ -141,6 +143,20 @@ n_opcode = len(re.findall(r'#\s*define\s+OPENDASH_CMD_', proto))
 todo_txt = open('TODO.md', encoding='utf-8', errors='ignore').read()
 if f'{n_opcode} opcodes' not in todo_txt:
     fail.append(f'OPCODE COUNT  opendash_protocol.h defines {n_opcode} OPENDASH_CMD_* opcodes but TODO.md does not say "{n_opcode} opcodes" — fix the doc, not this check')
+
+# ── 6. workflow files must be valid YAML ────────────────────────────────────
+# WHY: a workflow that fails to parse runs as ZERO-JOBS failure — it looks like
+# "CI is red like always" instead of "the config file is malformed". That exact
+# class of confusion cost a re-push on 2026-10-07 (see docs/gameplan-aduit.md §8).
+try:
+    import yaml as _yaml
+    for wf in sorted(glob.glob('.github/workflows/*.yml') + glob.glob('.github/workflows/*.yaml')):
+        try:
+            _yaml.safe_load(open(wf, encoding='utf-8'))
+        except Exception as e:
+            fail.append(f'BAD YAML      {wf} does not parse: {e}')
+except ImportError:
+    fail.append('NO YAML-LINT  PyYAML unavailable — workflow syntax cannot be checked')
 
 if fail:
     print()
