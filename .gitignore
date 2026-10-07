@@ -1,5 +1,9 @@
 # ESP-IDF build artifacts
 build/
+# sdkconfig (resolved per-node build configs) are now COMMITTED — single source
+# of truth for build configuration, diffable like source (2026-10-07: the old
+# gitignored-config + sdkconfig.defaults setup had silently drifted from every
+# bench flash — see ledger §8). sdkconfig.old stays junk.
 sdkconfig.old
 managed_components/
 # dependencies.lock IS committed on purpose — it pins the exact managed-component
