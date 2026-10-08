@@ -36,6 +36,18 @@
   now resolve identically on every runner and every dev box.
 - `docs/history/` for superseded diagnosis docs; canon/history boundary is now
   explicit.
+- **Fire interlock as tested common code** (A+ P1.2): `opendash_parachute_fire_verdict()`
+  in `common/` is now the single authority on energizing a MOS channel — a pure
+  function whose FULL truth table (every gate, every precedence, NULL fail-safe)
+  runs in `test/test_parachute.c` on every CI run. Both MOS mains now merely
+  transport the verdict; no gate logic lives in `main.c` anymore.
+
+### Changed
+
+- **Build config source of truth**: resolved per-node `sdkconfig` files are
+  committed and `sdkconfig.defaults` is gone (see
+  [docs/gameplan-aduit.md](docs/gameplan-aduit.md) §8) — CI now builds the same
+  configuration the bench fleet actually runs.
 
 ### Fixed
 

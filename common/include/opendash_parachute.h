@@ -356,6 +356,29 @@ esp_err_t opendash_parachute_config_get(opendash_parachute_config_t *out);
 /** Replace the config (validated), update RAM, and persist to NVS. */
 esp_err_t opendash_parachute_config_set(const opendash_parachute_config_t *cfg);
 
+/* ════════════════════════════════════════════════════════════════════════════
+ * FIRE INTERLOCK — the ONLY authority on "may I energize channel(s)?".
+ * Lives in common/ as a pure function (A+ program P1.2) precisely because it is
+ * the safety gate: it is table-tested on the host (test/test_parachute.c), so a
+ * regression in ANY gate fails a build, not a car. MOS mains call it and add
+ * no gate logic of their own.
+ * ════════════════════════════════════════════════════════════════════════════ */
+
+/** @brief Verdict of the fire interlock for a given config + latch/arm state. */
+typedef enum {
+    OPENDASH_PARACHUTE_FIRE_ALLOW = 0,           /**< every gate clear — may energize  */
+    OPENDASH_PARACHUTE_FIRE_DENY_DISABLED,        /**< system disabled (or NULL cfg)    */
+    OPENDASH_PARACHUTE_FIRE_DENY_NO_CHANNEL,      /**< no channel selected              */
+    OPENDASH_PARACHUTE_FIRE_DENY_NOT_ARMED,       /**< not armed                        */
+    OPENDASH_PARACHUTE_FIRE_DENY_ALREADY_FIRED,   /**< already latched — idempotent no-op */
+} opendash_parachute_fire_verdict_t;
+
+/** Evaluate the fire interlock. Pure: config + arm/latch state in, verdict out.
+ *  A NULL config fail-safes to DENY_DISABLED. already_fired takes precedence
+ *  (idempotent lockout outranks every other gate, matching pre-P1.2 behavior). */
+opendash_parachute_fire_verdict_t opendash_parachute_fire_verdict(
+    const opendash_parachute_config_t *cfg, bool armed, bool already_fired);
+
 #ifdef __cplusplus
 }
 #endif

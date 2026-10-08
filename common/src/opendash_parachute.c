@@ -134,3 +134,22 @@ esp_err_t opendash_parachute_config_set(const opendash_parachute_config_t *cfg)
     unlock();
     return ESP_OK;
 }
+
+/* ────────────────────────────────────────────────────────────────────────
+ * Fire interlock verdict (A+ program P1.2). Pure function — the ONE authority
+ * on "may I energize channel(s)?". Its full truth table runs on every host
+ * `ctest` (test/test_parachute.c), so a regression in any gate fails a build
+ * instead of a car. MOS mains call this and carry no gate logic themselves.
+ * Gate precedence matches the original hand-rolled checks it replaced:
+ * already-fired (idempotent lockout) > disabled > no-channel > not-armed.
+ * ──────────────────────────────────────────────────────────────────────── */
+opendash_parachute_fire_verdict_t opendash_parachute_fire_verdict(
+    const opendash_parachute_config_t *cfg, bool armed, bool already_fired)
+{
+    if (!cfg)          return OPENDASH_PARACHUTE_FIRE_DENY_DISABLED; /* fail-safe */
+    if (already_fired) return OPENDASH_PARACHUTE_FIRE_DENY_ALREADY_FIRED;
+    if (!cfg->enabled) return OPENDASH_PARACHUTE_FIRE_DENY_DISABLED;
+    if ((cfg->channel_mask & 0x0F) == 0) return OPENDASH_PARACHUTE_FIRE_DENY_NO_CHANNEL;
+    if (!armed)        return OPENDASH_PARACHUTE_FIRE_DENY_NOT_ARMED;
+    return OPENDASH_PARACHUTE_FIRE_ALLOW;
+}

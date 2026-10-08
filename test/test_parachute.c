@@ -87,6 +87,76 @@ void test_reboot_reloads_persisted_config(void)
     TEST_ASSERT_FLOAT_WITHIN(1e-4f, 42.0f, reread.min_speed_mph);
 }
 
+/* ── P1.2: fire-interlock truth table ─────────────────────────────────────
+ * Every gate, every precedence, both polarities. This table IS the safety
+ * spec: if a future change flips any cell's outcome, CI goes red. */
+
+static opendash_parachute_config_t fire_cfg(bool enabled, uint8_t mask)
+{
+    opendash_parachute_config_t c;
+    opendash_parachute_config_default(&c);
+    c.enabled      = enabled ? 1 : 0;
+    c.channel_mask = mask;
+    return c;
+}
+
+void test_fire_verdict_denies_when_disabled(void)
+{
+    opendash_parachute_config_t c = fire_cfg(false, 0x05);
+    TEST_ASSERT_EQUAL_INT(OPENDASH_PARACHUTE_FIRE_DENY_DISABLED,
+                          opendash_parachute_fire_verdict(&c, true, false));
+}
+
+void test_fire_verdict_denies_no_channel(void)
+{
+    opendash_parachute_config_t c = fire_cfg(true, 0x00);
+    TEST_ASSERT_EQUAL_INT(OPENDASH_PARACHUTE_FIRE_DENY_NO_CHANNEL,
+                          opendash_parachute_fire_verdict(&c, true, false));
+    /* high garbage bits must NOT count as a channel */
+    c.channel_mask = 0xF0;
+    TEST_ASSERT_EQUAL_INT(OPENDASH_PARACHUTE_FIRE_DENY_NO_CHANNEL,
+                          opendash_parachute_fire_verdict(&c, true, false));
+}
+
+void test_fire_verdict_denies_not_armed(void)
+{
+    opendash_parachute_config_t c = fire_cfg(true, 0x0A);
+    TEST_ASSERT_EQUAL_INT(OPENDASH_PARACHUTE_FIRE_DENY_NOT_ARMED,
+                          opendash_parachute_fire_verdict(&c, false, false));
+}
+
+void test_fire_verdict_allows_only_when_everything_clear(void)
+{
+    opendash_parachute_config_t c = fire_cfg(true, 0x0A);
+    TEST_ASSERT_EQUAL_INT(OPENDASH_PARACHUTE_FIRE_ALLOW,
+                          opendash_parachute_fire_verdict(&c, true, false));
+}
+
+void test_fire_verdict_precedence_and_lockout(void)
+{
+    opendash_parachute_config_t c = fire_cfg(true, 0x05);
+    /* already-fired outranks everything (silent idempotent lockout) */
+    TEST_ASSERT_EQUAL_INT(OPENDASH_PARACHUTE_FIRE_DENY_ALREADY_FIRED,
+                          opendash_parachute_fire_verdict(&c, true, true));
+    TEST_ASSERT_EQUAL_INT(OPENDASH_PARACHUTE_FIRE_DENY_ALREADY_FIRED,
+                          opendash_parachute_fire_verdict(&c, false, true));
+    c.enabled = 0;
+    TEST_ASSERT_EQUAL_INT(OPENDASH_PARACHUTE_FIRE_DENY_ALREADY_FIRED,
+                          opendash_parachute_fire_verdict(&c, false, true));
+    /* disabled outranks not-armed (precedence preserved from old checks) */
+    opendash_parachute_config_t d = fire_cfg(false, 0x00);
+    TEST_ASSERT_EQUAL_INT(OPENDASH_PARACHUTE_FIRE_DENY_DISABLED,
+                          opendash_parachute_fire_verdict(&d, false, false));
+}
+
+void test_fire_verdict_null_cfg_is_failsafe_denied(void)
+{
+    TEST_ASSERT_EQUAL_INT(OPENDASH_PARACHUTE_FIRE_DENY_DISABLED,
+                          opendash_parachute_fire_verdict(NULL, true, false));
+    TEST_ASSERT_EQUAL_INT(OPENDASH_PARACHUTE_FIRE_DENY_DISABLED,
+                          opendash_parachute_fire_verdict(NULL, false, false));
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -94,5 +164,11 @@ int main(void)
     RUN_TEST(test_hostile_config_is_sanitized);
     RUN_TEST(test_null_args_rejected);
     RUN_TEST(test_reboot_reloads_persisted_config);
+    RUN_TEST(test_fire_verdict_denies_when_disabled);
+    RUN_TEST(test_fire_verdict_denies_no_channel);
+    RUN_TEST(test_fire_verdict_denies_not_armed);
+    RUN_TEST(test_fire_verdict_allows_only_when_everything_clear);
+    RUN_TEST(test_fire_verdict_precedence_and_lockout);
+    RUN_TEST(test_fire_verdict_null_cfg_is_failsafe_denied);
     return UNITY_END();
 }

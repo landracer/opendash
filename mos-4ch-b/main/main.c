@@ -155,22 +155,20 @@ static void parachute_pulse_off_cb(void *arg)
 
 static esp_err_t parachute_fire(opendash_parachute_reason_t reason)
 {
-    if (s_para_fired) return ESP_OK;   /* idempotent lockout */
-
+    /* The interlock verdict itself is common/ code with a full host truth table
+     * (P1.2) — main() only transports the verdict. DENY_ALREADY_FIRED keeps the
+     * original silent idempotent-lockout behavior (ESP_OK). */
     opendash_parachute_config_t pc;
     opendash_parachute_config_get(&pc);
+    opendash_parachute_fire_verdict_t v = opendash_parachute_fire_verdict(
+        &pc, opendash_parachute_actuator_is_armed(), s_para_fired);
 
-    /* HARD INTERLOCK — every condition must hold or nothing energizes. */
-    if (!pc.enabled) {
-        ESP_LOGW(TAG, "DEPLOY refused: system DISABLED (reason=%d)", (int)reason);
-        return ESP_ERR_INVALID_STATE;
-    }
-    if ((pc.channel_mask & 0x0F) == 0) {
-        ESP_LOGW(TAG, "DEPLOY refused: no channel selected (reason=%d)", (int)reason);
-        return ESP_ERR_INVALID_STATE;
-    }
-    if (!opendash_parachute_actuator_is_armed()) {
-        ESP_LOGW(TAG, "DEPLOY refused: DISARMED (reason=%d)", (int)reason);
+    if (v == OPENDASH_PARACHUTE_FIRE_DENY_ALREADY_FIRED) return ESP_OK;  /* lockout */
+    if (v != OPENDASH_PARACHUTE_FIRE_ALLOW) {
+        ESP_LOGW(TAG, "DEPLOY refused: %s (reason=%d)",
+                 v == OPENDASH_PARACHUTE_FIRE_DENY_DISABLED    ? "system DISABLED"     :
+                 v == OPENDASH_PARACHUTE_FIRE_DENY_NO_CHANNEL ? "no channel selected" :
+                                                                "DISARMED", (int)reason);
         return ESP_ERR_INVALID_STATE;
     }
 
