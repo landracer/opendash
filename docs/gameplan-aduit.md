@@ -130,7 +130,30 @@ then gets deleted or hard-guarded per the plan's "hard-fail guard" item.
 | P5.x | ⏳ deferred by design (they document phases 1–3 truths) | — |
 | P6.1–P6.4 | ⏳ deferred; P6.2's single-source check will target `common/include/opendash_common.h` `OPENDASH_VERSION_*` (exists, per readme §Versioning) | readme |
 
+### 6.1 Comment archaeology (original list, live status)
 
+Preserved from the pre-audit "comment archaeology" list so nothing was silently
+dropped when this file was rebuilt; status as of 2026-10-07:
+
+1. ~~mos-4ch-a/README.md:12~~ **resolved** (P1.1 rewrite; see §5 P1.1)
+2. `gnss/main/gnss.c:261-263` — says CAN frames are "not forwarded **yet**";
+   forwarding IS wired (`forward_can_frame()` in `relay/main/main.c`) →
+   rewrite to state the **routing rule** + future CAN capability (P3.4)
+3. `mos-4ch-a/README.md:117` (and mos-b twin) — "reserved for future use (BLE
+   OTA opcode)" → **rewrite to say what the reserved field is *for*** (wire
+   evolution room) (P3.4)
+4. ~~mos main's "wired in a later change / nothing fires yet" block~~
+   **resolved** (P1.1; and the gate logic itself is tested common code since P1.2)
+5. `relay/main/main.c:206` `// TODO: CAN TX` — CAN is **real hardware and a
+   real future feature**. `boost/boost.c` is a **placeholder for integration
+   with an existing commercial product** — the J1939↔ESP-NOW bridge
+   (OPENDASH_CMD_BOOST / RATES) stays specified as future work, honestly
+   labeled (P3.4/P3.5)
+
+**Comment canon (still program law):** a comment may state facts ("X is not
+forwarded yet — this node only forwards opcode N") but future tense = spec.
+Specs live in docs, referenced by the comment; inline "whatever you want"
+language is not acceptable on shared code.
 
 ---
 
