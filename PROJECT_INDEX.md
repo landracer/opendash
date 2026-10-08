@@ -5,7 +5,9 @@
 > Start here to understand the project, then follow links to detailed documents.
 >
 > **Last updated:** 2026-10-07 (A+ program ledger opened — game-plan + audit
-> ledger indexed below). Convention: bump this line
+> ledger indexed below; Phase 0 hygiene completed same day — converters-in-CI
+> real, repo bloat untracked, first fully-green CI run build-smoke #30.
+> Convention: bump this line
 > on every documentation pass on a *core reference* doc (this index, the readme,
 > CHANGELOG, QUICKSTART, and the top-level design docs). Not every wiki/ doc carries
 > one yet — rollout is in progress; do not assume absence means the doc is stale.

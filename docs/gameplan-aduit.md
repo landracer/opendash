@@ -99,7 +99,7 @@ then gets deleted or hard-guarded per the plan's "hard-fail guard" item.
 | Item | Verdict | Evidence / note |
 |---|---|---|
 | P0.1 | ✅ DONE 2026-10-07 (`4a7a7c4`): workflow now installs the converter toolchain on the runner and generates sources before the IDF container build; `OD_PREGENERATED_ASSETS` deleted from CMake + docs; `if(NOT FONT_SOURCES/IMAGE_SOURCES) FATAL_ERROR` guard live | commits 4a7a7c4 |
-| P0.2 | ✅ superseded by evidence — see §3 Correction 1 (CI runs, red since 2026-10-06). Badge rule: `readme.md` gets no CI badge until first green run | `gh run list` |
+| P0.2 | ✅ CLOSED 2026-10-07: first fully-green run is [build-smoke #30](https://github.com/landracer/opendash/actions/runs/37705648769) (12-node matrix + docs-lint + unit-tests all success, same day the pipeline went real). readme.md badge added per rule | run #30 |
 | P0.3 | ✅ HEAD-side DONE (`a5f889b` + `f73a74c`): FCStd + gps/time + 26 PNGs untracked — tracked content 213 MB → **10.0 MB**. HISTORY REWRITE still ⏳ OPEN pending D2 (clone still pays full 252 MB .git until it happens) | `git ls-files` |
 | P0.4 | ✅ DONE (`a5f889b`): check_docs.sh check 4 = >5 MB guard + `.repo-size-allowlist` (empty by design, WHY-per-entry culture); `*.FCStd`/`*.f3d`/`*.log`/`gps/time` ignores added | check_docs.sh diff |
 | P0.5 | ✅ DONE (`a5f889b`): scripts/fleet-clean.sh landed (dry-run default, --force acts, venv report-only, tearing-logs kept) — executed with --force, tree 5.3 GB → ~2.4 GB | script + du |
@@ -156,22 +156,27 @@ then gets deleted or hard-guarded per the plan's "hard-fail guard" item.
 | 2026-10-07 | `a5f889b` | untracked 26 PNGs + FCStd (HEAD side); ignores + allow-list + size guard + opcode self-verify + fleet-clean.sh landed | P0.4/P0.5/P0.6 |
 | 2026-10-07 | `f73a74c` | gps/time finally untracked (extensionless — needed its own ignore line after a `git add -A` re-picked it up) | P0.3-step-4 |
 | 2026-10-07 | — | fleet-clean --force executed locally; tracked content 213 MB → 10.0 MB; first-green-run link pending the post-push Actions run (then readme badge per P0.2) | P0.5, P0.2 |
+| 2026-10-07 | `fe32212` | the five superseded docs actually MOVED into committed docs/history/ and every table link repointed — the tables had been linking docs/archived/ (git-ignored local-only: links that can never resolve in a fresh clone; caught by the now-alive docs-lint) | P0.6 culture working |
+| 2026-10-07 | `375d477`+`6c4e9fa` | **biggest honest find**: resolved per-node `sdkconfig` files are now COMMITTED and all sdkconfig.defaults deleted — the old defaults had silently drifted from every bench flash (missing LV_FONT_FMT_TXT_LARGE; -Og debug default vs the fleet's actual PERF build with assertions disabled; pod1 overflowed its old 2.5 MB slot by 47 KB under the release-line toolchain). Also: my own first build.yml edit shipped a YAML syntax error (runs #23/#24 = zero-job failures, caught by new check 6) | P0.1 completion |
+| 2026-10-07 | `f1b2c81` | every live doc reference synced from sdkconfig.defaults to committed sdkconfig (CHANGELOG/history untouched — they record history) | doc sync |
+| 2026-10-07 | `df5c8fe` | pod1/pod2 app slots widened 2.5→3 MB (slack from storage; lands via the wired P1.4 re-flash), lv_font_conv pinned exactly 1.5.3, pod2 CSV header copy-paste drift corrected | build honesty |
+| 2026-10-07 | — | **[build-smoke #30](https://github.com/landracer/opendash/actions/runs/37705648769) GREEN** — all 12 node builds + docs-lint + unit-tests; readme badge shipped; P0.2 closed | first green |
 
 ## 9. Next actions (ledger-adjusted, post-Phase-0)
 
 1. Owner line-by-line review of `4db839a` (safety-critical comment diff — P1.1)
-2. Watch the post-push Actions run; capture the first-green-run link into §8,
-   then readme gets its CI badge (P0.2 closeout)
-3. `test(parachute)`: fire-verdict truth table moved into common/ — P1.2; the
+   and of the committed sdkconfig (now build truth)
+2. `test(parachute)`: fire-verdict truth table moved into common/ — P1.2; the
    verdict function must also carry the D4 rule (silence never disarms)
-4. P1.3 policy-gate design doc first: ROSTER per D4 (center + designated
+3. P1.3 policy-gate design doc first: ROSTER per D4 (center + designated
    IMU/trigger peers), NVS-persisted, boot-button re-pair, per-class opcode
    gates, ctrl_rejected counter — then bench proof with the second ESP32
-5. P1.4 LMK rollout runbook (wiki/ota-bluetooth style) → two-board dry run →
-   full-fleet one-sitting re-flash; keeps the D3 simplicity bar
-6. D5: owner call on app-signing vs accepted-risk register (plain-language
+4. P1.4 LMK rollout runbook (wiki/ota-bluetooth style) → two-board dry run →
+   full-fleet one-sitting re-flash; keeps the D3 simplicity bar (this re-flash
+   also lands the widened pod partition tables — see §8)
+5. D5: owner call on app-signing vs accepted-risk register (plain-language
    answer already in §7)
-7. Then Phase 3 (fuzz + coverage gate) and Phase 4 (ui_manager split,
+6. Then Phase 3 (fuzz + coverage gate) and Phase 4 (ui_manager split,
    gauge-pair dedupe, 1,500-line grandfather list) per plan order
 
 ---

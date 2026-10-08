@@ -5,6 +5,9 @@
     Built on <strong>ESP-IDF v6.1</strong> + <strong>LVGL 9</strong> + <strong>ESP-NOW</strong> across a fleet of ESP32-S3 display and controller nodes.<br>
     <em>Licensed under Sovereign Individual License v1.0 — see LICENSE file</em>
   </p>
+  <p align="center">
+    <a href="https://github.com/landracer/opendash/actions/workflows/build-smoke.yml"><img src="https://github.com/landracer/opendash/actions/workflows/build-smoke.yml/badge.svg" alt="build-smoke"></a>
+  </p>
 </p>
 
 ---
