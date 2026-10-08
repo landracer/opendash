@@ -52,6 +52,7 @@ opendash/
 │   ├── architecture.md          — System-level architecture & data flow
 │   ├── hardware.md              — Hardware specifications & pin mappings
 │   ├── espnow-protocol.md       — ESP-NOW inter-node protocol (no wired bus)
+│   ├── POLICY_GATE.md           — Roster policy-gate DESIGN spec (A+ P1.3, pending ratification)
 │   ├── data-points.md           — Legend of all displayable data points
 │   ├── font-system-testing.md   — Font system implementation and testing
 │   └── setup-guide.md           — Development environment setup

@@ -109,7 +109,7 @@ then gets deleted or hard-guarded per the plan's "hard-fail guard" item.
 
 | P1.1 | ✅ FIXED 2026-10-07 (`4db839a`): both MOS mains now describe the real behavior — "Firing IS wired: parachute_fire() energizes the selected channels ONLY when enabled ∧ channel_mask≠0 ∧ armed (idempotent — latches once, never re-fires); LATCH holds until disarm/reboot, PULSE auto-off after pulse_ms. Disarm safe-resets fired channels." Remaining `inhibited` mentions (mos-a :120/:684, mos-b :120/:679) verified ACCURATE — they describe the optional shared-GPIO actuator path (parachute_gpio.h -1), not the channel fire path | diff reviewed line-by-line by owner |
 | P1.2 | ✅ DONE 2026-10-07: `opendash_parachute_fire_verdict()` — pure function in `common/src/opendash_parachute.c`, FULL truth table (disabled / no-channel incl. garbage-high-bits / not-armed / allow / already-fired lockout precedence / NULL fail-safe) now runs in `test/test_parachute.c` on every CI unit-tests run. Both MOS mains call it and carry zero gate logic | local ctest 4/4 suites pass; CI enforces |
-| P1.3 | ✏️ premise sharpened: the learn-the-center-MAC machinery exists (`mos-4ch-a/main/main.c:92-93` `s_center_mac`; learn block in `dispatch_message()` ≈`:211-263`), BUT it is **not a gate at all today**: ANY sender of a whitelisted control opcode is *latched as the center*, and every mismatch **re-latches** ("Center MAC re-synced", `:263`). RAM-only, no NVS. **D4 consequence (owner ruling, §7): the trust set is NOT center-only** — a DEPLOY legitimately originated by the GPS/IMU-bearing node must survive center absence, so the future policy gate pins a ROSTER (center + designated IMU/trigger nodes), per-class, NVS-persisted, button re-pair. Today an attacker frame *becomes* the pinned center — this is the from-scratch feature | dispatch_message read 2026-10-07 |
+| P1.3 | ✏️ premise sharpened: the learn-the-center-MAC machinery exists (`mos-4ch-a/main/main.c:92-93` `s_center_mac`; learn block in `dispatch_message()` ≈`:211-263`), BUT it is **not a gate at all today**: ANY sender of a whitelisted control opcode is *latched as the center*, and every mismatch **re-latches** ("Center MAC re-synced", `:263`). RAM-only, no NVS. **D4 consequence (owner ruling, §7): the trust set is NOT center-only** — a DEPLOY legitimately originated by the GPS/IMU-bearing node must survive center absence, so the future policy gate pins a ROSTER (center + designated IMU/trigger nodes), per-class, NVS-persisted, button re-pair. Today an attacker frame *becomes* the pinned center — this is the from-scratch feature. **→ DESIGN DELIVERED 2026-10-08: [`docs/POLICY_GATE.md`](POLICY_GATE.md)** — gate table (§3 of doc), MOS-local vote fusion mirroring center logic (TTL 600 ms / tick 100 ms / unanimous-among-roster-voters, manual==hard-override), GPIO0-boot-button pairing ritual, `ctrl_rejected` counters, config-version-2 struct delta. **Open questions for owner inside the doc: confirm pairing-button GPIO, unanimity rule, GPIO0 default, config v2 rollout** — implementation waits on ratification | dispatch_message read 2026-10-07; design 2026-10-08 |
 | P1.4 | ✅ confirmed: `common/src/opendash_espnow.c:177` `bcast_peer.encrypt = false;` and `:256` `peer.encrypt = false;` — both peer paths unencrypted, exactly as the plan claims. D3 ratified (see §7): single fleet PMK/LMK, compile-time dev default, NVS override — deliberately NOT fancy | grep |
 | P1.5 | ✏️ **OWNER OVERRULED the plan's recommendation** — see §7 D4: arm is a persistent intent state; no auto-DISARM on center silence; disarm only when its own criteria are met. The plan's "(b) auto-DISARM 30 s" is DEAD; the doc paragraph must now explain why silence ≠ disarm, and P1.3's roster design carries the deploy-without-center capability | owner decision 2026-10-07 |
 | P1.6 | ⏳ deferred until P1.3/P1.4 land | — |
@@ -185,24 +185,24 @@ language is not acceptable on shared code.
 | 2026-10-07 | `df5c8fe` | pod1/pod2 app slots widened 2.5→3 MB (slack from storage; lands via the wired P1.4 re-flash), lv_font_conv pinned exactly 1.5.3, pod2 CSV header copy-paste drift corrected | build honesty |
 | 2026-10-07 | — | **[build-smoke #30](https://github.com/landracer/opendash/actions/runs/37705648769) GREEN** — all 12 node builds + docs-lint + unit-tests; readme badge shipped; P0.2 closed | first green |
 | 2026-10-07 | `ffc2dd9` | **P1.2**: fire interlock extracted to `opendash_parachute_fire_verdict()` (pure, common/) + full truth-table tests; both MOS mains stripped of gate logic. D2 marked ON HOLD; D5 ratified (standard CONFIG_APP_SIGNING, no fuse) — P2.2 unblocked. CI #32 green on the refactor itself; #33 green after this ledger restore | P1.2, D2, D5 |
+| 2026-10-08 | — | **Owner signed off P1.2 review** ("all looks good") — safety-refactor review closed. Bench toolchain fixed: ImageMagick was missing on the bench/runner machine; now installed. Proven end-to-end on bench: both converters `--check` green (node v24 + local lv_font_conv; ImageMagick 7.1.2-32 + Pillow 12.2), `--force` regenerated 49 font + 78 image sources, `center` IDF v6.1 build → "Project build complete", `opendash_center.bin` 3,167,184 B, git tree stayed clean (generated-dir ignore guards working) | D1 verified, P1.2 review closed |
+| 2026-10-08 | (this commit) | **P1.3 design doc delivered**: `docs/POLICY_GATE.md` (roster trust model per D4, per-opcode gate table, MOS-local vote fusion, pairing ritual, ctrl_rejected telemetry, config-v2 delta) + indexed into readme tree & PROJECT_INDEX. **Awaiting owner ratification — no firmware changed.** Implementation (pure gate/fusion functions + host tables + MOS wiring) starts only after sign-off | P1.3 design |
 
 ## 9. Next actions (ledger-adjusted, post-Phase-0)
 
-1. Owner line-by-line review of the P1.2 commit (fire-interlock extraction —
-   safety-critical refactor) and the committed sdkconfig (now build truth)
-2. P1.3 policy-gate design doc first: ROSTER per D4 (center + designated
-   IMU/trigger peers), NVS-persisted, boot-button re-pair, per-class opcode
-   gates, ctrl_rejected counter — then bench proof with the second ESP32
-3. P1.3 policy-gate design doc first: ROSTER per D4 (center + designated
-   IMU/trigger peers), NVS-persisted, boot-button re-pair, per-class opcode
-   gates, ctrl_rejected counter — then bench proof with the second ESP32
-4. P1.4 LMK rollout runbook (wiki/ota-bluetooth style) → two-board dry run →
+1. **P1.3: owner ratification of `docs/POLICY_GATE.md`** (open questions listed in
+   the doc: pairing GPIO, unanimity rule, config-v2 rollout) → then implement:
+   pure `gate_decide()`/`fusion_eval()` + full host tables + MOS wiring + bench
+   proof with the second ESP32
+2. P1.4 LMK rollout runbook (wiki/ota-bluetooth style) → two-board dry run →
    full-fleet one-sitting re-flash; keeps the D3 simplicity bar (this re-flash
-   also lands the widened pod partition tables — see §8)
-5. D5: owner call on app-signing vs accepted-risk register (plain-language
-   answer already in §7)
-6. Then Phase 3 (fuzz + coverage gate) and Phase 4 (ui_manager split,
-   gauge-pair dedupe, 1,500-line grandfather list) per plan order
+   also lands the widened pod partition tables — see §8); same re-flash carries
+   the D5-signed images once P2.2 wires CONFIG_APP_SIGNING
+3. Then Phase 3 (fuzz + coverage gate) and Phase 4 (ui_manager split,
+   gauge-pair dedupe, 47-marker grandfather burn-down) per plan order
+
+Closed review items: owner line-by-line review of `ffc2dd9` (P1.2) — SIGNED OFF
+2026-10-08; committed sdkconfig review — same sign-off covers it.
 
 ---
 

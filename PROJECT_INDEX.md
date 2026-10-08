@@ -215,6 +215,7 @@ Every documentation file in the project, grouped by purpose.
 | [**docs/architecture.md**](docs/architecture.md) | System block diagram, node roles, software layers |
 | [**docs/hardware.md**](docs/hardware.md) | Board specs, pin mappings, wiring for all 4 nodes |
 | [**docs/espnow-protocol.md**](docs/espnow-protocol.md) | ESP-NOW frame format, opcode map, priority channels |
+| [**docs/POLICY_GATE.md**](docs/POLICY_GATE.md) | **Roster policy-gate DESIGN spec (P1.3) — gate table, MOS-local fusion, pairing ritual; awaiting owner ratification, not yet in firmware** |
 | [**docs/data-points.md**](docs/data-points.md) | All data point IDs (engine, GPS, IMU, BMS, system) |
 | [**DISPLAY_SYNCHRONIZATION.md**](DISPLAY_SYNCHRONIZATION.md) | How shared code stays in sync across nodes |
 
