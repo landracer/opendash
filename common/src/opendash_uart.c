@@ -112,18 +112,22 @@ static inline uint32_t rd_u32(const uint8_t *p) {
 }
 
 /**
- * Parse a complete binary payload (93 bytes after STX, before ETX).
- * Returns true if the frame is valid and data was stored.
+ * Pure payload decoder — the ONLY MD-frame byte sink (P3.1 fuzz target).
+ * No state, no locks: fills *out from a complete binary payload
+ * (93 bytes: TAG + 92 data bytes). False on wrong length or bad TAG.
  */
-static bool parse_binary_frame(const uint8_t *payload, int len)
+bool opendash_md_parse_payload(const uint8_t *payload, int len,
+                               opendash_md_data_t *out)
 {
-    if (len != MD_PAYLOAD_SIZE) return false;
+    if (!payload || !out || len != MD_PAYLOAD_SIZE) return false;
     if (payload[MD_OFF_TAG] != MD_BINARY_TAG) {
         ESP_LOGD(TAG, "Bad TAG: 0x%02X (expected 0x%02X)", payload[0], MD_BINARY_TAG);
         return false;
     }
 
-    /* Decode all fields from the binary payload */
+    /* Decode all fields from the binary payload into a local frame */
+    opendash_md_data_t d;
+    memset(&d, 0, sizeof(d));
     int16_t  raw_rpm      = rd_s16(&payload[MD_OFF_RPM]);
     uint16_t raw_boost    = rd_u16(&payload[MD_OFF_BOOST]);
     uint8_t  raw_throttle = payload[MD_OFF_THROTTLE];
@@ -144,85 +148,123 @@ static bool parse_binary_frame(const uint8_t *payload, int len)
     uint16_t raw_efr      = rd_u16(&payload[MD_OFF_EFR]);
     uint16_t raw_knock    = rd_u16(&payload[MD_OFF_KNOCK]);
 
-    /* Store parsed values (thread-safe) */
-    portENTER_CRITICAL(&s_data_lock);
-    s_latest_data.rpm       = (float)raw_rpm;
-    s_latest_data.boost     = (float)raw_boost / 100.0f;
-    s_latest_data.throttle  = (float)raw_throttle;
-    s_latest_data.lambda    = (float)raw_lambda / 100.0f;
-    s_latest_data.lmm       = (float)raw_lmm / 100.0f;
-    s_latest_data.case_temp = (float)raw_casetemp / 100.0f;
+    d.rpm       = (float)raw_rpm;
+    d.boost     = (float)raw_boost / 100.0f;
+    d.throttle  = (float)raw_throttle;
+    d.lambda    = (float)raw_lambda / 100.0f;
+    d.lmm       = (float)raw_lmm / 100.0f;
+    d.case_temp = (float)raw_casetemp / 100.0f;
     for (int i = 0; i < 8; i++) {
-        s_latest_data.egt[i] = (float)rd_s16(&payload[MD_OFF_EGT + i * 2]);
+        d.egt[i] = (float)rd_s16(&payload[MD_OFF_EGT + i * 2]);
     }
-    s_latest_data.bat_volt  = (float)raw_batvolt / 100.0f;
-    s_latest_data.vdo_pres1 = (float)raw_vdop1;
-    s_latest_data.vdo_pres2 = (float)raw_vdop2;
-    s_latest_data.vdo_pres3 = (float)raw_vdop3;
-    s_latest_data.vdo_temp1 = (float)raw_vdot1;
-    s_latest_data.vdo_temp2 = (float)raw_vdot2;
-    s_latest_data.vdo_temp3 = (float)raw_vdot3;
-    s_latest_data.speed     = (float)raw_speed / 100.0f;
-    s_latest_data.gear      = raw_gear;
-    s_latest_data.n75_duty  = raw_n75;
-    s_latest_data.req_boost = (float)raw_reqboost / 100.0f;
-    s_latest_data.efr_speed = (float)raw_efr;
-    s_latest_data.knock     = (float)raw_knock;
+    d.bat_volt  = (float)raw_batvolt / 100.0f;
+    d.vdo_pres1 = (float)raw_vdop1;
+    d.vdo_pres2 = (float)raw_vdop2;
+    d.vdo_pres3 = (float)raw_vdop3;
+    d.vdo_temp1 = (float)raw_vdot1;
+    d.vdo_temp2 = (float)raw_vdot2;
+    d.vdo_temp3 = (float)raw_vdot3;
+    d.speed     = (float)raw_speed / 100.0f;
+    d.gear      = raw_gear;
+    d.n75_duty  = raw_n75;
+    d.req_boost = (float)raw_reqboost / 100.0f;
+    d.efr_speed = (float)raw_efr;
+    d.knock     = (float)raw_knock;
 
     /* ── OBD-II summary (35 bytes at offset 58) ─────────────────────── */
     uint8_t obd2_flags = payload[MD_OFF_OBD2_FLAGS];
-    s_latest_data.obd2_flags       = obd2_flags;
-    s_latest_data.obd2_rpm         = (float)rd_s16(&payload[MD_OFF_OBD2_RPM]);   /* ×1 (unscaled) */
-    s_latest_data.obd2_speed       = (float)rd_s16(&payload[MD_OFF_OBD2_SPD])   / 100.0f;
-    s_latest_data.obd2_coolant_temp= (float)rd_s16(&payload[MD_OFF_OBD2_CLT])   / 100.0f;
-    s_latest_data.obd2_engine_load = (float)rd_s16(&payload[MD_OFF_OBD2_LOAD])  / 100.0f;
-    s_latest_data.obd2_intake_map  = (float)rd_s16(&payload[MD_OFF_OBD2_MAP])   / 100.0f;
-    s_latest_data.obd2_throttle    = (float)rd_s16(&payload[MD_OFF_OBD2_TPS])   / 100.0f;
-    s_latest_data.obd2_intake_temp = (float)rd_s16(&payload[MD_OFF_OBD2_IAT])   / 100.0f;
-    s_latest_data.obd2_maf_rate    = (float)rd_s16(&payload[MD_OFF_OBD2_MAF])   / 10.0f;  /* ×10 */
-    s_latest_data.obd2_timing_adv  = (float)rd_s16(&payload[MD_OFF_OBD2_ADV])   / 100.0f;
-    s_latest_data.obd2_stft_b1     = (float)rd_s16(&payload[MD_OFF_OBD2_STFT])  / 100.0f;
-    s_latest_data.obd2_ltft_b1     = (float)rd_s16(&payload[MD_OFF_OBD2_LTFT])  / 100.0f;
-    s_latest_data.obd2_fuel_press  = (float)rd_s16(&payload[MD_OFF_OBD2_FP])    / 10.0f;  /* ×10 */
-    s_latest_data.obd2_baro_press  = (float)rd_s16(&payload[MD_OFF_OBD2_BARO])  / 100.0f;
-    s_latest_data.obd2_oil_temp    = (float)rd_s16(&payload[MD_OFF_OBD2_OIL])   / 100.0f;
-    s_latest_data.obd2_ctrl_voltage= (float)rd_s16(&payload[MD_OFF_OBD2_VOLT])  / 100.0f;
-    s_latest_data.obd2_fuel_level  = (float)rd_s16(&payload[MD_OFF_OBD2_FUEL])  / 100.0f;
-    s_latest_data.obd2_present     = (obd2_flags != 0);
+    d.obd2_flags        = obd2_flags;
+    d.obd2_rpm          = (float)rd_s16(&payload[MD_OFF_OBD2_RPM]);  /* ×1 (unscaled) */
+    d.obd2_speed        = (float)rd_s16(&payload[MD_OFF_OBD2_SPD])   / 100.0f;
+    d.obd2_coolant_temp = (float)rd_s16(&payload[MD_OFF_OBD2_CLT])   / 100.0f;
+    d.obd2_engine_load  = (float)rd_s16(&payload[MD_OFF_OBD2_LOAD])  / 100.0f;
+    d.obd2_intake_map   = (float)rd_s16(&payload[MD_OFF_OBD2_MAP])   / 100.0f;
+    d.obd2_throttle     = (float)rd_s16(&payload[MD_OFF_OBD2_TPS])   / 100.0f;
+    d.obd2_intake_temp  = (float)rd_s16(&payload[MD_OFF_OBD2_IAT])   / 100.0f;
+    d.obd2_maf_rate     = (float)rd_s16(&payload[MD_OFF_OBD2_MAF])   / 10.0f;  /* ×10 */
+    d.obd2_timing_adv   = (float)rd_s16(&payload[MD_OFF_OBD2_ADV])   / 100.0f;
+    d.obd2_stft_b1      = (float)rd_s16(&payload[MD_OFF_OBD2_STFT])  / 100.0f;
+    d.obd2_ltft_b1      = (float)rd_s16(&payload[MD_OFF_OBD2_LTFT])  / 100.0f;
+    d.obd2_fuel_press   = (float)rd_s16(&payload[MD_OFF_OBD2_FP])    / 10.0f;  /* ×10 */
+    d.obd2_baro_press   = (float)rd_s16(&payload[MD_OFF_OBD2_BARO])  / 100.0f;
+    d.obd2_oil_temp     = (float)rd_s16(&payload[MD_OFF_OBD2_OIL])   / 100.0f;
+    d.obd2_ctrl_voltage = (float)rd_s16(&payload[MD_OFF_OBD2_VOLT])  / 100.0f;
+    d.obd2_fuel_level   = (float)rd_s16(&payload[MD_OFF_OBD2_FUEL])  / 100.0f;
+    d.obd2_present      = (obd2_flags != 0);
 
+    *out = d;
+    return true;
+}
+
+/**
+ * Task-context frame sink: pure decode + atomic commit into shared state.
+ * Non-decoded fields (DTC/VIN/MIL) of s_latest_data are preserved.
+ */
+static bool parse_binary_frame(const uint8_t *payload, int len)
+{
+    opendash_md_data_t d;
+    if (!opendash_md_parse_payload(payload, len, &d)) return false;
+
+    portENTER_CRITICAL(&s_data_lock);
+    s_latest_data.rpm       = d.rpm;
+    s_latest_data.boost     = d.boost;
+    s_latest_data.throttle  = d.throttle;
+    s_latest_data.lambda    = d.lambda;
+    s_latest_data.lmm       = d.lmm;
+    s_latest_data.case_temp = d.case_temp;
+    for (int i = 0; i < 8; i++) s_latest_data.egt[i] = d.egt[i];
+    s_latest_data.bat_volt  = d.bat_volt;
+    s_latest_data.vdo_pres1 = d.vdo_pres1;
+    s_latest_data.vdo_pres2 = d.vdo_pres2;
+    s_latest_data.vdo_pres3 = d.vdo_pres3;
+    s_latest_data.vdo_temp1 = d.vdo_temp1;
+    s_latest_data.vdo_temp2 = d.vdo_temp2;
+    s_latest_data.vdo_temp3 = d.vdo_temp3;
+    s_latest_data.speed     = d.speed;
+    s_latest_data.gear      = d.gear;
+    s_latest_data.n75_duty  = d.n75_duty;
+    s_latest_data.req_boost = d.req_boost;
+    s_latest_data.efr_speed = d.efr_speed;
+    s_latest_data.knock     = d.knock;
+    s_latest_data.obd2_flags        = d.obd2_flags;
+    s_latest_data.obd2_rpm          = d.obd2_rpm;
+    s_latest_data.obd2_speed        = d.obd2_speed;
+    s_latest_data.obd2_coolant_temp = d.obd2_coolant_temp;
+    s_latest_data.obd2_engine_load  = d.obd2_engine_load;
+    s_latest_data.obd2_intake_map   = d.obd2_intake_map;
+    s_latest_data.obd2_throttle     = d.obd2_throttle;
+    s_latest_data.obd2_intake_temp  = d.obd2_intake_temp;
+    s_latest_data.obd2_maf_rate     = d.obd2_maf_rate;
+    s_latest_data.obd2_timing_adv   = d.obd2_timing_adv;
+    s_latest_data.obd2_stft_b1      = d.obd2_stft_b1;
+    s_latest_data.obd2_ltft_b1      = d.obd2_ltft_b1;
+    s_latest_data.obd2_fuel_press   = d.obd2_fuel_press;
+    s_latest_data.obd2_baro_press   = d.obd2_baro_press;
+    s_latest_data.obd2_oil_temp     = d.obd2_oil_temp;
+    s_latest_data.obd2_ctrl_voltage = d.obd2_ctrl_voltage;
+    s_latest_data.obd2_fuel_level   = d.obd2_fuel_level;
+    s_latest_data.obd2_present      = d.obd2_present;
     s_latest_data.frame_count++;
     portEXIT_CRITICAL(&s_data_lock);
 
     /* Log OBD2 flags when MIL/DTC bits are set (aids CEL diagnostic) */
-    if (obd2_flags & 0x06) {
+    if (d.obd2_flags & 0x06) {
         ESP_LOGI(TAG, "[OBD2] flags=0x%02X MIL=%d DTCs=%d",
-                 obd2_flags, (obd2_flags >> 2) & 1, (obd2_flags >> 1) & 1);
+                 d.obd2_flags, (d.obd2_flags >> 2) & 1, (d.obd2_flags >> 1) & 1);
     }
 
 #if OPENDASH_UART_DEBUG
-    ESP_LOGI(TAG, "[MD] RPM=%d BOOST=%.2f THR=%d LAM=%.2f LMM=%.2f BAT=%.2fV"
-                  " EGT[%d,%d,%d,%d,%d,%d,%d,%d]",
-             raw_rpm, (float)raw_boost / 100.0f, raw_throttle,
-             (float)raw_lambda / 100.0f, (float)raw_lmm / 100.0f,
-             (float)raw_batvolt / 100.0f,
-             rd_s16(&payload[MD_OFF_EGT + 0]),
-             rd_s16(&payload[MD_OFF_EGT + 2]),
-             rd_s16(&payload[MD_OFF_EGT + 4]),
-             rd_s16(&payload[MD_OFF_EGT + 6]),
-             rd_s16(&payload[MD_OFF_EGT + 8]),
-             rd_s16(&payload[MD_OFF_EGT + 10]),
-             rd_s16(&payload[MD_OFF_EGT + 12]),
-             rd_s16(&payload[MD_OFF_EGT + 14]));
-    if (obd2_flags) {
+    ESP_LOGI(TAG, "[MD] RPM=%.0f BOOST=%.2f THR=%.0f LAM=%.2f LMM=%.2f BAT=%.2fV",
+             d.rpm, d.boost, d.throttle, d.lambda, d.lmm, d.bat_volt);
+    if (d.obd2_flags) {
         ESP_LOGI(TAG, "[OBD2] flags=0x%02X RPM=%.0f SPD=%.1f CLT=%.1f LOAD=%.1f "
                       "TPS=%.1f IAT=%.1f MAF=%.1f ADV=%.1f OIL=%.1f VOLT=%.2f FUEL=%.1f%%",
-                 obd2_flags,
-                 s_latest_data.obd2_rpm, s_latest_data.obd2_speed,
-                 s_latest_data.obd2_coolant_temp, s_latest_data.obd2_engine_load,
-                 s_latest_data.obd2_throttle, s_latest_data.obd2_intake_temp,
-                 s_latest_data.obd2_maf_rate, s_latest_data.obd2_timing_adv,
-                 s_latest_data.obd2_oil_temp, s_latest_data.obd2_ctrl_voltage,
-                 s_latest_data.obd2_fuel_level);
+                 d.obd2_flags, d.obd2_rpm, d.obd2_speed,
+                 d.obd2_coolant_temp, d.obd2_engine_load,
+                 d.obd2_throttle, d.obd2_intake_temp,
+                 d.obd2_maf_rate, d.obd2_timing_adv,
+                 d.obd2_oil_temp, d.obd2_ctrl_voltage,
+                 d.obd2_fuel_level);
     }
 #endif
 

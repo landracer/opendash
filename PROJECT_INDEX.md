@@ -287,7 +287,8 @@ Every documentation file in the project, grouped by purpose.
 | [**docs/history/IMPLEMENTATION_SUMMARY.md**](docs/history/IMPLEMENTATION_SUMMARY.md) | All implementation work summary |
 | [**CHANGELOG.md**](CHANGELOG.md) | Version history |
 | [**docs/history/**](docs/history/) | Superseded diagnosis/assessment docs (retained as history, not canon) |
-| [**test/**](test/README.md) | Host unit-test harness (Unity/ctest) for codec, data model, health, parachute |
+| [**test/**](test/README.md) | Host unit-test + fuzz harness (Unity/ctest) for codec, data model, health, parachute, roster, MD parser; coverage-instrumented in CI |
+| [**scripts/coverage_gate.sh**](scripts/coverage_gate.sh) | Per-file line-coverage floors (ratchet-up-only) enforced in the CI unit-tests job |
 | [**scripts/check_docs.sh**](scripts/check_docs.sh) | docs-lint enforced in CI (links, license headers, pod drift) |
 | [**wiki/pod1-pod2.md**](wiki/pod1-pod2.md) | Pod 1 and Pod 2 documentation |
 

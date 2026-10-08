@@ -59,8 +59,25 @@
 - **`PERSIST_ARM` opt-in (config v2):** with the flag set, ARM state mirrors to
   NVS and restores at boot — user choice, never built-in; flag clear ⇒ boot
   stays DISARMED (standard).
+- **Parser fuzzing (A+ P3.1):** `test/test_fuzz_parsers.c` — seeded, committed,
+  deterministic corpora (10k frames/suite) hammering the only two
+  attacker-controlled byte sinks in the system: the ESP-NOW frame codec
+  (invariant: a frame is accepted **iff** canonical — re-serialization is
+  byte-identical, checksum-byte corruption never verifies) and the MD payload
+  decoder (hard TAG/length gates, determinism, golden-value vectors).
+- **Coverage gate (A+ P3.2):** `-DOD_COVERAGE=ON` instruments the host build;
+  `scripts/coverage_gate.sh` parses gcov and fails below per-file line floors
+  (baseline measured 2026-10-08: protocol 80 / data_model 75 / parachute 90 /
+  roster 90 / health 70 / uart 15 — floors ratchet UP only). The CI
+  `unit-tests` job is now the coverage build: every CI run proves coverage,
+  not just correctness.
 
 ### Changed
+
+- **MD UART parser split:** the decode half of `opendash_uart.c` is now the
+  pure, host-testable `opendash_md_parse_payload()`; the RX task decodes into
+  a local frame and merges decoded fields into shared state atomically —
+  behavior-identical, single-threaded host-testable.
 
 - **Deployment config v2 wire bump:** `opendash_parachute_status_t` traded its
   pad byte for `last_reason` + `ctrl_rejected` gate counters, and

@@ -22,4 +22,10 @@ typedef uint32_t TickType_t;
 
 #define pdMS_TO_TICKS(ms) ((TickType_t)(ms))
 
+/* Single-threaded host build: critical sections are no-ops. */
+typedef int portMUX_TYPE;
+#define portMUX_INITIALIZER_UNLOCKED 0
+#define portENTER_CRITICAL(m) do { (void)(m); } while (0)
+#define portEXIT_CRITICAL(m)  do { (void)(m); } while (0)
+
 #endif /* OD_HOST_FREERTOS_H */

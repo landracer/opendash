@@ -15,6 +15,15 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 add_compile_options(-Wall -Wextra -Werror -Wno-unused-parameter)
 
+# ── P3.2 coverage instrumentation: cmake -DOD_COVERAGE=ON ... ───────────
+# Must be set BEFORE any target so the flag reaches the objects under test.
+# gcov data lands in the build tree; scripts/coverage_gate.sh parses it.
+option(OD_COVERAGE "Instrument host tests with gcov coverage" OFF)
+if(OD_COVERAGE)
+    add_compile_options(--coverage -O0 -g)
+    add_link_options(--coverage)
+endif()
+
 # Vendored Unity (ThrowTheSwitch) — see unity/LICENSE.txt
 add_library(unity STATIC unity/unity.c)
 target_include_directories(unity PUBLIC ${CMAKE_CURRENT_LIST_DIR}/unity)
@@ -22,8 +31,10 @@ target_include_directories(unity PUBLIC ${CMAKE_CURRENT_LIST_DIR}/unity)
 # Code under test + stub layer. Real sources, compiled verbatim.
 add_library(od_core STATIC
     stubs/stubs.c
+    stubs/stub_driver.c
     ../common/src/opendash_protocol.c
     ../common/src/opendash_data_model.c
+    ../common/src/opendash_uart.c
     ../common/src/node_health.c
     ../common/src/opendash_parachute.c
     ../common/src/opendash_roster.c
@@ -35,7 +46,7 @@ target_include_directories(od_core PUBLIC
 
 enable_testing()
 
-foreach(suite protocol data_model node_health parachute roster)
+foreach(suite protocol data_model node_health parachute roster fuzz_parsers)
     add_executable(test_${suite} test_${suite}.c)
     target_link_libraries(test_${suite} PRIVATE od_core unity m)
     add_test(NAME ${suite} COMMAND test_${suite})

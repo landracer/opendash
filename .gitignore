@@ -70,3 +70,7 @@ docs/pdf/
 gps/time
 
 test/build/
+
+# host-test build trees (regenerated on demand)
+test/build/
+test/build-cov/

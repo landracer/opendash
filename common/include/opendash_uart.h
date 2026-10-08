@@ -179,6 +179,16 @@ const char *opendash_uart_status_str(void);
 bool opendash_uart_get_data(opendash_md_data_t *out);
 
 /**
+ * @brief Pure MD binary-payload decoder (93-byte payload after STX).
+ *
+ * Stateless field decode into *out; returns false on wrong length or bad
+ * TAG. This is the single host-testable byte sink for MD frames — the UART
+ * task feeds it and commits the result atomically. No locking here.
+ */
+bool opendash_md_parse_payload(const uint8_t *payload, int len,
+                               opendash_md_data_t *out);
+
+/**
  * @brief Returns true when status transitions to RECEIVING for the first time
  *        (or after a TIMEOUT→RECEIVING recovery).  Resets after one read.
  *        Caller can use this to trigger a buzzer beep in main.c.
