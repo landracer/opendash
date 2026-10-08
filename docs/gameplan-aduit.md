@@ -184,7 +184,7 @@ language is not acceptable on shared code.
 | 2026-10-07 | `f1b2c81` | every live doc reference synced from sdkconfig.defaults to committed sdkconfig (CHANGELOG/history untouched — they record history) | doc sync |
 | 2026-10-07 | `df5c8fe` | pod1/pod2 app slots widened 2.5→3 MB (slack from storage; lands via the wired P1.4 re-flash), lv_font_conv pinned exactly 1.5.3, pod2 CSV header copy-paste drift corrected | build honesty |
 | 2026-10-07 | — | **[build-smoke #30](https://github.com/landracer/opendash/actions/runs/37705648769) GREEN** — all 12 node builds + docs-lint + unit-tests; readme badge shipped; P0.2 closed | first green |
-| 2026-10-07 | (this commit) | **P1.2**: fire interlock extracted to `opendash_parachute_fire_verdict()` (pure, common/) + full truth-table tests; both MOS mains stripped of gate logic. D2 marked ON HOLD; D5 ratified (standard CONFIG_APP_SIGNING, no fuse) — P2.2 unblocked | P1.2, D2, D5 |
+| 2026-10-07 | `ffc2dd9` | **P1.2**: fire interlock extracted to `opendash_parachute_fire_verdict()` (pure, common/) + full truth-table tests; both MOS mains stripped of gate logic. D2 marked ON HOLD; D5 ratified (standard CONFIG_APP_SIGNING, no fuse) — P2.2 unblocked. CI #32 green on the refactor itself; #33 green after this ledger restore | P1.2, D2, D5 |
 
 ## 9. Next actions (ledger-adjusted, post-Phase-0)
 
