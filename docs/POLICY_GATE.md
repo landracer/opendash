@@ -1,9 +1,13 @@
 # OpenDash Roster Policy Gate — design (A+ P1.3)
 
-> **Status: DESIGN — awaiting owner ratification. No firmware behavior described
-> here is implemented yet.** This doc converts ruling D4 ("silence never
-> disarms"; trust = ROSTER, not center-only) into a buildable spec. When ratified,
-> §4–§6 become code + host truth tables, exactly like P1.2 did for the fire gate.
+> **Status: RATIFIED (owner rulings 2026-10-08) — implementation authorized.
+> No firmware behavior described here is implemented yet.** This doc converts
+> ruling D4 ("silence never disarms" while powered; trust = ROSTER, not
+> center-only) plus the owner's 2026-10-08 clarifications (power-loss reboot =
+> disarm is CORRECT standard; persistence is an opt-in user choice; pairing has
+> NO hardware button — it is center-screen event coordination; the physical
+> switch panel is replaced by center-controlled channels) into a buildable spec.
+> §4–§6 are now code + host truth tables, exactly like P1.2 did for the fire gate.
 
 ## 1. Today's verified truth (baseline this replaces)
 
@@ -26,14 +30,23 @@
 4. **Consequence (the D4 bug):** center offline ⇒ a rollover cannot deploy.
    Silence currently equals disarm, functionally.
 
-## 2. Trust model (D4 made concrete)
+## 2. Trust model (D4 made concrete, owner-ratified 2026-10-08)
 
 * Every safety node stores a **roster** in NVS: `entry = {node_id, mac[6], role_bits}`.
-  * `role_bits`: `ROLE_CENTER` (exactly one), `ROLE_VOTER` (0..N IMU/trigger
-    nodes whose `PARACHUTE_VOTE` this node obeys). A peer may hold both.
-  * Roster + arm state **persist across reboot**. Reboot comes up in the last
-    persisted arm state — *that is D4: silence never disarms*. (The old
-    "reboot always DISARMED" convention is overruled per §7 of the audit ledger.)
+  * `role_bits`: `ROLE_CENTER` (exactly one), `ROLE_VOTER` (0..N; every voter is
+    a gyro/IMU node with real 3D spatial awareness — today RIGHT, POD1, POD2).
+    A peer may hold both.
+  * **Arm state is RAM-only by STANDARD (owner ruling):** a power loss IS a
+    reboot, and a reboot comes up DISARMED — that is correct and stays. Safety
+    nodes ride **separate redundant lithium power** (hardware-layer mitigation,
+    explicitly out of firmware scope) so an armed system does not silently lose
+    power; if it does, disarm-on-reboot is the desired safe state.
+  * **Persistent latch is an OPT-IN user choice, not built-in behavior:** config
+    flag `OPENDASH_PARACHUTE_FLAG_PERSIST_ARM` (new bit, §7). Clear = arm state
+    dies with the reboot (standard). Set = arm state is mirrored to NVS and a
+    reboot restores it. Center UI exposes this toggle per subsystem (§8).
+  * Runtime silence still never disarms (D4 stands): no timeout anywhere clears
+    `armed` or `deployed` while the node stays powered.
 * Frames from non-roster senders are dropped at the dispatcher and counted (§5).
 * The fire interlock (`opendash_parachute_fire_verdict()`, P1.2) is **unchanged
   and unchanged in precedence**: the gate decides *who may ask*; the verdict
@@ -75,29 +88,70 @@ Mirror of the proven center logic, instantiated per MOS against its own roster:
 * echoed in the status blob; center shows/counts them (UI surface is Phase 4,
   not part of this gate).
 
-## 6. Pairing ritual (the only roster mutation path)
+## 6. Pairing ritual (owner ruling: NO hardware button — center-screen event coordination)
 
-1. Hold BOOT (GPIO0 — **owner to confirm/replace pin**) through power-on ⇒
-   node enters PAIRING for 30 s, status LED fast-blink.
-2. During the window: first valid `PARACHUTE_SET_CONFIG`/`SET_ARM`/`SET_RELAY`
-   frame latches sender as `ROLE_CENTER`; each `PARACHUTE_VOTE` frame from a new
-   peer during the window adds it as `ROLE_VOTER`. Both persist to NVS on accept.
-3. Window expiry re-freezes the roster. Outside the window NOTHING mutates it —
-   including frames from the already-pinned center (roster edit requires a fresh
-   pairing ritual; belt-and-braces per D4's spirit).
+Waveshare boards have no usable spare buttons and an expansion board is out of
+scope. Pairing is therefore **wireless and center-initiated**, with an honest
+bootstrap caveat:
+
+1. **Factory/bootstrap state:** fresh NVS ⇒ empty roster + `bootstrap=true`. In
+   bootstrap, the FIRST valid center-class command from any sender latches that
+   sender `ROLE_CENTER` (this is exactly today's behavior, now explicitly a
+   one-shot bootstrap rather than a permanent re-latch). Honest caveat: until
+   P1.4/P2 LMK lands, "first sender wins" is the bootstrap trust model —
+   accepted risk, closed by encryption, not by a fairy-tale keyless ritual.
+2. **Enrollment of a new voter:** center's commissioning screen (its own
+   "pairing mode" event) broadcasts `ROSTER_PUSH` frames; a node in bootstrap
+   accepts them; `ROLE_VOTER` entries land in the MOS roster the same way. The
+   center only enrolls nodes it already speaks through (the voters are exactly
+   the gyro/IMU 3D-spatial nodes: RIGHT, POD1, POD2).
+3. **Center replacement (handover):** the CURRENT center is the only authority
+   that can command "adopt new center MAC" (a center-class opcode mutates the
+   roster's `ROLE_CENTER` entry). If the center itself is dead, re-pairing =
+   bench re-flash, which wipes NVS and returns the node to bootstrap. Honest,
+   and consistent with the P1.4 one-sitting re-flash ritual.
+4. After bootstrap clears, NOTHING mutates the roster except a center-class
+   handover/push from a member already on it.
 
 ## 7. Wire/struct delta (packed, versioned)
 
 * new payload struct `opendash_roster_t { version; count; entry entries[4]; }` —
   same sanitize discipline as config (`count` clamped, unknown role bits masked);
+* new config flag `OPENDASH_PARACHUTE_FLAG_PERSIST_ARM (1u << 2)` — opt-in
+  arm-state NVS persistence (§2); default CLEAR = today's behavior (reboot ⇒
+  disarmed) kept as the STANDARD, per owner ruling;
 * `opendash_parachute_status_t` grows its `reserved` byte into
   `{last_reason, ctrl_rejected_lo, ctrl_rejected_hi}` in **config version 2**;
   `OPENDASH_PARACHUTE_CONFIG_VERSION` 1→2 is the rollout signal to center UI.
 
-## 8. Test matrix (lands with the code, same harness as P1.2)
+## 8. Center control surface (what "integrate into /center" means, owner 2026-10-08)
 
-pure `opendash_gate_decide(opcode, sender_role, pairing_active) → allow|deny+reason`
+The physical switch panel is **eliminated**. Every subsystem the driver used to
+toggle by hand becomes a center-addressed relay channel with a user-labeled
+software switch on the center screen:
+
+* **Subsystem channels:** each MOS/relay channel gets a user-assigned role
+  (fuel pump, water pump, NOS, accessories…) stored in center NVS as a channel
+  registry `{node, channel, label, ui_group}`. Center UI renders the panel from
+  the registry; toggling a switch sends gated `SET_RELAY`.
+* **ARM/DISARM master control** lives on the same screen (per-subsystem arm via
+  `SET_ARM`, plus the per-subsystem **persistent-latch opt-in toggle** that
+  writes the `PERSIST_ARM` flag — a *user choice*, never built-in behavior).
+* **"START ENGINE" / startup procedure:** a center-side sequenced start-up:
+  e.g. arm subsystem ⇒ energize fuel pump channel ⇒ wait for pressure data
+  point ⇒ enable ignition channel. Modeled as a declarative step list in center
+  NVS (step = {channel, wait-for-datapoint/timeout, next}) so the procedure is
+  data, not code. Engine-off/idle interlocks stay center-UI state; the MOS-side
+  verdict still has the final word per channel.
+* All of this rides the SAME gated control path (§3) — the panel is a new face
+  on old, counted, gated rails.
+
+## 9. Test matrix (lands with the code, same harness as P1.2)
+
+pure `opendash_gate_decide(opcode, sender_role, bootstrap_latched) → allow|deny+reason`
 and pure `opendash_fusion_eval(votes[], voter_count, now_us) → fire|hold`:
 every row of the §3 table both ways, roster-empty dead state, TTL expiry,
-manual override, duplicate/stale seq, pairing-window-only mutation, and the
-full P1.2 fire-verdict table still passing unchanged on top of the gate.
+manual override, duplicate/stale seq, bootstrap one-shot latch (second
+would-be-center cannot re-latch), PERSIST_ARM both ways across a simulated
+reboot, and the full P1.2 fire-verdict table still passing unchanged on top of
+the gate.
