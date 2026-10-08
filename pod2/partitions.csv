@@ -1,10 +1,19 @@
-# OpenDash Pod 1 — Custom Partition Table
+# OpenDash Pod 2 — Custom Partition Table
 # ESP32-S3 with 16MB Flash
+#
+# (header said "Pod 1" until 2026-10-07 — copy-paste drift, corrected honestly;
+# pod1 and pod2 share one schematic, and so do these tables)
+#
+# WHY widened (2026-10-07): identical to pod1/partitions.csv — the bench
+# firmware (IDF v6.1 dev-snapshot build) fits the old 2.5 MB slots with zero
+# margin, while the same config on the v6.1 release line (CI image) lands 37 KB
+# over. Slots now 3 MB, slack taken from 'storage'. A partition-table change
+# only lands via a WIRED re-flash (P1.4 rollout re-flash covers both pods).
 #
 # Name,   Type, SubType, Offset,     Size,      Flags
 nvs,      data, nvs,     0x9000,     0x5000,
 otadata,  data, ota,     0xe000,     0x2000,
-factory,  app,  factory, 0x10000,    0x280000,
-ota_0,    app,  ota_0,   0x290000,   0x280000,
-ota_1,    app,  ota_1,   0x510000,   0x280000,
-storage,  data, spiffs,  0x790000,   0x870000,
+factory,  app,  factory, 0x10000,    0x300000,
+ota_0,    app,  ota_0,   0x310000,   0x300000,
+ota_1,    app,  ota_1,   0x610000,   0x300000,
+storage,  data, spiffs,  0x910000,   0x6F0000,
