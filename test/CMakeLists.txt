@@ -26,6 +26,7 @@ add_library(od_core STATIC
     ../common/src/opendash_data_model.c
     ../common/src/node_health.c
     ../common/src/opendash_parachute.c
+    ../common/src/opendash_roster.c
 )
 target_include_directories(od_core PUBLIC
     ${CMAKE_CURRENT_LIST_DIR}/../common/include
@@ -34,7 +35,7 @@ target_include_directories(od_core PUBLIC
 
 enable_testing()
 
-foreach(suite protocol data_model node_health parachute)
+foreach(suite protocol data_model node_health parachute roster)
     add_executable(test_${suite} test_${suite}.c)
     target_link_libraries(test_${suite} PRIVATE od_core unity m)
     add_test(NAME ${suite} COMMAND test_${suite})

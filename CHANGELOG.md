@@ -41,6 +41,13 @@
   function whose FULL truth table (every gate, every precedence, NULL fail-safe)
   runs in `test/test_parachute.c` on every CI run. Both MOS mains now merely
   transport the verdict; no gate logic lives in `main.c` anymore.
+- **Roster policy-gate core** (A+ P1.3, design: `docs/POLICY_GATE.md`):
+  `opendash_roster.c` in `common/` — pure opcode-class routing (`SET_RELAY`/
+  `PARACHUTE_*`/`ROSTER_PUSH` = center-class, `PARACHUTE_VOTE` = vote-class),
+  one-shot bootstrap center latch, MAC+node-id-bound accepts, wrap-safe vote-seq
+  dedupe, and MOS-local vote fusion (600 ms TTL, unanimous-among-pinned-voters,
+  manual override). Host tables in `test/test_roster.c`. Pure logic only —
+  node rewiring is the next P1.3 step, so shipped behavior is unchanged.
 
 ### Changed
 
