@@ -41,6 +41,8 @@
 #include "opendash_boost.h"
 #include "opendash_bt_ota.h"
 #include "opendash_parachute.h"
+#include "opendash_roster.h"
+#include "nvs.h"
 #include "parachute_gpio.h"
 
 /* Boost output → MOS channel 3 (configurable). PWM duty 0..255 written every
@@ -110,6 +112,23 @@ static bool               s_para_fired       = false;  /* channel deploy latched
 static uint8_t            s_para_fired_mask  = 0;       /* channels we energized            */
 static esp_timer_handle_t s_para_pulse_timer = NULL;    /* pulse-mode auto-off              */
 
+/* ── P1.3 gate telemetry + local voter cache (docs/POLICY_GATE.md) ── */
+static uint16_t              s_ctrl_rejected = 0;  /* gate-drop count (echoed to center) */
+static uint8_t               s_last_reject   = 0;  /* last gate decision (opendash_gate_decision_t) */
+static opendash_vote_cache_t s_votes[OPENDASH_ROSTER_MAX];
+
+/* PERSIST_ARM opt-in (owner ruling D4): the arm state mirrors to NVS ONLY when
+ * the user set the flag; with the flag clear, reboot ⇒ DISARMED is the standard
+ * safe state and nothing is persisted. */
+static void arm_persist_write(bool armed)
+{
+    nvs_handle_t h;
+    if (nvs_open("parachute", NVS_READWRITE, &h) != ESP_OK) return;
+    nvs_set_u8(h, "armed", armed ? 1 : 0);
+    nvs_commit(h);
+    nvs_close(h);
+}
+
 static void send_parachute_status(void)
 {
     if (!s_center_mac_known) return;
@@ -122,6 +141,8 @@ static void send_parachute_status(void)
                                 : (uint8_t)opendash_parachute_actuator_state();
     st.armed     = opendash_parachute_actuator_is_armed()   ? 1 : 0;
     st.deployed  = (s_para_fired || opendash_parachute_actuator_is_deployed()) ? 1 : 0;
+    st.last_reason   = s_last_reject;    /* gate telemetry (v2 echo) */
+    st.ctrl_rejected = s_ctrl_rejected;
 
     opendash_msg_t m;
     opendash_msg_build(&m, OPENDASH_CMD_PARACHUTE_STATUS,
@@ -209,57 +230,63 @@ static void parachute_disarm_reset(void)
 static void dispatch_message(const opendash_espnow_event_t *evt,
                               const opendash_msg_t *msg)
 {
-    /* Learn and track the center's MAC from genuine center→MOS commands ONLY.
-     * These commands are issued exclusively by the center and arrive as unicast
-     * addressed to this node, so their src MAC is always the live center.
-     *
-     * We deliberately do NOT latch onto every bit7-clear frame: other nodes also
-     * broadcast bit7-clear frames (notably GPS TIME_SYNC, cmd=SYSTEM). The old
-     * "first bit7-clear frame" latch grabbed GPS as the center, so our unicast
-     * replies (relay ACKs, parachute 0x95 echoes) were sent to GPS and the
-     * center's PUSH/REFRESH never confirmed. SYSTEM is excluded for this reason. */
-    bool is_center_cmd = false;
-    switch (msg->cmd) {
-        case OPENDASH_CMD_SET_RELAY:
-        case OPENDASH_CMD_REQUEST_RELAY_STATUS:
-        case OPENDASH_CMD_PARACHUTE_SET_CONFIG:
-        case OPENDASH_CMD_PARACHUTE_SET_ARM:
-        case OPENDASH_CMD_PARACHUTE_PULL_ALL:
-        case OPENDASH_CMD_PARACHUTE_DEPLOY:
-            is_center_cmd = true;
-            break;
-        default:
-            break;
+    /* ── P1.3 roster gate (docs/POLICY_GATE.md) — replaces the old center-MAC
+     *    latch. Every frame passes the NVS-pinned roster. Pre-bootstrap ONLY
+     *    bootstrap-eligible center frames pierce (SYSTEM time-sync chatter and
+     *    BOOST never do — the old "grabbed GPS as center" bug is structurally
+     *    dead now). The first eligible sender is latched as our center EXACTLY
+     *    once; after sealing, strangers are simply NOT_ROSTER and votes are
+     *    honored only from center-pinned, node-id-bound voters. */
+    opendash_roster_t roster;
+    opendash_roster_store_get(&roster);
+
+    opendash_parachute_vote_t vote;
+    memset(&vote, 0, sizeof(vote));
+    if (msg->cmd == OPENDASH_CMD_PARACHUTE_VOTE &&
+        msg->length >= sizeof(opendash_parachute_vote_t)) {
+        memcpy(&vote, msg->payload, sizeof(vote));
     }
-    if (is_center_cmd &&
-        (!s_center_mac_known || memcmp(s_center_mac, evt->src_mac, 6) != 0)) {
-        bool first = !s_center_mac_known;
+
+    opendash_gate_decision_t d = opendash_gate_decide(&roster, evt->src_mac,
+                                                      vote.node, msg->cmd);
+    if (d != OD_GATE_ALLOW) {
+        if (s_ctrl_rejected < 0xFFFF) s_ctrl_rejected++;
+        s_last_reject = (uint8_t)d;
+        ESP_LOGW(TAG, "GATE drop cmd=0x%02X from " MACSTR " (reason=%d)",
+                 msg->cmd, MAC2STR(evt->src_mac), (int)d);
+        return;
+    }
+
+    if (opendash_msg_class(msg->cmd) == OD_MSG_CLASS_CENTER && !roster.bootstrapped) {
+        /* One-shot bootstrap latch: this sender is our center, forever. */
+        opendash_roster_t nr = roster;
+        nr.entry[0].node  = OPENDASH_NODE_CENTER;
+        nr.entry[0].roles = OPENDASH_ROLE_CENTER;
+        memcpy(nr.entry[0].mac, evt->src_mac, 6);
+        nr.count        = 1;
+        nr.bootstrapped = 1;
+        opendash_roster_store_set(&nr);
         memcpy(s_center_mac, evt->src_mac, 6);
         s_center_mac_known = true;
-        opendash_espnow_add_peer(s_center_mac);
-        if (first) {
-            ESP_LOGI(TAG, "Center discovered @ " MACSTR, MAC2STR(s_center_mac));
-            /* Announce identity so the center auto-registers our MAC (via
-             * STATUS_REPORT node_type) immediately instead of waiting for the
-             * next periodic heartbeat. */
-            send_heartbeat_broadcast();
-            /* Boot announce: send actual relay state so center clears stale cache */
-            uint8_t boot_mask = 0;
-            for (int i = 0; i < 4; i++) {
-                opendash_relay_channel_state_t st;
-                if (opendash_relay_get_state(i, &st) == ESP_OK && st.is_on) boot_mask |= (1u << i);
-            }
-            uint8_t bp[3] = { 0xCA, OPENDASH_NODE_MOS_4CH_B, boot_mask };
-            opendash_msg_t bm;
-            opendash_msg_build(&bm, OPENDASH_CMD_RELAY_STATUS, bp, sizeof(bp));
-            uint8_t bb[OPENDASH_ESPNOW_MAX_DATA]; uint16_t bl = 0;
-            if (opendash_msg_serialize(&bm, bb, &bl) == OPENDASH_OK) {
-                opendash_espnow_send(s_center_mac, bb, bl);
-            }
-            ESP_LOGI(TAG, "Boot state announce: mask 0x%02X", boot_mask);
-        } else {
-            ESP_LOGW(TAG, "Center MAC re-synced -> " MACSTR, MAC2STR(s_center_mac));
+        opendash_espnow_add_peer(evt->src_mac);
+        ESP_LOGI(TAG, "Center latched @ " MACSTR, MAC2STR(evt->src_mac));
+        /* Announce identity so the center auto-registers our MAC (via
+         * STATUS_REPORT node_type) and can push the voter roster immediately. */
+        send_heartbeat_broadcast();
+        /* Boot announce: send actual relay state so center clears stale cache */
+        uint8_t boot_mask = 0;
+        for (int i = 0; i < 4; i++) {
+            opendash_relay_channel_state_t st;
+            if (opendash_relay_get_state(i, &st) == ESP_OK && st.is_on) boot_mask |= (1u << i);
         }
+        uint8_t bp[3] = { 0xCA, OPENDASH_NODE_MOS_4CH_B, boot_mask };
+        opendash_msg_t bm;
+        opendash_msg_build(&bm, OPENDASH_CMD_RELAY_STATUS, bp, sizeof(bp));
+        uint8_t bb[OPENDASH_ESPNOW_MAX_DATA]; uint16_t bl = 0;
+        if (opendash_msg_serialize(&bm, bb, &bl) == OPENDASH_OK) {
+            opendash_espnow_send(s_center_mac, bb, bl);
+        }
+        ESP_LOGI(TAG, "Boot state announce: mask 0x%02X", boot_mask);
     }
 
     switch (msg->cmd) {
@@ -367,12 +394,14 @@ static void dispatch_message(const opendash_espnow_event_t *evt,
         }
 
         /* ──────────────────────────────────────────────────────
-         * Parachute / Deployment System — center→MOS (0x27..0x29)
-         * Config is NVS-persisted here; ARM is transient (reboot = DISARMED).
-         * Firing IS wired: parachute_fire() energizes the selected channels ONLY
-         * when enabled ∧ channel_mask≠0 ∧ armed (idempotent — latches once and
-         * never re-fires); LATCH holds until disarm/reboot, PULSE auto-off after
-         * pulse_ms. Disarm safe-resets fired channels (parachute_disarm_reset).
+         * Parachute / Deployment System — center→MOS (0x27..0x2C)
+         * Config is NVS-persisted here. ARM is RAM-only by default (reboot =
+         * DISARMED, the standard safe state); PERSIST_ARM is an opt-in flag the
+         * user enables per-node. Firing is gated by the P1.2 verdict (enabled ∧
+         * channel_mask≠0 ∧ armed, idempotent latch until disarm/reboot; PULSE
+         * auto-off after pulse_ms; disarm safe-resets fired channels).
+         * Autonomous deploy = local unanimous VOTE fusion (AUTO_DETECT flag gates
+         * it); the center path is unchanged (DEPLOY 0x2A / SET_ARM still rule).
          * ────────────────────────────────────────── */
         case OPENDASH_CMD_PARACHUTE_SET_CONFIG: {
             if (msg->length < sizeof(opendash_parachute_config_t)) break;
@@ -393,6 +422,11 @@ static void dispatch_message(const opendash_espnow_event_t *evt,
             bool armed = msg->payload[0] != 0;
             opendash_parachute_actuator_set_armed(armed);
             if (!armed) parachute_disarm_reset();  /* safe-reset fired channels */
+            opendash_parachute_config_t pc;
+            opendash_parachute_config_get(&pc);
+            if (pc.flags & OPENDASH_PARACHUTE_FLAG_PERSIST_ARM) {
+                arm_persist_write(armed);   /* user opted into cross-reboot arm */
+            }
             ESP_LOGW(TAG, "Deploy actuator %s by center",
                      armed ? "ARMED" : "DISARMED");
             send_parachute_status();
@@ -406,6 +440,59 @@ static void dispatch_message(const opendash_espnow_event_t *evt,
             esp_err_t fr = parachute_fire(OPENDASH_PARACHUTE_REASON_MANUAL);
             ESP_LOGW(TAG, "Manual DEPLOY command from center -> %s", esp_err_to_name(fr));
             send_parachute_status();
+            break;
+        }
+        case OPENDASH_CMD_ROSTER_PUSH: {
+            /* Center replaces the whole trust set (center entry + pinned
+             * voters). opendash_roster_store_set re-sanitizes on the way in. */
+            if (msg->length < sizeof(opendash_roster_t)) break;
+            opendash_roster_t nr;
+            memcpy(&nr, msg->payload, sizeof(nr));
+            opendash_roster_store_set(&nr);
+            ESP_LOGI(TAG, "Roster replaced by center (count=%u)", nr.count);
+            break;
+        }
+        case OPENDASH_CMD_PARACHUTE_VOTE: {
+            /* Gate already pinned this sender as a ROLE_VOTER entry bound to
+             * the vote's self-identified node id. Local fusion mirrors the
+             * center rule — AUTO_DETECT (per-node flag) gates the whole path. */
+            if (msg->length < sizeof(opendash_parachute_vote_t)) break;
+            opendash_parachute_vote_t v;
+            memcpy(&v, msg->payload, sizeof(v));
+
+            opendash_roster_t roster;
+            opendash_roster_store_get(&roster);
+            int8_t slot = -1;
+            uint8_t voter_count = 0;
+            for (uint8_t i = 0; i < roster.count; i++) {
+                if (!(roster.entry[i].roles & OPENDASH_ROLE_VOTER)) continue;
+                voter_count++;
+                if (roster.entry[i].node == v.node &&
+                    memcmp(roster.entry[i].mac, evt->src_mac, 6) == 0) slot = (int8_t)i;
+            }
+            if (slot < 0) break;                                   /* shouldn't happen post-gate */
+            if (!opendash_seq_fresh(s_votes[slot].seq, v.seq)) break; /* stale/duplicate — drop */
+
+            s_votes[slot].valid   = true;
+            s_votes[slot].rolling = v.rolling != 0;
+            s_votes[slot].manual  = v.manual  != 0;
+            s_votes[slot].node    = v.node;
+            s_votes[slot].seq     = v.seq;
+            s_votes[slot].rx_us   = esp_timer_get_time();
+
+            opendash_parachute_config_t pc;
+            opendash_parachute_config_get(&pc);
+            if (!(pc.flags & OPENDASH_PARACHUTE_FLAG_AUTO_DETECT)) break;
+
+            opendash_fusion_result_t fr = opendash_fusion_eval(
+                s_votes, OPENDASH_ROSTER_MAX, voter_count, esp_timer_get_time());
+            if (fr.fire) {
+                esp_err_t fr2 = parachute_fire((opendash_parachute_reason_t)v.reason);
+                ESP_LOGW(TAG, "Local fuse (%s) -> %s",
+                         fr.manual ? "manual vote" : "unanimous vote",
+                         esp_err_to_name(fr2));
+                send_parachute_status();
+            }
             break;
         }
 
@@ -687,15 +774,35 @@ void app_main(void)
     opendash_parachute_actuator_init(&para_cfg);
 
     /* Deployment config — load persisted (or install safe defaults). ARM is
-     * NOT persisted: the node always boots DISARMED. */
+     * RAM-only unless the user opted into PERSIST_ARM (D4). */
     opendash_parachute_config_init();
     opendash_parachute_config_t dcfg;
     opendash_parachute_config_get(&dcfg);
     ESP_LOGI(TAG, "Deploy cfg: %s ch=0x%X spd>=%.0fmph roll>=%.0fdeg "
-                  "rate>=%.0fdeg/s sustain=%ums pulse=%ums (DISARMED)",
+                  "rate>=%.0fdeg/s sustain=%ums pulse=%ums",
              dcfg.enabled ? "ENABLED" : "disabled", dcfg.channel_mask,
              dcfg.min_speed_mph, dcfg.roll_deploy_deg, dcfg.roll_rate_deg_s,
              dcfg.sustain_ms, dcfg.pulse_ms);
+
+    /* P1.3 roster store — factory-fresh (bootstrap open) unless sealed before. */
+    opendash_roster_store_init();
+
+    /* ARM restore — ONLY on PERSIST_ARM opt-in; standard boot stays DISARMED. */
+    if (dcfg.flags & OPENDASH_PARACHUTE_FLAG_PERSIST_ARM) {
+        nvs_handle_t ph; uint8_t av = 0;
+        if (nvs_open("parachute", NVS_READONLY, &ph) == ESP_OK) {
+            nvs_get_u8(ph, "armed", &av);
+            nvs_close(ph);
+        }
+        if (av) {
+            opendash_parachute_actuator_set_armed(true);
+            ESP_LOGW(TAG, "PERSIST_ARM opt-in: restored ARMED from NVS");
+        } else {
+            ESP_LOGI(TAG, "PERSIST_ARM opt-in: NVS arm=0, staying DISARMED");
+        }
+    } else {
+        ESP_LOGI(TAG, "Deploy actuator DISARMED (RAM-only; PERSIST_ARM off)");
+    }
 
     xTaskCreatePinnedToCore(espnow_task,         "espnow_task",   4096, NULL, 5, NULL, 0);
     xTaskCreatePinnedToCore(boost_compute_task,  "boost_compute", 4096, NULL, 6, NULL, 1);

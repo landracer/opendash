@@ -22,6 +22,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "esp_err.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -77,6 +79,11 @@ typedef enum {
 /** Classify an opcode (pure). Unlisted opcodes are INVALID. */
 opendash_msg_class_t opendash_msg_class(uint8_t opcode);
 
+/** TRUE for opcodes whose receipt justifies latching a NEW center (the
+ *  factory-bootstrap path). SYSTEM (time sync chatter) and BOOST are center-class
+ *  but NEVER bootstrap-eligible — exactly the old code's lesson, now structural. */
+bool opendash_roster_bootstrap_eligible(uint8_t opcode);
+
 /** Stamp version, clamp count to MAX, mask unknown role bits, zero reserved.
  *  Idempotent. Wiring calls this on every blob that enters NVS. */
 void opendash_roster_sanitize(opendash_roster_t *r);
@@ -89,12 +96,14 @@ const opendash_roster_entry_t *opendash_roster_find(const opendash_roster_t *r,
  * @brief THE gate (pure): may a frame from @p src_mac self-identifying as
  *        @p src_node carry @p opcode against this roster?
  *
- * Bootstrap semantics: while r->bootstrapped == 0, center-class frames are
- * ALLOWed from ANY sender ("first sender wins", the factory path — the caller
- * latches the sender as ROLE_CENTER and sets bootstrapped=1; that latch is the
- * ONLY bootstrap mutation and can never happen twice). Votes are NEVER honored
- * before bootstrap. After bootstrap: MAC must match an entry, and that entry's
- * roles must permit the class; votes must also match the pinned node id.
+ * Bootstrap semantics: while r->bootstrapped == 0, only BOOTSTRAP-ELIGIBLE
+ * center-class frames (see opendash_roster_bootstrap_eligible) from ANY sender
+ * are ALLOWed ("first real center command wins" — the factory path; the caller
+ * then latches the sender as ROLE_CENTER and sets bootstrapped=1, and that
+ * latch can never happen twice). Everything else — SYSTEM chatter, BOOST —
+ * stays denied until a center is pinned. Votes are NEVER honored pre-bootstrap.
+ * After bootstrap: MAC must match an entry, and that entry's roles must permit
+ * the class; votes must also match the pinned node id.
  */
 opendash_gate_decision_t opendash_gate_decide(const opendash_roster_t *r,
                                               const uint8_t src_mac[6],
@@ -134,6 +143,18 @@ opendash_fusion_result_t opendash_fusion_eval(const opendash_vote_cache_t *votes
                                              size_t n,
                                              uint8_t voter_count,
                                              int64_t now_us);
+
+/* ── Node-side store (NVS-persisted roster; mirrors opendash_parachute.c) ── */
+
+/** Init the store mutex + load the persisted blob (or install factory-fresh:
+ *  version stamped, count 0, bootstrapped 0). Call once at boot. */
+esp_err_t opendash_roster_store_init(void);
+
+/** Copy the current in-RAM roster into @p out. */
+esp_err_t opendash_roster_store_get(opendash_roster_t *out);
+
+/** Sanitize @p in, persist to NVS, install in RAM. */
+esp_err_t opendash_roster_store_set(const opendash_roster_t *in);
 
 #ifdef __cplusplus
 }

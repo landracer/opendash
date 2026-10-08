@@ -46,10 +46,26 @@
   `PARACHUTE_*`/`ROSTER_PUSH` = center-class, `PARACHUTE_VOTE` = vote-class),
   one-shot bootstrap center latch, MAC+node-id-bound accepts, wrap-safe vote-seq
   dedupe, and MOS-local vote fusion (600 ms TTL, unanimous-among-pinned-voters,
-  manual override). Host tables in `test/test_roster.c`. Pure logic only —
-  node rewiring is the next P1.3 step, so shipped behavior is unchanged.
+  manual override). Host tables in `test/test_roster.c`.
+- **P1.3 WIRED into firmware:** both MOS mains now run every inbound frame
+  through `opendash_gate_decide()` — the old "first whitelisted sender wins,
+  re-latch on mismatch" block is gone; the roster is NVS-persisted
+  (`opendash_roster_store_*`), voters are pinned via center-pushed
+  `ROSTER_PUSH 0x2C`, and each MOS fuses votes **locally** (AUTO_DETECT flag
+  gates it) instead of depending on center liveness. Center auto-pushes the
+  sealed roster (self + registered voters) on every node enrollment. Gate
+  telemetry (`last_reason`, `ctrl_rejected`) echoes in the status blob; every
+  drop is logged and counted.
+- **`PERSIST_ARM` opt-in (config v2):** with the flag set, ARM state mirrors to
+  NVS and restores at boot — user choice, never built-in; flag clear ⇒ boot
+  stays DISARMED (standard).
 
 ### Changed
+
+- **Deployment config v2 wire bump:** `opendash_parachute_status_t` traded its
+  pad byte for `last_reason` + `ctrl_rejected` gate counters, and
+  `OPENDASH_PARACHUTE_CONFIG_VERSION` is 2 (fresh NVS defaults until center
+  re-pushes — the re-flash ritual carries it fleet-wide).
 
 - **Build config source of truth**: resolved per-node `sdkconfig` files are
   committed and `sdkconfig.defaults` is gone (see

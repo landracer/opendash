@@ -1,7 +1,7 @@
 # OpenDash Roster Policy Gate — design (A+ P1.3)
 
-> **Status: RATIFIED (owner rulings 2026-10-08) — implementation authorized.
-> No firmware behavior described here is implemented yet.** This doc converts
+> **Status: RATIFIED (owner rulings 2026-10-08) — IMPLEMENTED (pure core +
+> wiring landed; bench proof on the second ESP32 pending).** This doc converts
 > ruling D4 ("silence never disarms" while powered; trust = ROSTER, not
 > center-only) plus the owner's 2026-10-08 clarifications (power-loss reboot =
 > disarm is CORRECT standard; persistence is an opt-in user choice; pairing has

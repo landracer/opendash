@@ -36,19 +36,25 @@
 extern "C" {
 #endif
 
-/** @brief Config schema version (bump when fields/semantics change). */
-#define OPENDASH_PARACHUTE_CONFIG_VERSION  1
+/** @brief Config schema version (bump when fields/semantics change).
+ *  v2 (A+ P1.3): +PERSIST_ARM flag; status carries ctrl_rejected counters. */
+#define OPENDASH_PARACHUTE_CONFIG_VERSION  2
 
 /* Config flag bits (opendash_parachute_config_t.flags).
  * Default 0 = LATCH ON until disarm/clear (what most users want). Set the bit
  * to pulse the channel for pulse_ms instead. Bit-flags keep the wire/NVS struct
- * the same size and backward-compatible with the old `reserved` byte (0). */
+ * the same size and backward-compatible with the old `reserved` byte (0).
+ * PERSIST_ARM (v2, owner ruling D4-2026-10-08): OPT-IN user choice — when set,
+ * the ARM state is mirrored to NVS and survives a reboot; CLEAR (standard),
+ * arm is RAM-only and a reboot always comes up DISARMED. Never built-in. */
 #define OPENDASH_PARACHUTE_FLAG_FIRE_PULSE  (1u << 0)  /**< 1 = pulse pulse_ms; 0 = latch on */
 #define OPENDASH_PARACHUTE_FLAG_AUTO_DETECT (1u << 1)  /**< 1 = autonomous rollover-vote deploy enabled; 0 = manual only */
+#define OPENDASH_PARACHUTE_FLAG_PERSIST_ARM (1u << 2)  /**< 1 = arm state persists across reboot (opt-in); 0 = reboot ⇒ DISARMED (standard) */
 
 /** Mask of all defined config flag bits (sanitize drops anything outside this). */
 #define OPENDASH_PARACHUTE_FLAG_MASK \
-    (OPENDASH_PARACHUTE_FLAG_FIRE_PULSE | OPENDASH_PARACHUTE_FLAG_AUTO_DETECT)
+    (OPENDASH_PARACHUTE_FLAG_FIRE_PULSE | OPENDASH_PARACHUTE_FLAG_AUTO_DETECT | \
+     OPENDASH_PARACHUTE_FLAG_PERSIST_ARM)
 
 /* ════════════════════════════════════════════════════════════════════════════
  * 1. ROLL / INVERSION DEPLOY THRESHOLDS  (degrees)
@@ -292,8 +298,9 @@ esp_err_t opendash_parachute_actuator_clear(void);
  * to NVS. Center pushes updates (OPENDASH_CMD_PARACHUTE_SET_CONFIG) and reads
  * back a STATUS echo (OPENDASH_CMD_PARACHUTE_STATUS) for verification.
  *
- * NOTE: ARM state is intentionally NOT part of this config and is NOT
- * persisted — a reboot always comes up DISARMED for safety.
+ * ARM state is RAM-only by default (reboot ⇒ DISARMED — the standard safe
+ * state, owner ruling D4). PERSIST_ARM is an explicit OPT-IN flag: when the
+ * user enables it, the MOS mirrors ARM to its own NVS and restores it at boot.
  * ════════════════════════════════════════════════════════════════════════════ */
 
 /** @brief Center-pushed, MOS-persisted deployment configuration.
@@ -312,13 +319,16 @@ typedef struct __attribute__((packed)) {
     uint16_t pulse_ms;         /**< deploy energize duration (ms) */
 } opendash_parachute_config_t;
 
-/** @brief MOS→center status echo: persisted config + live actuator state. */
+/** @brief MOS→center status echo (v2): persisted config + live actuator state
+ *         + gate telemetry. last_reason carries the opendash_gate_decision_t of
+ *         the last DENIED frame; ctrl_rejected counts gate drops (u16, lo/hi). */
 typedef struct __attribute__((packed)) {
     opendash_parachute_config_t cfg;  /**< current persisted config           */
     uint8_t  act_state;        /**< opendash_parachute_act_state_t            */
     uint8_t  armed;            /**< 0/1 — live arm state                      */
     uint8_t  deployed;         /**< 0/1 — fired/latched                       */
-    uint8_t  reserved;         /**< pad (0)                                   */
+    uint8_t  last_reason;      /**< opendash_gate_decision_t of last drop     */
+    uint16_t ctrl_rejected;    /**< gate-denied frame count (saturating u16)  */
 } opendash_parachute_status_t;
 
 /** @brief Detector→center rollover VOTE (OPENDASH_CMD_PARACHUTE_VOTE, broadcast).

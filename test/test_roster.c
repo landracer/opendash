@@ -47,7 +47,7 @@ void test_bootstrap_center_allow_once_then_sealed(void)
 {
     opendash_roster_t r; memset(&r, 0, sizeof r);
     r.version = OPENDASH_ROSTER_VERSION;  /* factory: not bootstrapped */
-    /* first center-class sender wins */
+    /* first center-class sender wins (eligible frame) */
     TEST_ASSERT_EQUAL_INT(OD_GATE_ALLOW,
         opendash_gate_decide(&r, MAC_STRANGER, 0x09, OPENDASH_CMD_SET_RELAY));
     /* but votes are NEVER honored pre-bootstrap */
@@ -60,6 +60,27 @@ void test_bootstrap_center_allow_once_then_sealed(void)
     /* one-shot latch: a second sender cannot re-latch the center away */
     TEST_ASSERT_EQUAL_INT(OD_GATE_DENY_WRONG_ROLE,
         opendash_gate_decide(&s, MAC_VOTER, 0x03, OPENDASH_CMD_PARACHUTE_SET_ARM));
+}
+
+void test_bootstrap_ineligible_never_latches(void)
+{
+    opendash_roster_t r; memset(&r, 0, sizeof r);
+    r.version = OPENDASH_ROSTER_VERSION;  /* factory: not bootstrapped */
+    /* BOOST frames are center-class but NOT bootstrap-eligible: unpaired nodes
+     * take no boost orders from anyone (old hole — now structurally closed). */
+    TEST_ASSERT_FALSE(opendash_roster_bootstrap_eligible(OPENDASH_CMD_BOOST_LIVE_DATA));
+    TEST_ASSERT_TRUE(opendash_roster_bootstrap_eligible(OPENDASH_CMD_SET_RELAY));
+    TEST_ASSERT_TRUE(opendash_roster_bootstrap_eligible(OPENDASH_CMD_ROSTER_PUSH));
+    TEST_ASSERT_EQUAL_INT(OD_GATE_DENY_NOT_ROSTER,
+        opendash_gate_decide(&r, MAC_STRANGER, 0x09, OPENDASH_CMD_BOOST_LIVE_DATA));
+    /* SYSTEM (GPS time-sync broadcast) never bootstraps either */
+    TEST_ASSERT_FALSE(opendash_roster_bootstrap_eligible(OPENDASH_CMD_SYSTEM));
+    TEST_ASSERT_EQUAL_INT(OD_GATE_DENY_NOT_ROSTER,
+        opendash_gate_decide(&r, MAC_STRANGER, 0x07, OPENDASH_CMD_SYSTEM));
+    /* after sealing, center-class SYSTEM from the pinned center IS honored */
+    opendash_roster_t s = sealed_roster();
+    TEST_ASSERT_EQUAL_INT(OD_GATE_ALLOW,
+        opendash_gate_decide(&s, MAC_CENTER, 0x01, OPENDASH_CMD_SYSTEM));
 }
 
 void test_sealed_gate_table(void)
@@ -146,14 +167,48 @@ void test_fusion_unanimity_and_expiry(void)
     TEST_ASSERT_FALSE(inert.fire);
 }
 
+void test_store_roundtrip_and_sanitize(void)
+{
+    /* store_init with an empty fake NVS ⇒ factory-fresh (bootstrap open) */
+    TEST_ASSERT_EQUAL_INT(ESP_OK, opendash_roster_store_init());
+    opendash_roster_t got;
+    TEST_ASSERT_EQUAL_INT(ESP_OK, opendash_roster_store_get(&got));
+    TEST_ASSERT_EQUAL_UINT8(0, got.bootstrapped);
+    TEST_ASSERT_EQUAL_UINT8(0, got.count);
+
+    /* set → persists → re-init loads the sealed roster back */
+    opendash_roster_t in; memset(&in, 0, sizeof in);
+    in.version = OPENDASH_ROSTER_VERSION;
+    in.bootstrapped = 1; in.count = 2;
+    memcpy(in.entry[0].mac, MAC_CENTER, 6);
+    in.entry[0].roles = OPENDASH_ROLE_CENTER; in.entry[0].node = 0x01;
+    memcpy(in.entry[1].mac, MAC_VOTER, 6);
+    in.entry[1].roles = OPENDASH_ROLE_VOTER;  in.entry[1].node = 0x03;
+    TEST_ASSERT_EQUAL_INT(ESP_OK, opendash_roster_store_set(&in));
+
+    TEST_ASSERT_EQUAL_INT(ESP_OK, opendash_roster_store_init());  /* reload path */
+    opendash_roster_t got2;
+    TEST_ASSERT_EQUAL_INT(ESP_OK, opendash_roster_store_get(&got2));
+    TEST_ASSERT_EQUAL_UINT8(1, got2.bootstrapped);
+    TEST_ASSERT_EQUAL_UINT8(2, got2.count);
+    TEST_ASSERT_EQUAL_MEMORY(MAC_CENTER, got2.entry[0].mac, 6);
+    TEST_ASSERT_EQUAL_MEMORY(MAC_VOTER,  got2.entry[1].mac, 6);
+
+    /* NULL args refused */
+    TEST_ASSERT_EQUAL_INT(ESP_ERR_INVALID_ARG, opendash_roster_store_get(NULL));
+    TEST_ASSERT_EQUAL_INT(ESP_ERR_INVALID_ARG, opendash_roster_store_set(NULL));
+}
+
 int main(void)
 {
     UNITY_BEGIN();
     RUN_TEST(test_msg_class);
     RUN_TEST(test_bootstrap_center_allow_once_then_sealed);
+    RUN_TEST(test_bootstrap_ineligible_never_latches);
     RUN_TEST(test_sealed_gate_table);
     RUN_TEST(test_sanitize_clamps);
     RUN_TEST(test_seq_wrap_safe);
     RUN_TEST(test_fusion_unanimity_and_expiry);
+    RUN_TEST(test_store_roundtrip_and_sanitize);
     return UNITY_END();
 }

@@ -50,6 +50,7 @@
 #include "opendash_data_model.h"
 #include "opendash_common.h"
 #include "opendash_rollover.h"
+#include "opendash_roster.h"
 #include "opendash_uart.h"
 #include "opendash_layout.h"
 #include "sd_logger.h"
@@ -243,6 +244,57 @@ static opendash_node_t identify_sender(const uint8_t *mac)
     return OPENDASH_NODE_COUNT; /* Unknown */
 }
 
+/* Forward decl — defined below with the other send helpers. */
+static esp_err_t espnow_master_send_raw_force(opendash_node_t node, uint8_t cmd,
+                                              const void *payload, uint16_t length,
+                                              uint8_t max_retries);
+
+/**
+ * @brief Compose the sealed roster (center entry + every auto-registered
+ *        detector voter) and push it to every known actuator (MOS A/B).
+ *
+ * P1.3 pairing backbone (docs/POLICY_GATE.md): MOS nodes latch their center on
+ * the first eligible center-class frame; this replaces that trust set wholesale
+ * with the full roster — center + all voters known so far. Idempotent and
+ * cheap: called on EVERY node auto-registration, so late-joining detectors are
+ * folded into the next push. Unregistered voters ⇒ omitted (pushed again when
+ * they show up).
+ */
+static void roster_refresh(void)
+{
+    opendash_roster_t r;
+    memset(&r, 0, sizeof(r));
+    r.version      = OPENDASH_ROSTER_VERSION;
+    r.bootstrapped = 1;   /* sealed roster */
+
+    uint8_t self[6];
+    esp_read_mac(self, ESP_MAC_WIFI_STA);
+    r.entry[0].node  = OPENDASH_NODE_CENTER;
+    r.entry[0].roles = OPENDASH_ROLE_CENTER;
+    memcpy(r.entry[0].mac, self, 6);
+    r.count = 1;
+
+    const opendash_node_t dets[] = OPENDASH_ROLLOVER_DETECTORS;
+    for (size_t i = 0; i < OPENDASH_ROLLOVER_DETECTOR_COUNT; i++) {
+        const channel_node_t *n = channel_mgr_get_node(dets[i]);
+        if (!n || !n->mac_known) continue;   /* voter not paired yet — later push covers it */
+        r.entry[r.count].node  = (uint8_t)dets[i];
+        r.entry[r.count].roles = OPENDASH_ROLE_VOTER;
+        memcpy(r.entry[r.count].mac, n->mac, 6);
+        r.count++;
+    }
+
+    const opendash_node_t acts[] = { OPENDASH_NODE_MOS_4CH_A, OPENDASH_NODE_MOS_4CH_B };
+    for (size_t i = 0; i < 2; i++) {
+        const channel_node_t *m = channel_mgr_get_node(acts[i]);
+        if (!m || !m->mac_known) continue;   /* actuator not seen yet */
+        esp_err_t err = espnow_master_send_raw_force(acts[i], OPENDASH_CMD_ROSTER_PUSH,
+                                                     &r, sizeof(r), 3);
+        ESP_LOGI(TAG, "TX roster push -> %s (count=%u) err=0x%x",
+                 NODE_NAMES[acts[i]], r.count, err);
+    }
+}
+
 /**
  * @brief Auto-register a node from its STATUS_REPORT / ANNOUNCE payload.
  *
@@ -270,6 +322,9 @@ static void auto_register_node(const uint8_t *mac,
 
     ESP_LOGI(TAG, "Auto-registered %s @ " MACSTR " (ch=%d cap=0x%02X)",
              NODE_NAMES[node_type], MAC2STR(mac), ch, cap);
+
+    /* P1.3: keep every actuator's roster current as nodes enroll. */
+    roster_refresh();
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
