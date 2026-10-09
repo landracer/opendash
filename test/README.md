@@ -26,6 +26,16 @@ Set `OD_VERBOSE_LOG=1` to see the code-under-test's log output while running.
 | `test_data_model.c` | Store set/get/update/overflow + cross-domain id partitioning (MD_* never aliases ECU ids) |
 | `test_node_health.c` | Health state machine: instant-ONLINE on any rx; freq-mode windowed OFFLINE; heartbeat-mode honest silence (DEGRADED ~2 missed, OFFLINE ~4); NVS restore comes back AWAITING |
 | `test_parachute.c` | Deploy config defaults, hostile-config clamping (NaN/negative/oversize), NVS round-trip |
+| `test_roster.c` | Policy-gate table (every opcode class both ways, bootstrap one-shot latch, ineligible rows), seq-dedupe, fusion TTL/override, store round-trip |
+| `test_fuzz_parsers.c` | P3.1 fuzz: seeded deterministic corpora on both byte sinks — codec accepts ONLY canonical frames; MD payload decoder TAG/length gates + determinism + golden values |
+
+## Coverage (P3.2)
+
+CI builds this harness `-DOD_COVERAGE=ON` and runs
+[`scripts/coverage_gate.sh`](../scripts/coverage_gate.sh): per-file line
+floors at the measured 2026-10-08 baseline; floors ratchet UP only.
+Locally: `cmake -S test -B test/build-cov -DOD_COVERAGE=ON` then
+`../scripts/coverage_gate.sh build-cov` from this directory.
 
 ## Rules
 

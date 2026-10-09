@@ -97,9 +97,14 @@ bootstrap caveat:
 1. **Factory/bootstrap state:** fresh NVS ⇒ empty roster + `bootstrap=true`. In
    bootstrap, the FIRST valid center-class command from any sender latches that
    sender `ROLE_CENTER` (this is exactly today's behavior, now explicitly a
-   one-shot bootstrap rather than a permanent re-latch). Honest caveat: until
-   P1.4/P2 LMK lands, "first sender wins" is the bootstrap trust model —
-   accepted risk, closed by encryption, not by a fairy-tale keyless ritual.
+* honest caveat (owner decision 2026-10-08): "first sender wins" IS the
+  bootstrap trust model, and it stays that way — ESP-NOW encryption was
+  investigated and DEFERRED indefinitely (encrypted-peer cap of 6/device vs
+  ~9 center peers made fleet-wide encryption impossible; owner judged RF
+  authentication out of threat model for a private race vehicle). This is
+  not a placeholder awaiting crypto: the gate/roster/dedupe layer is the
+  permanent trust model. A MAC-spoofed frame from a captured/extracted
+  device remains the registered accepted risk — see ledger §7 D3.
 2. **Enrollment of a new voter:** center's commissioning screen (its own
    "pairing mode" event) broadcasts `ROSTER_PUSH` frames; a node in bootstrap
    accepts them; `ROLE_VOTER` entries land in the MOS roster the same way. The
