@@ -53,7 +53,7 @@ its persistent peer table. The ID is *not* a bus address.
 | Center | `OPENDASH_NODE_CENTER` | 0 | Master | Routes frames to the owning channel task, aggregates data, primary display |
 | Left | `OPENDASH_NODE_LEFT` | 1 | Slave | Renders gauge data pushed by Center |
 | Right | `OPENDASH_NODE_RIGHT` | 2 | Slave | Renders gauge data pushed by Center |
-| GPS | `OPENDASH_NODE_GPS` | 3 | Slave | **⛔ FROZEN 2026-09-29 → REOPENED 2026-10-19**: owner schematic review shows the LC76G UART **is routed** (RXD=GPIO17, TXD=GPIO18) and firmware never enabled it — all "dead command channel" evidence is I2C-only. Iteration-7 debug build probes UART1 + runs the `$PAIR051/050` ladder; bench verdict on the monitor decides: unfrozen (≤10 Hz, full spec §2.3 set) or final. See `wiki/GPS-LC76G-POSTMORTEM.md` §9/§10. |
+| GPS | `OPENDASH_NODE_GPS` | 3 | Slave | **⛔ CLOSED-FINAL 2026-10-19 (measured):** iteration-7 firmware drove + listened on GPIO17/18 (both directions × 115200/9600) — silence. The LC76G-I2C module's serial command channel is NOT connected to this board (schematic NC = No Connect); its I2C surface is data-OUT only. Fixed 1 Hz, unconfigurable — as built, permanently. On this bench unit the module is currently unresponsive on I2C too (module unseated/dead). Go-forward = POD3 conversion; `uart_bridge.c` already speaks PAIR@115200 for it. See `wiki/GPS-LC76G-POSTMORTEM.md` §9–§11. |
 | BMS (ext.) | `OPENDASH_NODE_BMS` | 4 | Slave | External BMS node (rAtTrax integration) |
 | POD1–POD8 | `OPENDASH_NODE_POD1..8` | 5–12 | Slave | Expansion gauge pods |
 | Relay / MOS | `OPENDASH_NODE_RELAY_4CH` … `MOS_4CH_B` | 13–17 | Slave | Silent-slave relay + MOS FET controllers |

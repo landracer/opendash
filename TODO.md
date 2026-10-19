@@ -301,6 +301,14 @@
       suspect: the wiring is. If a future node ever exposes LC76G UART (or an
       equivalent command path), every command in that spec becomes live — including
       the never-yet-probed `$PAIR062/063` per-sentence output rates.
+- [x] **2026-10-19: iteration-7 BENCH EXECUTED — CLOSED-FINAL (measured).**
+      Flashed ACM5 (GPS node confirmed by `opendash_gps` live logs). Probe swept
+      GPIO17/18 both directions × {115200, 9600}: silence → the module's serial
+      PAIR command channel is NOT connected on this board ("NC/GPS RX|TX" =
+      No Connect, now measured). Same log: module also unresponsive on I2C on
+      this unit (every TX NACKed, PMIC read 0xFF, Sats 0) — module unseated or
+      dead; only hardware can settle which. GPS slot's configurable-GNSS future
+      = POD3 module swap (`uart_bridge.c` in-tree already speaks PAIR@115200).
 - [ ] **BLE OTA hardening** (see §1.4) — full recipe + suspend sequence
 - [x] ~~10 Hz update rate activation (`$PAIR050,100` after first fix)~~ —
       **CANCELLED by the CLOSED-FINAL verdict**: the path to the module's (real,

@@ -188,13 +188,21 @@ normal operation:
 | Device Type | Serial Access | Identity Visibility |
 |-------------|---------------|---------------------|
 | Center (4.3" LCD) | USB-CDC via ACM0 | Full boot banner in serial monitor |
-| Left (2.8" Round) | USB-CDC via ACM2 | Full boot banner in serial monitor |
-| Right (2.8" Round) | USB-CDC (when connected) | Full boot banner in serial monitor |
-| GPS (1.75" AMOLED) | USB-CDC via ACM1 | Full boot banner in serial monitor |
+| Left (2.8" Round) | USB-CDC via ACM1 (`1C:DB:D4:7B:5F:88`) | Full boot banner in serial monitor |
+| Right (2.8" Round) | USB-CDC via ACM3 (`1C:DB:D4:7B:61:68`) | Full boot banner in serial log |
+| GPS (1.75" AMOLED) | USB-CDC via ACM5 (`10:20:BA:46:61:FC`) | Full boot banner in serial log |
 | BMS (rAtTrax) | USB-UART via USB0 | Full boot banner (Arduino Serial) |
 | Relay 4CH HD | **No USB in car** | Identity stored in NVS but mismatch warning not visible without monitor |
 | MOS 4CH A/B | **No USB in car** | Identity stored in NVS but mismatch warning not visible without monitor |
 | Pod1-Pod8 | Depends on mounting | May or may not have accessible USB |
+
+> **2026-10-19 measured correction:** the previous table claimed GPS = ACM1
+> and Left = ACM2. Live-log probe on the bench (`cat /dev/ttyACMx` per port)
+> proved: ACM0=center (`espnow_master` logs), ACM1=pod1 (`opendash_pod1`),
+> ACM3=pod2 (`opendash_pod2`), ACM5=GPS (`opendash_gps`). Always CONFIRM by
+> the banner/tag in the live log before flashing — `/dev/ttyACMx` numbers
+> re-enumerate when devices are (re)plugged; `ls -l /dev/serial/by-id/` is
+> the stable handle (MAC in the Espressif device name).
 
 ### Implications for Headless Nodes
 

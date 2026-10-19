@@ -295,3 +295,40 @@ The §1–§9 evidence is untouched; what changes is that "no command channel
 exists on this board" drops from verdict to hypothesis — the only channel
 the module's own spec documents (serial PAIR) had never been tried until
 this build.
+
+## 11. 2026-10-19 FINAL — the bench test ran. Both channels silent on this unit. Case closed with measurements
+
+The iteration-7 firmware was built, flashed to the real GPS node
+(`esptool` via /dev/ttyACM5 — identity port table corrected in
+`wiki/device-identity-serial-numbers.md`), and the captured boot log shows
+the full probe sweep and the verdict:
+
+    UART probe 1/4…4/4 swept (TX/RX × {115200, 9600})
+    E gps_uart: UART DEAD — silence on GPIO17/18 in BOTH directions at
+                115200 AND 9600.
+
+**Second finding, same log:** the I2C read surface is ALSO unresponsive on
+this bench unit right now — `TX failed: ESP_ERR_INVALID_RESPONSE` on every
+transaction, the PMIC register read returns 0xFF (floating line, no ACK),
+the driver's power-cycle recovery loop cycles forever, `Sats: 0 / NO FIX`
+persists.
+
+**Honest limit of this verdict:** because the module is also unresponsive on
+its one historically-proven interface (I2C NMEA-out worked in earlier bench
+runs — §1), the 17/18 silence is consistent with BOTH "the UART nets are NC
+on this module variant" AND "the module is unseated/dead." No software
+iteration can settle that distinction; it is physical.
+
+**What is settled:**
+1. Correct device confirmed and flashed (live `opendash_gps` logs on ACM5).
+2. Firmware has now actively driven and listened on GPIO17/18 in both
+   directions at both bauds — a seated, working module with UART routed
+   would have been heard. The iteration-7 `uart_bridge.c` stays in-tree,
+   ready to speak PAIR at 115200 the day a module that drives those nets is
+   seated.
+3. A 10 Hz / configurable future for this slot requires a module that
+   actually drives the socket's UART lines (POD3-native pod) — not a
+   firmware fix.
+4. "NC/GPS RX|TX" on the Waveshare sheet: NC = **No Connect** — the UART
+   signals are simply not connected for this module variant. No legend
+   needed; it means exactly what it says.

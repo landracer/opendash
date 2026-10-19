@@ -322,3 +322,22 @@ on live bytes, and on the `$PAIR001` ACK sends `$PAIR050,100*22` and logs
 measured GGA Hz. Bench verdict (serial monitor) decides the node's fate:
 ACK = unfrozen (10 Hz + full §2.3 command set); silence in all four combos =
 read-only 1 Hz stands, finally measured on the real channel.
+
+## 14. 2026-10-19: BENCH EXECUTED — flashed ACM5, probe swept, verdict captured. CLOSED-FINAL (measured)
+
+Owner authorized unattended bench execution. Steps executed: enumerated
+`/dev/serial/by-id/`, probed every tty port with live-log reads (ACM0=center,
+ACM1=pod1, ACM3=pod2, **ACM5=GPS** — the identity doc's old table was stale and
+is corrected), flashed the iteration-7 build to ACM5, captured the boot log.
+
+Captured verdict: `UART DEAD — silence on GPIO17/18 in BOTH directions at
+115200 AND 9600`. Same log: the module is ALSO unresponsive on I2C on this
+unit (`ESP_ERR_INVALID_RESPONSE` on every transaction, PMIC read = 0xFF,
+endless power-cycle recovery, Sats 0). Honest limit recorded in post-mortem
+§11: with the module electrically unreachable everywhere, the 17/18 silence
+cannot distinguish "NC on this variant" from "module unseated/dead" — only
+swapping/resating hardware can. What software can still do is done:
+`uart_bridge.c` stays in-tree, ready to speak PAIR@115200 the day a module
+that drives those nets is seated. GPS slot's configurable-GNSS future = POD3
+conversion, not firmware. Node identity system worked as designed throughout
+(gps-tagged logs; no wrong-device flash possible without a visible warning).

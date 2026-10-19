@@ -4,23 +4,22 @@
 This is the GPS and Telemetry Unit project for OpenDash, running on the
 Waveshare ESP32-S3-Touch-AMOLED-1.75 hardware.
 
-> **⛔ FROZEN (2026-09-29) — REOPENED FOR BENCH TEST 2026-10-19.** Owner
-> schematic review: the LC76G's **UART IS routed to the ESP32** (RXD net =
-> GPIO17, TXD net = GPIO18). Firmware generations all honored the folklore
-> "UART disabled — do NOT enable" and NEVER initialized UART1 — so every
-> `$PAIR` command ever sent had no path to the module by construction (see
-> [`../wiki/GPS-LC76G-POSTMORTEM.md`](../wiki/GPS-LC76G-POSTMORTEM.md) §8/§9/§10).
-> The vendor protocol spec (vendored:
-> `docs/p1185254-Quectel_LC26G&LC76G&LC86G_GNSS_Protocol_Specification_V1.0.0_Preliminary.pdf`)
-> proves the module speaks the full `$PAIR` command set over its serial layer
-> (default 115200 per PAIR864) — the frozen verdict rested on I2C-only access.
-> **Iteration-7 debug build:** `uart_bridge.c` now probes UART1 (both pin
-> directions × 115200/9600); on live bytes it runs `$PAIR051` → `$PAIR050,100`
-> and logs the measured rate. Monitor the serial output: parser-ACK logs =
-> node unfrozen (10 Hz + full command set); silence in all four combos =
-> read-only 1 Hz stands, finally measured.
+> **⛔ CLOSED-FINAL 2026-10-19 — MEASURED.** The iteration-7 UART probe was
+> flashed to the node (`opendash_gps` live logs, ACM5) and swept GPIO17/18 in
+> BOTH directions at 115200 AND 9600: **silence** (`UART DEAD`). The module's
+> serial `$PAIR` command channel never reaches this board — the schematic's
+> "NC/GPS RX|TX" = **No Connect** for this module variant. (On this bench unit
+> the module is right now unresponsive on I2C too — `ESP_ERR_INVALID_RESPONSE`
+> everywhere, PMIC read 0xFF — so the module is either unseated or dead; see
+> post-mortem §11 before any new software attempt.) Practical result on this
+> board, now measured, not folklore: **fixed 1 Hz, data-OUT only,
+> unconfigurable.** The go-forward path for this slot remains the POD3
+> conversion (`wiki/POD3-CONVERSION-PLAN.md`): a UART-native pod module drives
+> the RXD17/TXD18 nets, and `uart_bridge.c` is already in-tree to speak PAIR
+> at 115200 the day one is seated.
 >
-> **Last updated:** 2026-10-19 (iteration-7 UART probe built — see banner top)
+> **Last updated:** 2026-10-19 (iteration-7 bench verdict captured — §11; node
+> status now measured-final)
 > **Production Code:** `gps_handler.c` v16k-port (v15L2 base + v16 fixes — see file header) + `uart_bridge.c` (iteration-7 debug)
 > **Authoritative References:** `wiki/LC76G-I2C-GPS-Driver-Guide.md` (v2.0.0,
 > read-path) + the vendored Quectel GNSS Protocol Specification PDF (command set)

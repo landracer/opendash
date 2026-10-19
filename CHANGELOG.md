@@ -17,6 +17,15 @@
 
 ### Added
 
+- **GPS iteration-7 bench executed, node CLOSED-FINAL (2026-10-19):** iteration-7
+  firmware flashed to the real GPS node (ACM5 — measured port map now in the
+  identity doc). Probe swept GPIO17/18 in both directions × {115200, 9600}:
+  **silence** → the LC76G-I2C module's serial PAIR command channel is not
+  connected on this board (schematic "NC" = No Connect, now measured). Same log:
+  module also unresponsive on I2C (unseated/dead on this unit). 1 Hz read-only
+  stands — measured, not folklore. `uart_bridge.c` stays in-tree for a future
+  UART-native POD3 pod; GPS slot's configurable future is a module swap, not a
+  firmware fix.
 - **GPS node REOPENED for bench test (iteration-7, 2026-10-19):** owner
   schematic review proved the LC76G UART is routed to the ESP32 (RXD=GPIO17,
   TXD=GPIO18) while every firmware generation left UART1 uninitialized
