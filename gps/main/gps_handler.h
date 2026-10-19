@@ -96,7 +96,13 @@ typedef struct {
  *
  * Configures I2C CASIC communication with the LC76G module.
  * The I2C bus must already be initialized via display_init().
- * UART is NOT functional on this board — GPIO17/18 are I2C-routed only.
+ *
+ * 2026-10-19 CORRECTION (owner schematic review): the earlier claim "UART is
+ * not functional on this board — GPIO17/18 are I2C-routed only" was FOLKLORE.
+ * The schematic shows the LC76G UART IS routed (RXD net = GPIO17, TXD net =
+ * GPIO18); firmware simply never enabled UART until iteration-7 debug
+ * (uart_bridge.c). Until the bench verdict on that probe lands, treat the
+ * I2C read path below as the only PROVEN channel.
  *
  * @return ESP_OK on success.
  */

@@ -17,6 +17,14 @@
 
 ### Added
 
+- **GPS node REOPENED for bench test (iteration-7, 2026-10-19):** owner
+  schematic review proved the LC76G UART is routed to the ESP32 (RXD=GPIO17,
+  TXD=GPIO18) while every firmware generation left UART1 uninitialized
+  ("UART disabled" was folklore). New `gps/main/uart_bridge.c` probes UART1
+  (both directions × 115200/9600), then drives `$PAIR051` query → `$PAIR050,100`
+  rate set and logs the measured GGA rate. Serial-monitor verdict decides:
+  ACK → node unfrozen (≤10 Hz, full PAIR command set); silence → 1 Hz stands,
+  measured on the real channel for the first time.
 - **Vendor ground truth vendored (2026-10-19):** the real Quectel
   `LC26G&LC76G&LC86G GNSS Protocol Specification V1.0.0` is now tracked at
   `docs/p1185254-…Preliminary.pdf` and indexed. It refines (does not reverse)

@@ -9,6 +9,7 @@ idf_component_register(
         "display_init.c"
         "ui_manager.c"
         "gps_handler.c"
+        "uart_bridge.c"
         "imu_handler.c"
         "sd_logger.c"
         "../../common/src/opendash_bt_ota.c"

@@ -53,7 +53,7 @@ its persistent peer table. The ID is *not* a bus address.
 | Center | `OPENDASH_NODE_CENTER` | 0 | Master | Routes frames to the owning channel task, aggregates data, primary display |
 | Left | `OPENDASH_NODE_LEFT` | 1 | Slave | Renders gauge data pushed by Center |
 | Right | `OPENDASH_NODE_RIGHT` | 2 | Slave | Renders gauge data pushed by Center |
-| GPS | `OPENDASH_NODE_GPS` | 3 | Slave | **⛔ FROZEN 2026-09-29** — the LC76G module itself is a fully configurable ≤10 Hz GNSS engine (Quectel protocol spec, vendored at `docs/p1185254-…GNSS_Protocol_Specification…pdf`), but this board's I2C integration carries NMEA **out only** — the spec'd command path is not wired; spec-exact probes were bench-proven dead. Unusable for racing telemetry as built. See `wiki/GPS-LC76G-POSTMORTEM.md` (incl. §9 addendum). No further development. |
+| GPS | `OPENDASH_NODE_GPS` | 3 | Slave | **⛔ FROZEN 2026-09-29 → REOPENED 2026-10-19**: owner schematic review shows the LC76G UART **is routed** (RXD=GPIO17, TXD=GPIO18) and firmware never enabled it — all "dead command channel" evidence is I2C-only. Iteration-7 debug build probes UART1 + runs the `$PAIR051/050` ladder; bench verdict on the monitor decides: unfrozen (≤10 Hz, full spec §2.3 set) or final. See `wiki/GPS-LC76G-POSTMORTEM.md` §9/§10. |
 | BMS (ext.) | `OPENDASH_NODE_BMS` | 4 | Slave | External BMS node (rAtTrax integration) |
 | POD1–POD8 | `OPENDASH_NODE_POD1..8` | 5–12 | Slave | Expansion gauge pods |
 | Relay / MOS | `OPENDASH_NODE_RELAY_4CH` … `MOS_4CH_B` | 13–17 | Slave | Silent-slave relay + MOS FET controllers |

@@ -4,7 +4,8 @@
  *
  * Hardware: Waveshare ESP32-S3-Touch-AMOLED-1.75
  * Resolution: 466×466 Round AMOLED (CO5300 QSPI)
- * GPS: LC76G GNSS module (I2C)
+ * GPS: LC76G GNSS module — I2C read surface (GPIO15/14) + UART1 (GPIO17/18,
+ *      enabled 2026-10-19 by iteration-7 debug; see uart_bridge.c)
  * IMU: QMI8658 6-axis accelerometer + gyroscope (I2C)
  * Touch: CST9217 (I2C, managed by display_init)
  * Role: ESP-NOW node (OPENDASH_NODE_GPS), GPS/IMU data provider
@@ -15,6 +16,12 @@
  *   - NOTE (frozen): no boot ANNOUNCE is ever sent — center can only discover
  *     this node by content-inference once NMEA is already flowing (see
  *     TODO §2.4 audit finding — this is why the node "doesn't always connect")
+ *   - ITERATION-7 DEBUG (2026-10-19): owner schematic review shows the LC76G
+ *     UART IS routed (RXD net = GPIO17, TXD net = GPIO18). Firmware historically
+ *     never enabled UART — "UART not functional" was folklore, not measurement.
+ *     uart_bridge.c now probes direction+baud and drives $PAIR051/$PAIR050 over
+ *     UART; the bench verdict on the serial monitor reopens or finalizes the
+ *     frozen verdict.
  *   - Responds to the LEGACY PING subcmd with STATUS_REPORT (center no longer
  *     polls — dead path kept for wire-compat only)
  *   - Receives SET_DATA_POINT from center (engine data for display)
@@ -50,6 +57,7 @@
 #include "display_init.h"
 #include "ui_manager.h"
 #include "gps_handler.h"
+#include "uart_bridge.h"
 #include "imu_handler.h"
 #include "opendash_common.h"
 #include "opendash_display_config.h"
@@ -445,6 +453,15 @@ void app_main(void)
     ESP_LOGI(TAG, "Initializing GPS module (LC76G I2C)...");
     ESP_ERROR_CHECK(gps_handler_init());
     ESP_LOGI(TAG, "[5/9] GPS module initialized");
+
+    /* ── Step 5b: UART probe — ITERATION-7 DEBUG (2026-10-19) ── */
+    /* Owner schematic review: LC76G UART IS routed (RXD net=GPIO17,
+       TXD net=GPIO18). Firmware never enabled UART until now, so every
+       $PAIR command ever sent died on the I2C read surface by construction.
+       This probe auto-detects dir+baud and drives the spec'd command ladder
+       over UART. Bench verdict lands on the serial monitor. */
+    ESP_LOGI(TAG, "Starting UART probe on GPIO17/18 (iteration-7 debug)...");
+    ESP_ERROR_CHECK(esp_uart_bridge_probe_start());
 
     /* ── Step 6: IMU Sensor ─────────────────────────────────── */
     ESP_LOGI(TAG, "Initializing IMU sensor (QMI8658 I2C)...");

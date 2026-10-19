@@ -304,3 +304,21 @@ carries a blanket `*.pdf` rule ("copyrighted datasheets — never commit"). The
 owner supplying this document as ground truth is the owner-level ruling that
 carves out the single documented exception (see `.gitignore` comment); the
 blanket policy otherwise still stands.
+
+## 13. 2026-10-19: SCHEMATIC CONFIRMED — LC76G UART is routed (RXD=GPIO17, TXD=GPIO18). Node REOPENED for bench test
+
+Owner checked the actual board schematic: the module UART is wired to the
+ESP32 on GPIO17 (RXD net) / GPIO18 (TXD net) — the same nets the POD3 plan
+treats as the module socket signals. Historical folklore ("UART disabled — do
+NOT enable", gps_handler.h verbatim) was never verified, and no gps firmware
+generation ever initialized UART1 — `uart_bridge.c` did not even exist in
+`gps/main/`. So every $PAIR probe in §8 failed to reach the parser *by
+construction*: the only channel the vendor spec documents for commands
+(serial PAIR, default 115200 per PAIR864) was never connected in software.
+
+Iteration-7 debug firmware built: `gps/main/uart_bridge.c` probes UART1 over
+both pin directions × {115200, 9600}, logs every line, sends `$PAIR051*3E`
+on live bytes, and on the `$PAIR001` ACK sends `$PAIR050,100*22` and logs
+measured GGA Hz. Bench verdict (serial monitor) decides the node's fate:
+ACK = unfrozen (10 Hz + full §2.3 command set); silence in all four combos =
+read-only 1 Hz stands, finally measured on the real channel.

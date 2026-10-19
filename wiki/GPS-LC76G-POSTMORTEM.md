@@ -267,3 +267,31 @@ The real Quectel document is now vendored in-repo:
    integration of a fully configurable module is the limit.** Any future
    node that exposes LC76G UART (or any bridge into the spec'd command path)
    inherits the full §2.3 command set above.
+
+## 10. 2026-10-19 addendum 2 — SCHEMATIC: the module UART IS routed. Frozen verdict REOPENED for bench test
+
+Owner schematic review: the LC76G's UART is wired to the ESP32 — RXD net on
+GPIO17, TXD net on GPIO18 (the same nets the POD3 conversion plan treats as
+the module socket signals). The driver-guide table listed these pins as
+"UART — disabled, do NOT enable" and every firmware generation honored that
+folklore: **UART1 was never once initialized** (`uart_bridge.c` did not even
+exist in `gps/main/`; CMake SRCS had no UART file). Every $PAIR command ever
+attempted therefore had to die at the I2C read surface *by construction* —
+§8's conclusion "commands are not consumed by the module's parser" described
+the access path, not the module, and it was never testable over I2C.
+
+**Iteration-7 debug firmware built (2026-10-19):** `gps/main/uart_bridge.c`
+now probes UART1 across both pin directions × {115200 (PAIR864 default),
+9600}, logging every received line. On live bytes it sends `$PAIR051*3E`;
+on a `$PAIR001` ACK for 051 it sends `$PAIR050,100*22` and logs the measured
+GGA rate. Outcomes:
+- ACK observed → parser was never dead, the channel was never enabled →
+  node UNFROZENS (10 Hz + full §2.3 command set live); §8's "unconfigurable"
+  line is retired as folklore.
+- Silence in both directions at both bauds → the folklore survives a real
+  test for the first time; read-only 1 Hz stands, final and measured.
+
+The §1–§9 evidence is untouched; what changes is that "no command channel
+exists on this board" drops from verdict to hypothesis — the only channel
+the module's own spec documents (serial PAIR) had never been tried until
+this build.
