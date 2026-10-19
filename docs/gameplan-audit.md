@@ -298,3 +298,9 @@ not silicon), and iteration-6's probe set (050/051 only) is complete enough
 to have caught any live path (a working 050 would have moved RMC+GGA to
 10 Hz). `gps/README.md`, `docs/architecture.md`, and PROJECT_INDEX updated to
 the refined wording.
+
+Mechanism note: `docs/p1185254-…pdf` had been *untracked* because `.gitignore`
+carries a blanket `*.pdf` rule ("copyrighted datasheets — never commit"). The
+owner supplying this document as ground truth is the owner-level ruling that
+carves out the single documented exception (see `.gitignore` comment); the
+blanket policy otherwise still stands.

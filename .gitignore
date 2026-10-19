@@ -58,6 +58,11 @@ mos-4ch-a-pre-restore-*/
 # Copyrighted datasheets — never commit
 docs/pdf/
 *.pdf
+# OWNER-RULING EXCEPTION (2026-10-19, ledger §12): this one vendor document is
+# tracked by explicit owner decision — it is the ground-truth command-set canon
+# for the LC76G node (post-mortem §9). The blanket policy above still stands;
+# adding any other vendor PDF remains an owner-level decision.
+!docs/p1185254-Quectel_LC26G&LC76G&LC86G_GNSS_Protocol_Specification_V1.0.0_Preliminary.pdf
 
 # Repo hygiene guard rails (A+ program P0.4): CAD binaries and raw log dumps
 # never enter git — size enforcement lives in scripts/check_docs.sh check 4.
