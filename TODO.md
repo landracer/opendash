@@ -291,8 +291,22 @@
   - Recovery/WAKE writes now target only 0x58 — the endpoint the post-mortem
     proved intermittently NACKs at the wire level; a keep-alive write to a
     non-ACKing endpoint is a no-op by construction.
+- [x] **2026-10-19: manufacturer protocol spec vendored** —
+      `docs/p1185254-Quectel_LC26G&LC76G&LC86G_GNSS_Protocol_Specification_V1.0.0_Preliminary.pdf`.
+      Verdict REFINED (post-mortem §9): the LC76G module itself fully supports the
+      `$PAIR` command set (001 ACK, 002–007 power/starts, 050/051 fix-rate
+      100–1000 ms, 062/063 per-sentence rates, 066 search mode, 382 sleep-lock,
+      513 NVRAM-save) — the silicon is a configurable ≤10 Hz engine; THIS board's
+      I2C integration is what is read-only. "The hardware is shitty" was the wrong
+      suspect: the wiring is. If a future node ever exposes LC76G UART (or an
+      equivalent command path), every command in that spec becomes live — including
+      the never-yet-probed `$PAIR062/063` per-sentence output rates.
 - [ ] **BLE OTA hardening** (see §1.4) — full recipe + suspend sequence
-- [ ] 10 Hz update rate activation (`$PAIR050,100` after first fix)
+- [x] ~~10 Hz update rate activation (`$PAIR050,100` after first fix)~~ —
+      **CANCELLED by the CLOSED-FINAL verdict**: the path to the module's (real,
+      spec'd) rate command does not exist over this board's read-only I2C.
+      Node stays 1 Hz; the spec vendored 2026-10-19 proves the command exists —
+      just not reachable here.
 - [ ] **Parachute deployment system** — zero code anywhere; design + implement
 - [ ] GPS → RTC time sync on valid fix (gps_handler.c)
 - [ ] Track map overlay (if 466×466 allows)

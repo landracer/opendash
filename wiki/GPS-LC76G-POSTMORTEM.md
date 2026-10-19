@@ -226,3 +226,44 @@ by the module's parser. A 1 Hz fixed-rate NMEA logger, unconfigurable by
 design of THIS board's wiring. §§1–6 stand. The POD3 conversion
 (`POD3-CONVERSION-PLAN.md`) is the go-forward path for this node.
 unproven*. That is exactly the standard we closed on too early.
+
+## 9. 2026-10-19 addendum — the manufacturer spec landed; verdict refined, not reversed
+
+The real Quectel document is now vendored in-repo:
+`docs/p1185254-Quectel_LC26G&LC76G&LC86G_GNSS_Protocol_Specification_V1.0.0_Preliminary.pdf`
+(LC26G&LC76G&LC86G **GNSS Protocol Specification**, V1.0.0 Preliminary,
+2022-05-13, 61 pages). It changes the *explanation*, not the bench result:
+
+1. **The module's command language IS `$PAIR` after all.** Spec §1: the
+   software commands are "NMEA proprietary commands defined by the chipset
+   supplier (PAIR messages)." §2.3 defines the full set: `PAIR001` ACK (with
+   Result codes 0–5), `002/003` subsystem power on/off (Standby), `004–007`
+   hot/warm/cold/full-cold starts, `050/051` SET/GET position-fix interval
+   (100–1000 ms; spec examples `*12`/`*3E` — byte-identical to the
+   iteration-5/6 probes, checksums independently re-verified this pass),
+   `062/063` per-sentence NMEA output rates, `066/067` search mode, `382`
+   sleep-lock, `513` NVRAM save. So the original wiki's "$PAIR subset"
+   framing was *directionally right* — **the LC76G silicon/parser is not a
+   locked 1 Hz logger; it is a fully specified, configurable (≤10 Hz) GNSS
+   engine.**
+2. **The spec defines NO I2C transport at all.** All 61 pages document the
+   module's serial-layer NMEA command set; "I2C" appears exactly once (a
+   Standby note under the 003 command). What this board's I2C endpoints
+   expose (and what Waveshare's own read-only demo driver implements) is a
+   data-OUT-only surface. Commands die because **nothing on this board's
+   I2C wiring feeds the module's spec'd command interface** — not because
+   the module forgot the syntax, and not because the module itself is a
+   dumb logger.
+3. **Fact for the record:** iteration-6 probed only `050/051` over I2C. The
+   spec also defines `062/063` per-sentence output rates (§2.3.13/2.3.14) —
+   never probed over I2C. Moot for the verdict (a live 050 path would have
+   moved RMC+GGA to 10 Hz — the read path is provably one-way), but the
+   complete command family is now documented here.
+4. **Refined final verdict:** ⛔ FROZEN stands *for this board*. The LC76G
+   module itself is exactly as capable as the GNSS receivers used by the
+   rAtTrax-BMS-Logger and MultiDisplay integrations — configurable,
+   10 Hz-capable, per this spec. The "is the hardware that shitty?" question
+   is answered: **the module is not shitty; this board's read-only I2C
+   integration of a fully configurable module is the limit.** Any future
+   node that exposes LC76G UART (or any bridge into the spec'd command path)
+   inherits the full §2.3 command set above.

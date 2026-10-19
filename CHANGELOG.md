@@ -17,6 +17,15 @@
 
 ### Added
 
+- **Vendor ground truth vendored (2026-10-19):** the real Quectel
+  `LC26G&LC76G&LC86G GNSS Protocol Specification V1.0.0` is now tracked at
+  `docs/p1185254-…Preliminary.pdf` and indexed. It refines (does not reverse)
+  the GPS verdict: the LC76G module natively speaks the full `$PAIR` command
+  set (fix-rate 050/051 100–1000 ms, per-sentence rates 062/063, search mode
+  066, standby/start 002–007/382/513) — the module is a configurable ≤10 Hz
+  engine; THIS board's I2C integration is data-out-only, which is why
+  spec-exact commands were bench-proven dead. Root cause is now precisely
+  named: board wiring, not silicon. See post-mortem §9 and ledger §12.
 - **Independent documentation audit + cleanup pass (2026-10-12):** every remaining
   I2C-as-inter-node-transport prose drift fixed (I2C is ONLY a local peripheral
   bus inside one enclosure — ESP-NOW is the sole node-to-node transport); the

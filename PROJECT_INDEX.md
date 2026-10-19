@@ -4,11 +4,15 @@
 > **Central reference for the entire OpenDash codebase.**
 > Start here to understand the project, then follow links to detailed documents.
 >
-> **Last updated:** 2026-10-12 (documentation cleanup pass — orphaned canon docs
-> indexed below, remaining I2C-as-transport prose drift fixed — checklist now says
-> ESP-NOW, glossary I2C entry rewritten, LEFT/RIGHT main-loop row fixed, right/
-> tree line corrected; untracked duplicate `docs/archived/` copy deleted. Previous:
-> 2026-10-10 independent re-audit findings closed — see ledger
+> **Last updated:** 2026-10-19 (vendor ground truth landed: the real Quectel
+> LC26G&LC76G&LC86G GNSS Protocol Specification is vendored + indexed; GPS
+> verdict refined — module is fully PAIR-configurable ≤10 Hz, this board's I2C
+> wiring is the read-only limit. Previous: 2026-10-12 documentation cleanup
+> pass — orphaned canon docs indexed below, remaining I2C-as-transport prose
+> drift fixed — checklist now says ESP-NOW, glossary I2C entry rewritten,
+> LEFT/RIGHT main-loop row fixed, right/
+> tree line corrected; untracked duplicate `docs/archived/` copy deleted.
+> Previous: 2026-10-10 independent re-audit findings closed — see ledger
 > §10; ledger renamed `gameplan-aduit.md` → `gameplan-audit.md`; controller-node
 > READMEs landed; readme tree/node-ID/SD-logging claims corrected. Program opened
 > 2026-10-07 — game-plan + audit
@@ -186,7 +190,9 @@ opendash/
 │   └── README.md               GPS unit documentation (I2C, NOT UART)
 │
 ├── wiki/                       ── Authoritative Reference Docs ─────────
-│   ├── LC76G-I2C-GPS-Driver-Guide.md   SOLE GPS REFERENCE (v2.0.0)
+│   ├── LC76G-I2C-GPS-Driver-Guide.md   read-path reference (v2.0.0); module
+│   │       command set now canonically documented by the vendored vendor spec
+│   │       (docs/p1185254-…GNSS_Protocol_Specification…pdf)
 │   └── LC76G-10Hz-Spec-Breakout.md     10 Hz logging specs
 │
 ├── build/                      Top-level CMake output (generated)
@@ -247,7 +253,8 @@ Every documentation file in the project, grouped by purpose.
 
 | Document | What You'll Learn |
 |---|---|
-| [**wiki/GPS-LC76G-POSTMORTEM.md**](wiki/GPS-LC76G-POSTMORTEM.md) | **WHY GPS IS FROZEN** — 1 Hz hard limit, read-only receiver, abort criteria met. Read before touching `gps/` |
+| [**GPS-LC76G-POSTMORTEM.md**](wiki/GPS-LC76G-POSTMORTEM.md) | **WHY GPS IS FROZEN** — board I2C is read-out-only, abort criteria met; §9 addendum: the vendored manufacturer spec proves the module itself is fully PAIR-configurable (≤10 Hz) — the wiring is the limit, not the silicon. Read before touching `gps/` |
+| [**Quectel LC76G GNSS Protocol Specification V1.0.0 (PDF)**](docs/p1185254-Quectel_LC26G&LC76G&LC86G_GNSS_Protocol_Specification_V1.0.0_Preliminary.pdf) | **★ VENDOR GROUND TRUTH** — the module's real command set (PAIR001 ACK / 002–007 power+start / 050–051 fix rate / 062–063 sentence rates / 066 search mode / 382 sleep-lock / 513 NVRAM save); serial-layer spec, defines no I2C transport |
 | [**wiki/LC76G-I2C-GPS-Driver-Guide.md**](wiki/LC76G-I2C-GPS-Driver-Guide.md) | CASIC-over-I2C driver reference (0x50 W / 0x54 R / 0x58 DWR) for the local GNSS chip |
 | [**wiki/LC76G-10Hz-Spec-Breakout.md**](wiki/LC76G-10Hz-Spec-Breakout.md) | The 10 Hz plan that was rejected, and the math showing why |
 | [**wiki/gps-driver-debugging-v16.md**](wiki/gps-driver-debugging-v16.md) | Debug log for the v15M→v16 driver work |

@@ -4,19 +4,25 @@
 This is the GPS and Telemetry Unit project for OpenDash, running on the
 Waveshare ESP32-S3-Touch-AMOLED-1.75 hardware.
 
-> **⛔ NODE FROZEN 2026-09-29 — CLOSED-FINAL 2026-09-30.** The LC76G on this
-> board is a **read-only 1 Hz NMEA data pipe**: its command parser consumes
-> nothing (spec-exact `$PAIR050`/`$PAIR051` probes were bench-proven dead —
-> see [`../wiki/GPS-LC76G-POSTMORTEM.md`](../wiki/GPS-LC76G-POSTMORTEM.md) §8).
-> The "10 Hz via `$PAIR050,100`" line below was the *original spec hope* and
-> is FALSE for this module — the update rate can never be changed. No further
-> development on this node; the go-forward path for this slot is the POD3
-> conversion (`wiki/POD3-CONVERSION-PLAN.md`).
+> **⛔ NODE FROZEN 2026-09-29 — CLOSED-FINAL 2026-09-30; refined 2026-10-19.**
+> This board's I2C integration of the LC76G carries **NMEA data OUT only**:
+> spec-exact `$PAIR050,100*22` / `$PAIR051*3E` probes were bench-proven dead
+> (no `$PAIR001` ACK ever — see
+> [`../wiki/GPS-LC76G-POSTMORTEM.md`](../wiki/GPS-LC76G-POSTMORTEM.md) §8/§9).
+> The vendor protocol spec (now vendored:
+> `docs/p1185254-Quectel_LC26G&LC76G&LC86G_GNSS_Protocol_Specification_V1.0.0_Preliminary.pdf`)
+> proves the *module itself* is a fully configurable ≤10 Hz GNSS engine that
+> speaks the full `$PAIR` command set over its serial-layer interface — the
+> wiring, not the silicon, is the limit. Practical result on this board:
+> **fixed 1 Hz, unconfigurable.** No further development on this node; the
+> go-forward path for this slot is the POD3 conversion
+> (`wiki/POD3-CONVERSION-PLAN.md`).
 >
-> **Last updated:** 2026-10-12 (frozen-status banner added; v15L2→v16k-port;
-> 10 Hz claim corrected)
+> **Last updated:** 2026-10-19 (vendor spec vendored; verdict refined —
+> board wiring is the limit, not the module)
 > **Production Code:** `gps_handler.c` v16k-port (v15L2 base + v16 fixes — see file header)
-> **Authoritative Reference:** `wiki/LC76G-I2C-GPS-Driver-Guide.md` (v2.0.0)
+> **Authoritative References:** `wiki/LC76G-I2C-GPS-Driver-Guide.md` (v2.0.0,
+> read-path) + the vendored Quectel GNSS Protocol Specification PDF (command set)
 
 ## Hardware Specifications
 
@@ -115,8 +121,8 @@ gps/
 | Accuracy | <2.5m CEP (50%) |
 | Cold start | <30s |
 | Hot start | <1s |
-| Default update rate | **1 Hz — fixed** (nav engine produces exactly one solution/s) |
-| Max update rate | **not configurable** — command parser dead (see post-mortem §8); the old "10 Hz via `$PAIR050,100`" claim is refuted |
+| Default update rate | **1 Hz — fixed on this board** (nav engine produces one solution/s here) |
+| Max update rate | module spec: configurable 100–1000 ms fix interval (`$PAIR050`) — **unreachable over this board's read-only I2C**; the pre-vendoring "10 Hz via `$PAIR050,100`" note is refuted *for this board* (post-mortem §8/§9) |
 | I2C buffer | ~4096 bytes |
 | Protocol | CASIC I2C (0x50/0x54/0x58) |
 | Firmware | LC76GABNR12A03S (2024/04/14) |

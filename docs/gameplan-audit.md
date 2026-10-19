@@ -281,3 +281,20 @@ NOT vendored anywhere in this repo (only the LVGL flyer PDFs ship inside
 managed_components); §-references in the post-mortem point at the captured
 spec inside `wiki/LC76G-I2C-GPS-Driver-Guide.md`. Vendoring the actual LC76G
 datasheet into the repo remains an open hygiene item.
+
+## 12. 2026-10-19: the vendor protocol spec landed — §11 hygiene item CLOSED
+
+The owner supplied the real Quectel document; now vendored and tracked:
+`docs/p1185254-Quectel_LC26G&LC76G&LC86G_GNSS_Protocol_Specification_V1.0.0_Preliminary.pdf`
+(GNSS Protocol Specification V1.0.0 Preliminary, 2022-05-13). Verified against
+it (see post-mortem §9): the module's command language IS the `$PAIR` set
+(spec §2.3 — PAIR001 ACK with Result 0–5, 002–007 power/starts, 050/051
+fix-interval 100–1000 ms, 062/063 per-sentence rates, 066 search mode, 382
+sleep-lock, 513 NVRAM save); the spec defines NO I2C transport anywhere.
+**Interpretation:** the LC76G is a fully configurable ≤10 Hz GNSS engine —
+the frozen verdict stands *for this board* because its I2C surface is
+data-out-only, but the root cause is now precisely named (board integration,
+not silicon), and iteration-6's probe set (050/051 only) is complete enough
+to have caught any live path (a working 050 would have moved RMC+GGA to
+10 Hz). `gps/README.md`, `docs/architecture.md`, and PROJECT_INDEX updated to
+the refined wording.
