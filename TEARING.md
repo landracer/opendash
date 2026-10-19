@@ -118,7 +118,7 @@ The script:
 ### 2026-09-27 — H7: `CONFIG_LCD_RGB_RESTART_IN_VSYNC` flipped OFF
 
 - **Hypothesis:** H7 — the restart-in-vsync policy is designed for single-FB rebound and may be counterproductive with `num_fbs = 2`.
-- **Change:** `center/sdkconfig.defaults` + `center/sdkconfig`: option → not set. Rebuilt + reflashed.
+- **Change:** center build config (`center/sdkconfig` — then still fed by the retired defaults mechanism): option → not set. Rebuilt + reflashed.
 - **Result:** _pending user observation._
 - **Next:** if tear unchanged → plan step 3 (pclk 14 MHz, H6/H2).
 

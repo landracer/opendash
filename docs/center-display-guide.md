@@ -92,9 +92,11 @@ Entering ENGINE mode (non-grid):
 | **DON'T** read `lv_indev_get_point()` on LV_EVENT_RELEASED | Returns last known position, not lift position — causes phantom swipes. |
 | **DO** use `lv_indev_get_gesture_dir()` | Returns `LV_DIR_LEFT`, `LV_DIR_RIGHT`, etc. Clean and reliable. |
 
-### sdkconfig.defaults
+### Build configuration (committed sdkconfig)
 
-The center's `sdkconfig.defaults` controls critical memory and peripheral settings:
+The center's committed `sdkconfig` is the build-config source of truth (per-node
+config was unified into it on 2026-10-08 — see ledger §8). It controls critical
+memory and peripheral settings:
 
 ```ini
 # LVGL Memory — VALIDATED VALUES, DO NOT CHANGE
@@ -127,7 +129,7 @@ CONFIG_SPIRAM_SPEED_80M=y
 | `center/main/display_init.c` | LCD panel init, GT911 touch, LVGL display/input setup, vsync |
 | `center/main/main.c` | App entry, splash screen, task creation |
 | `center/main/espnow_master.c` | ESP-NOW master: node discovery, data forwarding, relay commands |
-| `center/sdkconfig.defaults` | Build-time defaults (LVGL memory, PSRAM, WiFi) |
+| `center/sdkconfig` | Committed build truth (LVGL memory, PSRAM, WiFi) — defaults mechanism retired 2026-10-08 |
 
 ---
 

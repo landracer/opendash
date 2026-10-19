@@ -6,7 +6,7 @@
     <em>Licensed under Sovereign Individual License v1.0 — see LICENSE file</em>
   </p>
   <p align="center">
-    <a href="https://github.com/landracer/opendash/actions/workflows/build-smoke.yml"><img src="https://github.com/landracer/opendash/actions/workflows/build-smoke.yml/badge.svg" alt="build-smoke"></a>
+    <a href="https://github.com/landracer/opendash/actions/workflows/build.yml"><img src="https://github.com/landracer/opendash/actions/workflows/build.yml/badge.svg" alt="build-smoke"></a>
   </p>
 </p>
 
@@ -36,8 +36,9 @@
 > **Detailed project roadmap:** [`TODO.md`](./TODO.md) | **Central reference:** [`PROJECT_INDEX.md`](./PROJECT_INDEX.md)
 >
 > **A+ improvement program:** master game-plan [`docs/A_PLUS_GAMEPLAN.md`](./docs/A_PLUS_GAMEPLAN.md),
-> live line-by-line audit ledger [`docs/gameplan-aduit.md`](./docs/gameplan-aduit.md) (append-only — every
-> program change is logged there with its evidence)
+> live line-by-line audit ledger [`docs/gameplan-audit.md`](./docs/gameplan-audit.md) (append-only — every
+> program change is logged there with its evidence; file renamed from the mispelled
+> `gameplan-aduit.md` on 2026-10-10 — links re-pointed, history untouched)
 >
 > **Additional documentation:** The project includes extensive documentation in the [`wiki/`](./wiki/) directory with integration guides and technical details.
 
@@ -80,7 +81,7 @@ opendash/
 │
 ├── left/                        ← Left gauge pod (ESP32-S3-LCD-2.8C)
 │   ├── main/
-│   │   ├── main.c               — Entry point; sole MD UART/HC-05 ingest (node 0x10)
+│   │   ├── main.c               — Entry point; sole MD UART/HC-05 ingest (node 1)
 │   │   ├── display_init.c/h     — ST7701S 3-wire SPI + RGB init
 │   │   └── ui_manager.c/h       — Round gauge UI
 │   ├── display.ini              — Hardware pin reference
@@ -89,7 +90,7 @@ opendash/
 │   └── README.md
 │
 ├── right/                       ← Right gauge pod (same hardware)
-│   ├── main/                    — Mirrors left's gauge pages (node 0x11); no UART — all data via Center's ESP-NOW relay
+│   ├── main/                    — Mirrors left's gauge pages (node 2); no UART — all data via Center's ESP-NOW relay
 │   ├── display.ini
 │   ├── CMakeLists.txt
 │   ├── sdkconfig
@@ -97,7 +98,7 @@ opendash/
 │
 ├── pod1/                        ← Pod 1 display unit (ESP32-S3-Touch-AMOLED-1.75)
 │   ├── main/
-│   │   ├── main.c               — Entry point, ESP-NOW slave (node 0x30)
+│   │   ├── main.c               — Entry point, ESP-NOW slave (node 5)
 │   │   ├── display_init.c/h     — CO5300 AMOLED init
 │   │   ├── ui_manager.c/h       — Display UI
 │   │   ├── imu_handler.c/h      — QMI8658 IMU driver
@@ -108,7 +109,7 @@ opendash/
 │
 ├── pod2/                        ← Pod 2 display unit (ESP32-S3-Touch-AMOLED-1.75)
 │   ├── main/
-│   │   ├── main.c               — Entry point, ESP-NOW slave (node 0x31)
+│   │   ├── main.c               — Entry point, ESP-NOW slave (node 6)
 │   │   ├── display_init.c/h     — CO5300 AMOLED init
 │   │   ├── ui_manager.c/h       — Display UI
 │   │   ├── imu_handler.c/h      — QMI8658 IMU driver
@@ -117,19 +118,31 @@ opendash/
 │   ├── sdkconfig
 │   └── README.md
 │
-├── gps/                         ← ESP32-S3-Touch-AMOLED-1.75 project
+├── gps/                         ← GPS/Telemetry unit (ESP32-S3-Touch-AMOLED-1.75) — ⛔ FROZEN (wiki/GPS-LC76G-POSTMORTEM.md)
     ├── main/
     │   ├── main.c
     │   ├── display_init.c/h     — CO5300 AMOLED init
     │   ├── ui_manager.c/h
     │   ├── gps_handler.c/h      — LC76G GNSS module
     │   ├── imu_handler.c/h      — QMI8658 6-axis IMU
-    │   ├── parachute.c/h        — Gyro-triggered parachute deployment
+    │   ├── sd_logger.c/h        — SD telemetry logging (the real logger; center's sd_logger is a stub)
     │   └── assets/
     ├── CMakeLists.txt
     ├── sdkconfig
     └── README.md
-
+│
+├── mos-4ch-a/                   ← Headless 4-ch MOS FET controller (node 16) — hosts the
+│   └── ...                          parachute actuator + roster gate (see mos-4ch-a/README.md)
+├── mos-4ch-b/                   ← Headless 4-ch MOS FET controller (node 17) — see its README.md
+├── relay-4ch-hd/                ← Headless 4-ch HD relay controller (node 13) — see its README.md
+├── relay-8ch-a/                 ← Headless 8-ch relay controller (node 14) — see its README.md
+├── relay-8ch-b/                 ← Headless 8-ch relay controller (node 15) — see its README.md
+├── openDstream/                 ← ESP-NOW → UART data-point bridge to host PC — see its README.md
+├── agent/                       ← AI-agent / contributor playbooks
+├── wiki/                        ← Subsystem references + postmortems (see PROJECT_INDEX tables)
+├── scripts/                     ← Tooling: check_docs.sh (docs-lint), coverage_gate.sh, od-flash.py…
+├── test/                        ← Host unit-test + fuzz harness (Unity/ctest, CI unit-tests job)
+│
 ├── rAtTrax_BMS_Logger/          ← External ESP-NOW node (separate repo)
 │   └── See: rAtTrax_BMS_Logger/docs/opendash-integration.md
 ```
@@ -259,18 +272,23 @@ idf.py -p /dev/ttyUSB0 flash monitor
 | [`docs/hardware.md`](docs/hardware.md) | Hardware specs, pin mappings, and wiring |
 | [`docs/espnow-protocol.md`](docs/espnow-protocol.md) | ESP-NOW communication protocol between nodes |
 | [`docs/data-points.md`](docs/data-points.md) | Full legend of displayable data points |
+| [`DATAFLOW.md`](DATAFLOW.md) | **End-to-end data path: MD UART → LEFT ingest → Center fan-out → pods (canon)** |
+| [`FEATURES_AND_SENSORS.md`](FEATURES_AND_SENSORS.md) | Sensor sources & feature status matrix |
+| [`UART_CONNECTION.md`](UART_CONNECTION.md) | MultiDisplay ECU UART/HC-05 link into LEFT |
+| [`boost-controller-opendash.md`](boost-controller-opendash.md) | Boost controller master doc (clean-room rewrite gates v1.0.0) |
+| [`PER_NODE_DISPLAY_CONFIG_SPEC.md`](PER_NODE_DISPLAY_CONFIG_SPEC.md) | Per-node layout/unit config spec (shipped) |
 | [`docs/font-system-testing.md`](docs/font-system-testing.md) | Font system implementation and testing |
 | [`center/README.md`](center/README.md) | **Center display project guide** — Display mode system, customization |
 | [`left/README.md`](left/README.md) | Left gauge pod guide |
 | [`right/README.md`](right/README.md) | Right gauge pod guide |
-| [`pod1/main/main.c`](pod1/main/main.c) | Pod 1 firmware (no separate README — see source header) |
-| [`pod2/main/main.c`](pod2/main/main.c) | Pod 2 firmware (no separate README — see source header) |
+| [`pod1/README.md`](pod1/README.md) | Pod 1 display + safety-deployment unit (CO5300 AMOLED, QMI8658 IMU votes) |
+| [`pod2/README.md`](pod2/README.md) | Pod 2 display + safety-deployment unit (same hardware as pod1) |
 | [`gps/README.md`](gps/README.md) | GPS/Telemetry unit guide |
-| [`mos-4ch-a/main/main.c`](mos-4ch-a/main/main.c) | MOS-4CH-A headless controller documentation |
-| [`mos-4ch-b/main/main.c`](mos-4ch-b/main/main.c) | MOS-4CH-B headless controller documentation |
-| [`relay-4ch-hd/main/main.c`](relay-4ch-hd/main/main.c) | Relay-4CH-HD headless relay controller documentation |
-| [`relay-8ch-a/main/main.c`](relay-8ch-a/main/main.c) | Relay-8CH-A headless relay controller documentation |
-| [`relay-8ch-b/main/main.c`](relay-8ch-b/main/main.c) | Relay-8CH-B headless relay controller documentation |
+| [`mos-4ch-a/README.md`](mos-4ch-a/README.md) | MOS-4CH-A headless controller — roster gate LIVE, parachute actuator host |
+| [`mos-4ch-b/README.md`](mos-4ch-b/README.md) | MOS-4CH-B headless controller — same firmware shape as MOS-4CH-A |
+| [`relay-4ch-hd/README.md`](relay-4ch-hd/README.md) | Relay-4CH-HD headless relay controller (pre-P1.3 latch — gate rewrite pending) |
+| [`relay-8ch-a/README.md`](relay-8ch-a/README.md) | Relay-8CH-A headless relay controller (pre-P1.3 latch — gate rewrite pending) |
+| [`relay-8ch-b/README.md`](relay-8ch-b/README.md) | Relay-8CH-B headless relay controller (pre-P1.3 latch — gate rewrite pending) |
 | [`wiki/`](wiki/) | **Wiki documentation** — Additional project documentation and integration guides |
 | [`wiki/system-overview.md`](wiki/system-overview.md) | **★ End-user system guide — start here for usage** |
 | [`wiki/relay-mos-controllers.md`](wiki/relay-mos-controllers.md) | **Relay & MOS FET controller documentation** |
@@ -280,6 +298,9 @@ idf.py -p /dev/ttyUSB0 flash monitor
 | [`wiki/ota-bluetooth.md`](wiki/ota-bluetooth.md) | **★ BLE OTA step-by-step guide (Linux desktop)** |
 | [`wiki/ota-android-plan.md`](wiki/ota-android-plan.md) | Roadmap & options for Android-based OTA |
 | [`BLE_OTA.md`](BLE_OTA.md) | BLE OTA architecture & root-cause reference |
+| [`BLUETOOTH_PAIRING.md`](BLUETOOTH_PAIRING.md) | BLE pairing/bonding design behind ENTER_BT_OTA |
+| [`QUICK_REFERENCE.md`](QUICK_REFERENCE.md) | Center warning-box + screen API quick reference |
+| [`TEARING.md`](TEARING.md) | Center RGB tearing investigation (CLOSED — residual shimmer is physical) |
 
 > **Note:** The project includes extensive documentation in the [`wiki/`](wiki/) directory with additional integration guides and technical details.
 

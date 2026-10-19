@@ -864,7 +864,7 @@ retry.
 A node is OTA-capable iff **all** of the following are true:
 
 - `partitions.csv` defines `ota_0`, `ota_1`, and `otadata` slots.
-- `sdkconfig.defaults` enables `CONFIG_PARTITION_TABLE_CUSTOM=y`,
+- The node's committed `sdkconfig` enables `CONFIG_PARTITION_TABLE_CUSTOM=y`,
   `CONFIG_BT_ENABLED=y`, `CONFIG_BT_NIMBLE_ENABLED=y`, and
   `CONFIG_APP_PROJECT_VER_FROM_CONFIG=y`.
 - `main/CMakeLists.txt` links `common/src/opendash_bt_ota.c` and `REQUIRES`

@@ -17,6 +17,7 @@
 #include "opendash_display_config.h"
 #include "opendash_layout.h"
 #include "espnow_master.h"
+#include "start_sequencer.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -218,6 +219,29 @@ esp_err_t ui_manager_apply_layout(uint8_t mode, const screen_layout_v1_t *layout
  * @return ESP_OK on success.
  */
 esp_err_t ui_manager_get_layout(uint8_t mode, screen_layout_v1_t *out);
+
+/**
+ * @brief Read a cached data point value (value last seen on the wire).
+ *
+ * Thread-safe; takes the LVGL lock internally. Used by the START ENGINE
+ * sequencer to evaluate WAIT_DP steps. Returns false if never received.
+ */
+bool ui_manager_get_dp(uint16_t id, float *out);
+
+/**
+ * @brief Repaint one switch-panel box after a channel-registry edit.
+ *
+ * Thread-safe (takes the LVGL lock itself). Safe to call before the panel
+ * grid exists — the repaint is skipped and the registry stays authoritative.
+ */
+esp_err_t ui_manager_apply_binding_change(int idx);
+
+/**
+ * @brief Sequencer state/progress push (registered into start_sequencer).
+ *
+ * Called from the sequencer runner task context; takes the LVGL lock itself.
+ */
+void ui_manager_seq_notify(opendash_seq_state_t state, int step_idx, int step_count);
 
 #ifdef __cplusplus
 }

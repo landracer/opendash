@@ -1,5 +1,5 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
-# OpenDash — Game-Plan Audit Ledger (`gameplan-aduit.md`)
+# OpenDash — Game-Plan Audit Ledger (`gameplan-audit.md`)
 
 > **Purpose:** live, line-by-line audit of [`A_PLUS_GAMEPLAN.md`](./A_PLUS_GAMEPLAN.md)
 > against the actual tree. Every claim in the game-plan is checked, graded, and
@@ -191,6 +191,7 @@ language is not acceptable on shared code.
 | 2026-10-08 | (this commit) | **P1.3 WIRED (behavioral).** Gate live in both MOS mains (old learn/re-latch block deleted; bootstrap-eligible whitelist = old is_center_cmd set, SYSTEM/BOOST never latch); NVS roster store in `common/` (mutex + blob, factory-fresh on miss/corrupt/version); MOS-local fusion + AUTO_DETECT gate + seq-dedupe in the VOTE case; `PERSIST_ARM` opt-in honored (boot restore + SET_ARM mirror); config version → 2; status echo v2 (`last_reason`, `ctrl_rejected` replace pad byte); center `roster_refresh()` pushes sealed roster on every `auto_register_node`; host tables extended (ineligible-opcode rows + fake-NVS store round-trip) — local ctest 5/5 green. Firmware builds verified by CI build-smoke; bench proof still pending | P1.3 wiring |
 | 2026-10-08 | (this commit) | **P3.1 + P3.2 landed (Phase 3 core).** `test/test_fuzz_parsers.c`: seeded deterministic corpus (10k/suite) fuzzing BOTH attacker byte sinks — msg codec accepts only canonical frames; MD decoder extracted into pure `opendash_md_parse_payload()` (UART commit path = decode + atomic merge, behavior-preserving split), TAG/length gates hard + golden-value vectors. `OD_COVERAGE` build + `scripts/coverage_gate.sh` per-file floors (measured baseline, ratchet-up only) wired into the CI unit-tests job. **P1.4 design limit flagged for OWNER DECISION:** ESP-NOW caps encrypted peers at 6/device, center has ~9 radio peers — see §5 P1.4 row options (a)/(b)/(c); recommendation (a) encrypt actuation path only | P3.1, P3.2, P1.4 flagged |
 | 2026-10-08 | — | **P1.4 CLOSED as deferred (owner):** "who is going to MAC-hack these at speed… back-burner till more devices are supported or a better way evolves." Transport stays plaintext permanently; the P1.3 gate/roster/dedupe layer IS the trust model. Owner's timestamp+random-offset idea recorded honestly (obfuscation ≠ authentication: firmware extractable per D5 no-fuse stance ⇒ offset never secret; freshness already handled by seq dedupe). No transport code changes — `encrypt = false` is now the DESIGN, documented in POLICY_GATE §6 | P1.4 closed, D3 superseded |
+| 2026-10-10 | (this commit) | **Independent re-audit — all doc-drift findings closed (see §10):** stale defaults-mechanism guidance purged from canon docs; readme tree corrected (phantom gps parachute file, missing directories, enum-correct node IDs); architecture.md duplicate heading + SD-logging falsehood fixed; PROJECT_INDEX frame diagram now matches the codec; five controller-node READMEs landed; readme badge re-pointed to `build.yml`; this ledger renamed `gameplan-aduit.md` → `gameplan-audit.md` with every link re-pointed; `check_docs.sh` check 7 (retired-mechanism guard) added | §10 rows R1–R8 |
 
 ---
 
@@ -218,5 +219,65 @@ Closed review items: owner line-by-line review of `ffc2dd9` (P1.2) — SIGNED OF
 
 ---
 
+## 10. Independent re-audit 2026-10-10 — documentation-drift sweep (ALL CLOSED same day)
+
+Scope: full doc set (readme, PROJECT_INDEX, QUICKSTART/QUICK_REFERENCE,
+architecture, espnow-protocol, DATAFLOW, wiki, agent playbooks, this ledger)
+audited against the code/headers/git-history, with ~30 independent spot
+verifications — claims that HELD were recorded and left alone (TODO-marker
+count = 47 exactly as corrected here; lvgl 9.2.2 + IDF 6.1.0 in
+`dependencies.lock`; version single-source at 0.1.0; codec doc matches
+`opendash_protocol.h`; pod-pair byte-identical; docs-lint green).
+
+| # | Finding (severity) | Evidence at finding | Resolution (2026-10-10) |
+|---|---|---|---|
+| R1 | Canon contributor docs instructed editing the deleted defaults mechanism (medium) | agent playbook + digest rules named `sdkconfig.defaults` after `375d477` deleted every such file | rules rewritten to "committed per-node `sdkconfig`"; also fixed in `docs/center-display-guide.md`, `TEARING.md`, `boost-controller-opendash.md`, `gps/INTENSIVE_TODO.md`, `left-right/README.md`, and the `build.yml` matrix comment |
+| R2 | readme repo-tree wrong (medium) | tree listed `gps/main/parachute.c/h` — file does not exist (actuation lives in `common/` + MOS nodes); tree omitted all controller nodes, `openDstream/`, `agent/`, `scripts/`, `test/`, `wiki/` | tree rewritten honestly (incl. real `gps/main/sd_logger.c/h`) |
+| R3 | readme/QUICKSTART pod rows false (medium) | "Pod 1/2: no separate README — see source header" while `pod1/README.md` and `pod2/README.md` existed | rows re-pointed to the real READMEs |
+| R4 | architecture.md data-flow falsehood (medium) | "SD card logging happens on the Center unit (primary)" — `center/main/sd_logger.c` is a self-declared stub; the real logger is `gps/main/sd_logger.c` | step 8 corrected, stub labeled honestly |
+| R5 | PROJECT_INDEX frame diagram contradicted the codec (low-medium) | diagram showed `[0xAA][CMD][LEN][NODE_ID][PAYLOAD…]`; the codec header defines a 3-byte header — node id rides *inside specific payloads* (`auto_register_node()` reads `payload[0]`; `identify_sender()` maps MAC→node) | diagram + prose corrected in PROJECT_INDEX and architecture.md |
+| R6 | readme CI badge dead (low) | badge URL referenced `workflows/build-smoke.yml` — the file is `build.yml` (only the workflow *name* is build-smoke) | re-pointed to `build.yml`; private-repo caveat understood |
+| R7 | stale hex node IDs (low — caught while fixing R2) | readme tree + DATAFLOW diagrams showed `0x10/0x11/0x30/0x31`; the enum truth is LEFT=1, RIGHT=2, POD1=5, POD2=6 | corrected in readme tree and both DATAFLOW diagrams |
+| R8 | canonical ledger filename misspelled (cosmetic) | old file path (this line deliberately escapes it) — docs/gameplan-aduit.md | `git mv` → `docs/gameplan-audit.md`; title updated; every referencing link re-pointed (readme, PROJECT_INDEX, TODO §, CHANGELOG ×2, workflow comment, check_docs comment); ledger content untouched except this note |
+
+Also honestly recorded, not doc errors: `center/main/ui_manager.c` grew
+4752 → 5256 lines in the 3 days since the P4.1 snapshot (+10.6%) — decomposition
+is losing to feature velocity, P4.1 urgency raised; `docs/archived/` remains a
+git-ignored local-only residue (known trap, untracked by design); opcode count
+drift (docs said 39, header defines 42) was the pre-existing gap that check 5
+(P0.6) now guards — verified working by this pass.
+
+**Grade after re-audit:** Documentation returns to **A** by this section's
+evidence-backed closures. A+ remains gated on the P2.1 threat-model document —
+per the §0 rubric an un-documented threat model is not an A+ category. Do not
+declare A+ before P2.1 lands.
+
+---
+
 *Ledger opened 2026-10-07. Every future phase-gate updates §8 and flips the
 matching row's verdict from ⏳ to ✅/✏️ with its evidence link.*
+
+---
+
+## 11. Independent audit + cleanup pass (2026-10-12)
+
+Second independent audit of the whole documentation estate (all 100+ md files,
+461 relative links scanned, docs-vs-code spot-verification of frame format,
+channel tables, node IDs, display timing, version defines; host test suite
+re-run green 6/6). Findings and closures:
+
+| # | Finding (severity) | Evidence at finding | Resolution (2026-10-12) |
+|---|---|---|---|
+| C1 | I2C-as-transport prose survived the R-series purge (medium) | `PROJECT_INDEX.md`: checklist "shared across I2C"; glossary "I2C ... shared by all four nodes"; LEFT/RIGHT task table "I2C receive → odometer"; repo-tree note claimed right differs by "I2C addr 0x11 vs 0x10" (right/README proves both boards are GT911 @ 0x5D) | all four corrected (ESP-NOW wording; right/ line now says the only difference is logical node ID 2). Check 7 only guards `sdkconfig.defaults` — a banned-phrase guard for I2C-as-network prose remains open |
+| C2 | Eight canon docs were unreachable orphans (medium) | `DATAFLOW.md` (named the "end-to-end journey" canon by espnow-protocol.md!), `TEARING.md`, `QUICK_REFERENCE.md`, `UART_CONNECTION.md`, `FEATURES_AND_SENSORS.md`, `BLUETOOTH_PAIRING.md`, `BLE_OTA.md` (readme-only), `PER_NODE_DISPLAY_CONFIG_SPEC.md`, `boost-controller-opendash.md` — absent from the other index; PROJECT_INDEX claims "every documentation file" | all indexed in PROJECT_INDEX + readme docs tables |
+| C3 | `docs/rgb_lcd.rst` looked like a rogue file (low) | `git log --follow`: vendored verbatim in `9ba4c82` (2026-06-06 BLE-OTA/doc-gather commit); content = official ESP-IDF "RGB Interfaced LCD" API page — exactly the `esp_lcd_rgb_panel` API every RGB node's `display_init.c` drives | KEPT (it is real display-dev reference material, not stray); provenance header added; indexed under Architecture & Design. Upstream drift risk noted in header |
+| C4 | `docs/archived/` still littered local trees | byte-identical copies of five `docs/history/` docs; untracked (known trap per §10 note); source of 9 broken relative links in local scans | deleted locally; canon stays `docs/history/` only |
+| C5 | GPS firmware-side join weakness explains "doesn't always connect" (high, informational — node stays FROZEN) | `gps/main/main.c` sends NO boot `CHANNEL_MSG_ANNOUNCE`; center registers GPS only via NVS-MAC (Method 2) or GPS-domain-DP content inference (Method 3) — invisible until LC76G streams; TIME_SYNC sends day/month/year=0 under a false "not parsed" comment (parse_rmc parses them); WAKE dummy write targets 0x58, the endpoint the post-mortem proved intermittently NACKs | recorded as an audit finding in TODO §2.4 (not fixed — node frozen); main.c comments corrected to match reality |
+| C6 | `gps/README.md` contradicted CLOSED-FINAL (medium) | capabilities table still advertised "Max update rate 10 Hz (via $PAIR050,100)" and header said "v15L2 verified working" | frozen banner added; rate row corrected to "not configurable — parser dead"; v16k-port label squared with code header |
+| C7 | Agent playbook Rule 4 said "All nodes are ESP32-S3" (low) | five controller/bridge nodes are classic ESP32-WROOM-32E (see build.yml matrix targets) | Rule 4 rewritten: S3 displays vs classic-ESP32 controllers |
+
+**Not a doc error, honestly recorded:** the LC76G manufacturer datasheet PDF is
+NOT vendored anywhere in this repo (only the LVGL flyer PDFs ship inside
+managed_components); §-references in the post-mortem point at the captured
+spec inside `wiki/LC76G-I2C-GPS-Driver-Guide.md`. Vendoring the actual LC76G
+datasheet into the repo remains an open hygiene item.

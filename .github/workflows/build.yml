@@ -23,7 +23,7 @@
 #    mechanism — an OD_PREGENERATED_ASSETS job env meant to skip converters
 #    because "assets are committed" — was doubly false: nothing was committed,
 #    and the env never reached the build container anyway. Owner decision D1:
-#    converters-in-CI is the ratified mode. docs/gameplan-aduit.md §3.)
+#    converters-in-CI is the ratified mode. docs/gameplan-audit.md §3.)
 #  - `dependencies.lock` is committed for every project, so component
 #    versions resolve identically on every runner.
 name: build-smoke
@@ -45,7 +45,7 @@ jobs:
       fail-fast: false          # keep building other nodes when one fails
       matrix:
         # each include entry = one matrix job (project dir + its IDF target,
-        # read from that project's sdkconfig.defaults CONFIG_IDF_TARGET)
+        # read from that project's committed sdkconfig CONFIG_IDF_TARGET)
         include:
           - { node: center,       target: esp32s3 }
           - { node: left,         target: esp32s3 }

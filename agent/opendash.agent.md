@@ -32,7 +32,10 @@ Specialized agent for the **OpenDash** project — a modular, multi-display race
 
 ### Rule 4: MATCH THE PROJECT'S FRAMEWORK EXACTLY
 - This project uses **ESP-IDF** (v6.1 line, pinned dev snapshot — see BUILD_DEPENDENCIES.md) with CMake build system.
-- All nodes are **ESP32-S3** with PSRAM, LVGL 9 UI, and ESP-NOW communication.
+- Display nodes (center, left, right, gps, pod1, pod2) are **ESP32-S3** with
+  PSRAM, LVGL 9 UI, and ESP-NOW. Controller nodes (mos-4ch-a/b, relay-4ch-hd,
+  relay-8ch-a/b) and openDstream are **classic ESP32 (WROOM-32E — no PSRAM, no
+  native USB)**: never assume S3 features there.
 - Do NOT use Arduino APIs. Do NOT create PlatformIO files.
 - Build commands use `idf.py`, not `pio`.
 
@@ -221,7 +224,7 @@ Checksum = XOR of SYNC, CMD, LENGTH, and all PAYLOAD bytes.
 4. Forgetting `vTaskDelay()` yields in tight loops (WDT will fire on CPU0)
 5. Assuming I2C bus availability — multiple devices share buses, check for conflicts
 6. Changing the protocol frame format — ALL nodes (including external BMS) must match
-7. Modifying `sdkconfig.defaults` without understanding cascading effects on WiFi/BT/PSRAM
+7. Modifying a node's committed `sdkconfig` (the build-config single source of truth — the defaults mechanism was retired 2026-10-08) without understanding cascading effects on WiFi/BT/PSRAM
 
 ---
 

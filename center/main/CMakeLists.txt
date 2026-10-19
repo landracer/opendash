@@ -11,6 +11,8 @@ idf_component_register(
         "espnow_master.c"
         "layout_editor.c"
         "system_config.c"
+        "channel_registry.c"
+        "start_sequencer.c"
         "boost_client.c"
         "boost_config_ui.c"
         "lv_mem_psram.c"

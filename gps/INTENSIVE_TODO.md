@@ -63,7 +63,7 @@
 ### 2.1 BSP Dependency Setup
 - [ ] Update `idf_component.yml` with Waveshare BSP dependency
 - [ ] Add `lvgl/lvgl: "~9.xx.x"` constraint
-- [ ] Configure `sdkconfig.defaults` for BSP build flags
+- [x] Configure committed `sdkconfig` for BSP build flags (archived item — build config now lives in the committed `sdkconfig`; defaults mechanism retired 2026-10-08)
 - [ ] Set ESP-IDF target to ESP32-S3
 - [ ] Configure partition table for flash layout
 
@@ -149,7 +149,7 @@
 ### 3.3 CMakeLists.txt & sdkconfig Updates
 - [ ] Update CMakeLists.txt to list all SRCS: main.c, display_init.c, gps_handler.c, imu_handler.c, ui_manager.c, i2c_node.c
 - [ ] Update REQUIRES: common, lvgl__lvgl, driver, esp_lcd, esp_timer, esp_driver_gpio, esp_driver_spi, esp_driver_i2c
-- [ ] Update sdkconfig.defaults: remove BSP-specific entries, keep I2C/LCD/SD relevant entries
+- [x] Update build config (`sdkconfig`): BSP-specific entries removed, I2C/LCD/SD relevant entries kept (archived item — completed via the committed `sdkconfig`)
 - [ ] Verify partition table for 1 MB app partition
 
 ### 3.4 New display_init.c (Direct LVGL)
@@ -709,7 +709,7 @@
 - [ ] Document build instructions and dependencies
 
 ### 9.3 Configuration Documentation
-- [ ] Document sdkconfig.defaults settings
+- [ ] Document the committed `sdkconfig` settings (build truth; defaults mechanism retired 2026-10-08)
 - [ ] Document component manager dependencies
 - [ ] Document ESP-IDF version requirement (6.1-dev)
 - [ ] Document LVGL configuration (9.2.2, RGB565, draw buffer size)

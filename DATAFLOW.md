@@ -21,7 +21,7 @@ This document describes how a single sensor reading travels from the engine harn
                                ▼
                   ┌──────────────────────────┐
                   │       LEFT  (slave)      │  ESP32-S3-LCD-2.8C round
-                  │  uart_parser_task        │  Node 0x10
+                  │  uart_parser_task        │  Node 1
                   │   → dp_id, value         │
                   │  forward_md_data_to_     │
                   │   center() — BATCHES     │
@@ -43,7 +43,7 @@ This document describes how a single sensor reading travels from the engine harn
                         │              │ OPENDASH_CMD_SET_DATA_BATCH (0x0C)
                         ▼              ▼
                   ┌──────────┐   ┌──────────────────────┐
-                  │  LEFT    │   │   RIGHT  (slave)     │  Node 0x11
+                  │  LEFT    │   │   RIGHT  (slave)     │  Node 2
                   │  fan-out │   │   fan-out → per-dp   │  (no UART of its own —
                   │ → UI     │   │   ui_manager_update  │   everything is
                   └──────────┘   └──────────────────────┘   relayed)

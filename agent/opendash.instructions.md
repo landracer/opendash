@@ -10,7 +10,7 @@
 2. **NEVER remove working code** from the codebase without explicit user consent (a signed-off request naming the specific function or block).
 3. **NEVER mark a TODO item `[x]`** unless the feature compiles, flashes, and runs.
 4. **NEVER use Arduino framework APIs** in OpenDash code. This is ESP-IDF + CMake.
-5. **NEVER modify `sdkconfig.defaults`** for WiFi, Bluetooth, or PSRAM settings without explaining impact.
+5. **NEVER modify a node's committed `sdkconfig`** (build-config single source of truth; the defaults mechanism was retired 2026-10-08) for WiFi, Bluetooth, or PSRAM settings without explaining impact.
 6. **NEVER change the ESP-NOW protocol frame format** — it must match SYNC(0xAA)+CMD+LEN+PAYLOAD+CHECKSUM across ALL nodes.
 
 ## Code Style

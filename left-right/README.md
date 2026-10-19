@@ -56,7 +56,7 @@ idf.py -p /dev/ttyUSB0 flash monitor
 ```
 left-right/
 ├── CMakeLists.txt                # Main project CMake file
-├── sdkconfig.defaults            # ESP-IDF configuration defaults
+├── sdkconfig                     # Committed build truth (defaults mechanism retired 2026-10-08)
 ├── README.md                     # This file
 └── main/
     ├── CMakeLists.txt            # Main component CMake file

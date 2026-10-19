@@ -17,6 +17,16 @@
 
 ### Added
 
+- **Independent documentation audit + cleanup pass (2026-10-12):** every remaining
+  I2C-as-inter-node-transport prose drift fixed (I2C is ONLY a local peripheral
+  bus inside one enclosure — ESP-NOW is the sole node-to-node transport); the
+  nine orphaned canon docs (DATAFLOW, TEARING, QUICK_REFERENCE, UART_CONNECTION,
+  FEATURES_AND_SENSORS, BLE_OTA, BLUETOOTH_PAIRING, PER_NODE spec,
+  boost-controller master) indexed into PROJECT_INDEX + readme; `docs/rgb_lcd.rst`
+  provenance established (vendored ESP-IDF RGB-LCD API page — kept, header added)
+  and the untracked duplicate `docs/archived/` copy deleted; GPS frozen-node audit
+  findings recorded (missing boot ANNOUNCE = the "doesn't always connect"
+  join-path gap; TIME_SYNC date-field bug) — see `docs/gameplan-audit.md` §11.
 - **Host unit tests** (`test/`): native CMake + vendored Unity suites covering the
   wire codec (SYNC/checksum/truncation/round-trip/252-byte boundary), the data
   store + MD-vs-ECU domain id partitioning, the node-health rate/heartbeat state
@@ -31,7 +41,7 @@
   sources before the IDF build — generated sources are deliberately NOT
   committed. The earlier mechanism claimed here ("committed generated
   fonts/images" via `OD_PREGENERATED_ASSETS=1`) was false — see
-  [docs/gameplan-aduit.md](docs/gameplan-aduit.md) §3.
+  [docs/gameplan-audit.md](docs/gameplan-audit.md) §3.
 - **`dependencies.lock` committed fleet-wide** and un-ignored — component versions
   now resolve identically on every runner and every dev box.
 - `docs/history/` for superseded diagnosis docs; canon/history boundary is now
@@ -71,6 +81,18 @@
   roster 90 / health 70 / uart 15 — floors ratchet UP only). The CI
   `unit-tests` job is now the coverage build: every CI run proves coverage,
   not just correctness.
+- **Switch panel + START ENGINE sequencer on center** (design:
+  `docs/POLICY_GATE.md` §8): the 28 soft buttons now live in an NVS-backed
+  `channel_registry` — button→`(node, channel)` bindings + labels survive
+  reflashes, re-bindable on-screen (long-press editor with node/channel
+  pickers + on-screen text keyboard for labels) or over serial (`chmap`,
+  `chlabel`, `panel on|off`). Boot routing
+  sends the center to the panel while the engine is not running (no/low RPM =
+  "engine-running parameters not met"); the first RPM reading at/above idle
+  latches the home screen to the gauge views until reboot. The declarative
+  `start_sequencer` step list (`SEND` / `WAIT_DP`-with-timeout / `DELAY`)
+  proceeds only on wire proof — a timed-out wait fails the run — edited via
+  serial `seq ...` and run from the `ENGINE SEQ` panel button.
 
 ### Changed
 
@@ -86,7 +108,7 @@
 
 - **Build config source of truth**: resolved per-node `sdkconfig` files are
   committed and `sdkconfig.defaults` is gone (see
-  [docs/gameplan-aduit.md](docs/gameplan-aduit.md) §8) — CI now builds the same
+  [docs/gameplan-audit.md](docs/gameplan-audit.md) §8) — CI now builds the same
   configuration the bench fleet actually runs.
 
 ### Fixed

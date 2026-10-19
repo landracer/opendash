@@ -12,9 +12,15 @@
  * Architecture:
  *   - GPS reads sensor data locally (LC76G + QMI8658 on shared I2C bus)
  *   - Proactively broadcasts all GPS/IMU data to center via ESP-NOW
- *   - Responds to center PINGs with STATUS_REPORT
+ *   - NOTE (frozen): no boot ANNOUNCE is ever sent — center can only discover
+ *     this node by content-inference once NMEA is already flowing (see
+ *     TODO §2.4 audit finding — this is why the node "doesn't always connect")
+ *   - Responds to the LEGACY PING subcmd with STATUS_REPORT (center no longer
+ *     polls — dead path kept for wire-compat only)
  *   - Receives SET_DATA_POINT from center (engine data for display)
- *   - Broadcasts TIME_SYNC to all nodes when GPS has valid fix
+ *   - Broadcasts TIME_SYNC to all nodes when GPS has valid fix (time-of-day
+ *     only — day/month/year bytes are sent as 0 even though parse_rmc() parses
+ *     the date; see TODO §2.4)
  *
  * Initialization Order (critical):
  *   1. NVS
@@ -323,10 +329,10 @@ static void data_broadcast_task(void *pvParameters)
             time_payload[1] = gps.hour;
             time_payload[2] = gps.minute;
             time_payload[3] = gps.second;
-            time_payload[4] = 0;  /* day - not parsed from NMEA yet */
-            time_payload[5] = 0;  /* month */
-            time_payload[6] = 0;  /* year_lo */
-            time_payload[7] = 0;  /* year_hi */
+            time_payload[4] = 0;  /* day  — NOT carried (parse_rmc parses it; deliberately unwired — TODO §2.4) */
+            time_payload[5] = 0;  /* month — same */
+            time_payload[6] = 0;  /* year_lo — same */
+            time_payload[7] = 0;  /* year_hi — same */
             time_payload[8] = gps.fix_valid ? 1 : 0;
 
             opendash_msg_t time_msg;

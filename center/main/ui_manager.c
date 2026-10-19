@@ -39,6 +39,8 @@
 #include "boost_client.h"
 #include "node_health.h"
 #include "node_definitions.h"
+#include "channel_registry.h"
+#include "start_sequencer.h"
 #include "esp_log.h"
 #include "esp_task_wdt.h"
 #include "esp_timer.h"
@@ -120,8 +122,8 @@ static const display_mode_config_t mode_configs[DISPLAY_MODE_COUNT] = {
         .status_text = "MODE: MULTIDISPLAY | " OPENDASH_MD_BT_NAME
     },
     [DISPLAY_MODE_RELAY] = {
-        .section_labels = {"", "", "", "", "", ""},  /* Not used — relay grid has own labels */
-        .status_text = "DEBUG: RELAY CONTROL | Tap box to toggle | Hold here to exit"
+        .section_labels = {"", "", "", "", "", ""},  /* Not used — panel has own labels */
+        .status_text = "SWITCH PANEL | Tap=toggle | EDIT MAP=re-bind | Hold bar to exit"
     },
     [DISPLAY_MODE_BMS] = {
         .section_labels = {"", "", "", "", "", ""},  /* Not used — BMS grid has own labels */
@@ -184,16 +186,8 @@ typedef struct {
 #define RELAY_GRID_ROWS  4
 #define RELAY_GRID_TOTAL (RELAY_GRID_COLS * RELAY_GRID_ROWS)
 
-/**
- * @brief Relay box mapping — which node & channel each grid box controls
- */
-typedef struct {
-    const char      *label;      /**< Display label (e.g., "RAD FAN 1") */
-    opendash_node_t  node;       /**< Target relay/MOS node */
-    uint8_t          channel;    /**< Channel index on that node (0-based) */
-    bool             is_on;      /**< Current known state */
-} relay_box_mapping_t;
-
+/* Widgets per panel box. Bindings (label/node/channel/is_on) live in the
+ * NVS-backed channel registry — no compiled-in mapping table anymore.     */
 typedef struct {
     lv_obj_t *box;               /**< Container object */
     lv_obj_t *label;             /**< Label text */
@@ -203,45 +197,9 @@ typedef struct {
 static relay_box_widgets_t relay_boxes[RELAY_GRID_TOTAL] = {0};
 static lv_obj_t *relay_grid_container = NULL;
 
-/**
- * @brief Relay box mappings — 15 boxes in 5×3 grid.
- * Maps each box to a specific relay node + channel.
- * Update labels to match your physical wiring.
- */
-static relay_box_mapping_t relay_box_map[RELAY_GRID_TOTAL] = {
-    /* Row 0: 4-CH HD relay (fans/pumps) + RELAY A CH1-3 */
-    { .label = "RAD FAN 1",   .node = OPENDASH_NODE_RELAY_4CH,   .channel = 0, .is_on = false },
-    { .label = "RAD FAN 2",   .node = OPENDASH_NODE_RELAY_4CH,   .channel = 1, .is_on = false },
-    { .label = "WATER PUMP",  .node = OPENDASH_NODE_RELAY_4CH,   .channel = 2, .is_on = false },
-    { .label = "FUEL PUMP",   .node = OPENDASH_NODE_RELAY_4CH,   .channel = 3, .is_on = false },
-    { .label = "R-A CH1",     .node = OPENDASH_NODE_RELAY_8CH_A, .channel = 0, .is_on = false },
-    { .label = "R-A CH2",     .node = OPENDASH_NODE_RELAY_8CH_A, .channel = 1, .is_on = false },
-    { .label = "R-A CH3",     .node = OPENDASH_NODE_RELAY_8CH_A, .channel = 2, .is_on = false },
-    /* Row 1: RELAY A CH4-8 + RELAY B CH1-2 */
-    { .label = "R-A CH4",     .node = OPENDASH_NODE_RELAY_8CH_A, .channel = 3, .is_on = false },
-    { .label = "R-A CH5",     .node = OPENDASH_NODE_RELAY_8CH_A, .channel = 4, .is_on = false },
-    { .label = "R-A CH6",     .node = OPENDASH_NODE_RELAY_8CH_A, .channel = 5, .is_on = false },
-    { .label = "R-A CH7",     .node = OPENDASH_NODE_RELAY_8CH_A, .channel = 6, .is_on = false },
-    { .label = "R-A CH8",     .node = OPENDASH_NODE_RELAY_8CH_A, .channel = 7, .is_on = false },
-    { .label = "R-B CH1",     .node = OPENDASH_NODE_RELAY_8CH_B, .channel = 0, .is_on = false },
-    { .label = "R-B CH2",     .node = OPENDASH_NODE_RELAY_8CH_B, .channel = 1, .is_on = false },
-    /* Row 2: RELAY B CH3-8 + MOS A CH1 */
-    { .label = "R-B CH3",     .node = OPENDASH_NODE_RELAY_8CH_B, .channel = 2, .is_on = false },
-    { .label = "R-B CH4",     .node = OPENDASH_NODE_RELAY_8CH_B, .channel = 3, .is_on = false },
-    { .label = "R-B CH5",     .node = OPENDASH_NODE_RELAY_8CH_B, .channel = 4, .is_on = false },
-    { .label = "R-B CH6",     .node = OPENDASH_NODE_RELAY_8CH_B, .channel = 5, .is_on = false },
-    { .label = "R-B CH7",     .node = OPENDASH_NODE_RELAY_8CH_B, .channel = 6, .is_on = false },
-    { .label = "R-B CH8",     .node = OPENDASH_NODE_RELAY_8CH_B, .channel = 7, .is_on = false },
-    { .label = "MOS-A CH1",   .node = OPENDASH_NODE_MOS_4CH_A,   .channel = 0, .is_on = false },
-    /* Row 3: MOS A CH2-4 + MOS B CH1-4 */
-    { .label = "MOS-A CH2",   .node = OPENDASH_NODE_MOS_4CH_A,   .channel = 1, .is_on = false },
-    { .label = "MOS-A CH3",   .node = OPENDASH_NODE_MOS_4CH_A,   .channel = 2, .is_on = false },
-    { .label = "MOS-A CH4",   .node = OPENDASH_NODE_MOS_4CH_A,   .channel = 3, .is_on = false },
-    { .label = "MOS-B CH1",   .node = OPENDASH_NODE_MOS_4CH_B,   .channel = 0, .is_on = false },
-    { .label = "MOS-B CH2",   .node = OPENDASH_NODE_MOS_4CH_B,   .channel = 1, .is_on = false },
-    { .label = "MOS-B CH3",   .node = OPENDASH_NODE_MOS_4CH_B,   .channel = 2, .is_on = false },
-    { .label = "MOS-B CH4",   .node = OPENDASH_NODE_MOS_4CH_B,   .channel = 3, .is_on = false },
-};
+/* Mapping-editor state: active flag + currently selected button index */
+static bool s_map_edit_active = false;
+static int  s_map_edit_sel    = 0;
 
 /* ── Data Grid (shared layout for BMS + OBD screens) ────────────────────── */
 #define DATA_GRID_COLS  5
@@ -354,6 +312,14 @@ static void restore_mode_cached_values(display_mode_t mode);
 static void capture_mode_defaults(void);
 static void load_layouts_from_nvs(void);
 static void devmgmt_layout_editor_cb(lv_event_t *e);
+static void map_editor_refresh(void);
+static void relay_box_paint(int idx);
+static void relay_box_longpress_cb(lv_event_t *e);
+static void panel_edit_btn_cb(lv_event_t *e);
+static void panel_seq_btn_cb(lv_event_t *e);
+static void create_map_editor(lv_obj_t *parent);
+static bool dp_cache_get(uint16_t id, float *out);
+static bool engine_running_now(void);
 
 /* ── OBD Config Submenu ─────────────────────────────────────────────────── */
 static lv_obj_t *obd_config_container = NULL;  /* OBD config submenu screen */
@@ -788,8 +754,66 @@ static void create_rpm_arc(lv_obj_t *parent, lv_obj_t **arc_out, lv_obj_t **valu
  * Relay Control Grid — 7×4 Toggle Boxes (28 channels)
  * ──────────────────────────────────────────────────────────────────────────── */
 
+/* Panel widgets created once at init, visible only in DISPLAY_MODE_RELAY */
+static lv_obj_t *panel_btn_edit = NULL;   /* "EDIT MAP" (status bar) */
+static lv_obj_t *panel_btn_seq  = NULL;   /* "ENGINE SEQ" (status bar) */
+static lv_obj_t *panel_seq_label = NULL;  /* label inside the seq button */
+static lv_obj_t *map_edit_container = NULL; /* full-screen binding editor */
+static lv_obj_t *map_edit_info = NULL;      /* selected-button info line */
+
+/* Label editor: on-screen TEXT keyboard modal (same pattern as the boost
+ * numeric keypad), rendered on the top layer over the mapping editor. */
+static lv_obj_t *s_le_root = NULL;
+static lv_obj_t *s_le_ta   = NULL;
+
+/* Engine-running latch: once any RPM reading reaches idle speed the panel
+ * stops being the home screen (gauge screens take over until reboot). */
+#define ENGINE_RUNNING_RPM 200.0f
+static bool s_engine_running_latched = false;
+
+/** Engine running = a cached RPM reading at/above idle, or already latched.
+ *  No data at all counts as NOT running ("parameters not met" → panel). */
+static bool engine_running_now(void)
+{
+    float v;
+    if (s_engine_running_latched) return true;
+    if (dp_cache_get(OPENDASH_DP_RPM, &v)    && v >= ENGINE_RUNNING_RPM) return true;
+    if (dp_cache_get(OPENDASH_DP_MD_RPM, &v)  && v >= ENGINE_RUNNING_RPM) return true;
+    return false;
+}
+
 /**
- * @brief Touch callback for a relay box — toggles ON/OFF
+ * @brief Repaint one panel box (label + ON/OFF + colors + selection ring).
+ * Call with LVGL lock held.
+ */
+static void relay_box_paint(int idx)
+{
+    const channel_binding_t *b = channel_registry_get(idx);
+    if (!b) return;
+
+    if (relay_boxes[idx].label) {
+        lv_label_set_text(relay_boxes[idx].label, b->label);
+    }
+    if (relay_boxes[idx].state_label) {
+        lv_label_set_text(relay_boxes[idx].state_label, b->is_on ? "ON" : "OFF");
+        lv_obj_set_style_text_color(relay_boxes[idx].state_label,
+            lv_color_hex(b->is_on ? 0x00FF00 : 0xFF4444), 0);
+    }
+    if (relay_boxes[idx].box) {
+        lv_obj_set_style_bg_color(relay_boxes[idx].box,
+            lv_color_hex(b->is_on ? 0x004400 : OPENDASH_COLOR_BG_SECTION), 0);
+        lv_obj_set_style_border_color(relay_boxes[idx].box,
+            lv_color_hex((s_map_edit_active && s_map_edit_sel == idx)
+                         ? 0xFFD700 : 0xFFFFFF), 0);
+    }
+}
+
+/**
+ * @brief Touch callback for a panel box.
+ *
+ * Normal mode: tap toggles the bound channel via ESP-NOW.
+ * Editor mode (s_map_edit_active): tap only SELECTS the box for re-binding —
+ * the wire is never energized by an editing tap.
  */
 static void relay_box_touch_cb(lv_event_t *e)
 {
@@ -799,29 +823,53 @@ static void relay_box_touch_cb(lv_event_t *e)
     intptr_t idx = (intptr_t)lv_event_get_user_data(e);
     if (idx < 0 || idx >= RELAY_GRID_TOTAL) return;
 
-    relay_box_mapping_t *map = &relay_box_map[idx];
-    map->is_on = !map->is_on;
-
-    /* Send relay command via ESP-NOW */
-    esp_err_t ret = espnow_master_send_relay_command(map->node, map->channel,
-                                                      map->is_on ? 1 : 0, 255);
-
-    /* Update box visual */
-    if (relay_boxes[idx].state_label) {
-        lv_label_set_text(relay_boxes[idx].state_label, map->is_on ? "ON" : "OFF");
-        lv_obj_set_style_text_color(relay_boxes[idx].state_label,
-            lv_color_hex(map->is_on ? 0x00FF00 : 0xFF4444), 0);
+    if (s_map_edit_active) {
+        int prev = s_map_edit_sel;
+        s_map_edit_sel = (int)idx;
+        relay_box_paint(prev);
+        relay_box_paint((int)idx);
+        map_editor_refresh();
+        return;
     }
-    if (relay_boxes[idx].box) {
-        lv_obj_set_style_bg_color(relay_boxes[idx].box,
-            lv_color_hex(map->is_on ? 0x004400 : OPENDASH_COLOR_BG_SECTION), 0);
-        /* Orange border if node is offline — state still persists across screens */
+
+    const channel_binding_t *b = channel_registry_get((int)idx);
+    if (!b) return;
+    bool on = !b->is_on;
+    channel_registry_set_state((int)idx, on);
+
+    /* Send relay command via ESP-NOW (goes through the policy gate) */
+    esp_err_t ret = espnow_master_send_relay_command(b->node, b->channel,
+                                                      on ? 1 : 0, 255);
+
+    relay_box_paint((int)idx);
+    if (ret != ESP_OK && relay_boxes[idx].box) {
+        /* Orange border if node is offline — state still persists */
         lv_obj_set_style_border_color(relay_boxes[idx].box,
-            lv_color_hex(ret == ESP_OK ? 0xFFFFFF : 0xFF8800), 0);
+            lv_color_hex(0xFF8800), 0);
     }
 
-    ESP_LOGI(TAG, "Relay box %d [%s] → %s (send=%s)", (int)idx, map->label,
-             map->is_on ? "ON" : "OFF", esp_err_to_name(ret));
+    ESP_LOGI(TAG, "Panel button %d → %s (send=%s)", (int)idx,
+             on ? "ON" : "OFF", esp_err_to_name(ret));
+}
+
+/**
+ * @brief Long-press a panel box → open the binding editor for that button.
+ */
+static void relay_box_longpress_cb(lv_event_t *e)
+{
+    intptr_t idx = (intptr_t)lv_event_get_user_data(e);
+    if (idx < 0 || idx >= RELAY_GRID_TOTAL) return;
+
+    int prev = s_map_edit_sel;
+    s_map_edit_active = true;
+    s_map_edit_sel    = (int)idx;
+    relay_box_paint(prev);
+    relay_box_paint((int)idx);
+    if (map_edit_container) {
+        lv_obj_clear_flag(map_edit_container, LV_OBJ_FLAG_HIDDEN);
+    }
+    map_editor_refresh();
+    ESP_LOGI(TAG, "Mapping editor opened for button %d", (int)idx);
 }
 
 /**
@@ -831,25 +879,353 @@ static void relay_box_touch_cb(lv_event_t *e)
 void ui_manager_update_relay_status(opendash_node_t node, const uint8_t *states, uint8_t num_ch)
 {
     for (int idx = 0; idx < RELAY_GRID_TOTAL; idx++) {
-        relay_box_mapping_t *map = &relay_box_map[idx];
-        if (map->node != node) continue;
-        if (map->channel >= num_ch) continue;
+        const channel_binding_t *b = channel_registry_get(idx);
+        if (!b || b->node != node) continue;
+        if (b->channel >= num_ch) continue;
 
-        bool on = (states[map->channel] != 0);
-        map->is_on = on;
+        channel_registry_set_state(idx, states[b->channel] != 0);
+        relay_box_paint(idx);
+    }
+}
 
-        if (relay_boxes[idx].state_label) {
-            lv_label_set_text(relay_boxes[idx].state_label, on ? "ON" : "OFF");
-            lv_obj_set_style_text_color(relay_boxes[idx].state_label,
-                lv_color_hex(on ? 0x00FF00 : 0xFF4444), 0);
+/* ────────────────────────────────────────────────────────────────────────────
+ * Mapping Editor — rebind a panel button to a different node/channel
+ *
+ * Opened by long-pressing any panel box. While open, taps on boxes SELECT
+ * (never toggle); node/channel buttons write through to the channel registry
+ * (NVS) and live-repaint the grid underneath.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+static void map_editor_refresh(void)
+{
+    if (!map_edit_info) return;
+    const channel_binding_t *b = channel_registry_get(s_map_edit_sel);
+    if (!b) return;
+    lv_label_set_text_fmt(map_edit_info,
+                          "BTN %d:  %s   →  NODE %d / CH %" PRIu8,
+                          s_map_edit_sel, b->label, (int)b->node, b->channel);
+}
+
+static void map_edit_node_cb(lv_event_t *e)
+{
+    if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
+    opendash_node_t node = (opendash_node_t)(intptr_t)lv_event_get_user_data(e);
+    const channel_binding_t *b = channel_registry_get(s_map_edit_sel);
+    if (!b) return;
+    channel_registry_set_binding(s_map_edit_sel, node, b->channel);
+    relay_box_paint(s_map_edit_sel);
+    map_editor_refresh();
+}
+
+static void map_edit_ch_cb(lv_event_t *e)
+{
+    if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
+    uint8_t ch = (uint8_t)(uintptr_t)lv_event_get_user_data(e);
+    const channel_binding_t *b = channel_registry_get(s_map_edit_sel);
+    if (!b) return;
+    channel_registry_set_binding(s_map_edit_sel, b->node, ch);
+    relay_box_paint(s_map_edit_sel);
+    map_editor_refresh();
+}
+
+static void map_edit_prev_cb(lv_event_t *e)
+{
+    (void)e;
+    int prev = s_map_edit_sel;
+    s_map_edit_sel = (s_map_edit_sel + CHANNEL_REGISTRY_COUNT - 1) % CHANNEL_REGISTRY_COUNT;
+    relay_box_paint(prev);
+    relay_box_paint(s_map_edit_sel);
+    map_editor_refresh();
+}
+
+static void map_edit_next_cb(lv_event_t *e)
+{
+    (void)e;
+    int prev = s_map_edit_sel;
+    s_map_edit_sel = (s_map_edit_sel + 1) % CHANNEL_REGISTRY_COUNT;
+    relay_box_paint(prev);
+    relay_box_paint(s_map_edit_sel);
+    map_editor_refresh();
+}
+
+static void map_edit_reset_cb(lv_event_t *e)
+{
+    (void)e;
+    channel_registry_reset_defaults();
+    for (int i = 0; i < CHANNEL_REGISTRY_COUNT; i++) relay_box_paint(i);
+    map_editor_refresh();
+}
+
+static void map_edit_auto_cb(lv_event_t *e)
+{
+    (void)e;
+    bool now = !channel_registry_panel_auto();
+    channel_registry_set_panel_auto(now);
+    ESP_LOGI(TAG, "Boot-to-panel routing now %s — takes effect at next boot",
+             now ? "AUTO" : "MANUAL");
+    map_editor_refresh();
+}
+
+static void map_edit_close_cb(lv_event_t *e)
+{
+    (void)e;
+    s_map_edit_active = false;
+    if (map_edit_container) lv_obj_add_flag(map_edit_container, LV_OBJ_FLAG_HIDDEN);
+    relay_box_paint(s_map_edit_sel);  /* restore white border on last box */
+    ESP_LOGI(TAG, "Mapping editor closed");
+}
+
+/** "EDIT MAP" status-bar button: toggle binding-edit mode (+ overlay). */
+static void panel_edit_btn_cb(lv_event_t *e)
+{
+    (void)e;
+    if (!s_map_edit_active) {
+        s_map_edit_active = true;
+        if (map_edit_container) {
+            lv_obj_clear_flag(map_edit_container, LV_OBJ_FLAG_HIDDEN);
         }
-        if (relay_boxes[idx].box) {
-            lv_obj_set_style_bg_color(relay_boxes[idx].box,
-                lv_color_hex(on ? 0x004400 : OPENDASH_COLOR_BG_SECTION), 0);
-            lv_obj_set_style_border_color(relay_boxes[idx].box,
-                lv_color_hex(0xFFFFFF), 0);  /* Reset to white (was orange if offline) */
+        relay_box_paint(s_map_edit_sel);
+        map_editor_refresh();
+        ESP_LOGI(TAG, "Panel edit mode ON");
+    } else {
+        s_map_edit_active = false;
+        if (map_edit_container) lv_obj_add_flag(map_edit_container, LV_OBJ_FLAG_HIDDEN);
+        relay_box_paint(s_map_edit_sel);
+        ESP_LOGI(TAG, "Panel edit mode OFF");
+    }
+}
+
+/** "ENGINE SEQ" status-bar button: start (or abort) the sequencer. */
+static void panel_seq_btn_cb(lv_event_t *e)
+{
+    (void)e;
+    if (start_sequencer_state() == OPENDASH_SEQ_RUNNING) {
+        start_sequencer_stop();
+    } else {
+        esp_err_t err = start_sequencer_start();
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "Sequencer start refused: %s", esp_err_to_name(err));
         }
     }
+}
+
+/**
+ * @brief Create the full-screen binding-editor overlay (hidden by default)
+ */
+/* ── Label editor — on-screen text keyboard for custom button labels ──────
+ * Same modal pattern as the boost numeric keypad: full-screen dimmed root
+ * on lv_layer_top(), clickable with gesture bubbling OFF so swipes never
+ * escape to the screen-level mode cycler. OK commits via
+ * channel_registry_set_label() (uppercased, NVS write-through). */
+
+static void label_edit_close(void)
+{
+    if (!s_le_root) return;
+    lv_obj_del(s_le_root);
+    s_le_root = NULL;
+    s_le_ta   = NULL;
+}
+
+static void label_edit_commit(void)
+{
+    if (s_le_ta) {
+        const char *txt = lv_textarea_get_text(s_le_ta);
+        if (txt && txt[0] != '\0') {
+            channel_registry_set_label(s_map_edit_sel, txt);
+            relay_box_paint(s_map_edit_sel);
+            map_editor_refresh();
+        }
+    }
+    label_edit_close();
+}
+
+static void le_kbd_event_cb(lv_event_t *e)
+{
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_READY || code == LV_EVENT_CANCEL) label_edit_close();
+}
+
+static void le_ok_cb(lv_event_t *e) { (void)e; label_edit_commit(); }
+static void le_cancel_cb(lv_event_t *e) { (void)e; label_edit_close(); }
+
+static void label_edit_open_cb(lv_event_t *e)
+{
+    (void)e;
+    if (s_le_root) return;  /* already open */
+    const channel_binding_t *b = channel_registry_get(s_map_edit_sel);
+    if (!b) return;
+
+    s_le_root = lv_obj_create(lv_layer_top());
+    lv_obj_set_size(s_le_root, LCD_H_RES, LCD_V_RES);
+    lv_obj_set_style_bg_color(s_le_root, lv_color_black(), 0);
+    lv_obj_set_style_bg_opa(s_le_root, LV_OPA_70, 0);
+    lv_obj_set_style_border_width(s_le_root, 0, 0);
+    lv_obj_set_style_pad_all(s_le_root, 8, 0);
+    lv_obj_clear_flag(s_le_root, LV_OBJ_FLAG_SCROLLABLE);
+    /* Soak up gestures so they cannot escape to the screen-level handler */
+    lv_obj_add_flag(s_le_root, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_clear_flag(s_le_root, LV_OBJ_FLAG_GESTURE_BUBBLE);
+
+    lv_obj_t *t = create_simple_label(s_le_root, "", OPENDASH_FONT_SIZE_MEDIUM,
+                                     0xFFD700);
+    lv_label_set_text_fmt(t, "RENAME BUTTON %d", s_map_edit_sel);
+    lv_obj_align(t, LV_ALIGN_TOP_MID, 0, 0);
+
+    s_le_ta = lv_textarea_create(s_le_root);
+    lv_obj_set_size(s_le_ta, 400, 52);
+    lv_obj_align(s_le_ta, LV_ALIGN_TOP_MID, 0, 36);
+    lv_textarea_set_one_line(s_le_ta, true);
+    lv_textarea_set_max_length(s_le_ta, CHANNEL_LABEL_MAX - 1);
+    lv_textarea_set_accepted_chars(s_le_ta,
+        " ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_");
+    lv_textarea_set_text(s_le_ta, b->label);
+
+    /* OK / Cancel row */
+    lv_obj_t *btn_row = lv_obj_create(s_le_root);
+    lv_obj_set_size(btn_row, 280, 48);
+    lv_obj_align(btn_row, LV_ALIGN_TOP_MID, 0, 96);
+    lv_obj_set_style_bg_opa(btn_row, 0, 0);
+    lv_obj_set_style_border_width(btn_row, 0, 0);
+    lv_obj_set_style_pad_all(btn_row, 0, 0);
+    lv_obj_clear_flag(btn_row, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *b_ok = lv_btn_create(btn_row);
+    lv_obj_set_size(b_ok, 120, 44);
+    lv_obj_align(b_ok, LV_ALIGN_LEFT_MID, 4, 0);
+    lv_obj_set_style_bg_color(b_ok, lv_color_hex(0x2E7D32), 0);
+    lv_obj_set_style_radius(b_ok, 8, 0);
+    lv_obj_add_event_cb(b_ok, le_ok_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_t *ok_lbl = create_simple_label(b_ok, "OK", OPENDASH_FONT_SIZE_SMALL, 0xFFFFFF);
+    lv_obj_center(ok_lbl);
+
+    lv_obj_t *b_cancel = lv_btn_create(btn_row);
+    lv_obj_set_size(b_cancel, 120, 44);
+    lv_obj_align(b_cancel, LV_ALIGN_RIGHT_MID, -4, 0);
+    lv_obj_set_style_bg_color(b_cancel, lv_color_hex(0x555555), 0);
+    lv_obj_set_style_radius(b_cancel, 8, 0);
+    lv_obj_add_event_cb(b_cancel, le_cancel_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_t *cancel_lbl = create_simple_label(b_cancel, "CANCEL",
+                                               OPENDASH_FONT_SIZE_SMALL, 0xFFFFFF);
+    lv_obj_center(cancel_lbl);
+
+    lv_obj_t *kbd = lv_keyboard_create(s_le_root);
+    lv_keyboard_set_mode(kbd, LV_KEYBOARD_MODE_TEXT_UPPER);
+    lv_keyboard_set_textarea(kbd, s_le_ta);
+    lv_obj_set_width(kbd, lv_pct(95));
+    lv_obj_set_height(kbd, 250);
+    lv_obj_align(kbd, LV_ALIGN_BOTTOM_MID, 0, -8);
+    lv_obj_add_event_cb(kbd, le_kbd_event_cb, LV_EVENT_READY, NULL);
+    lv_obj_add_event_cb(kbd, le_kbd_event_cb, LV_EVENT_CANCEL, NULL);
+
+    ESP_LOGI(TAG, "Label editor opened for button %d", s_map_edit_sel);
+}
+
+/** Small flat button used inside the mapping editor. */
+static lv_obj_t *map_edit_btn(lv_obj_t *parent, const char *text, uint32_t bg,
+                              lv_event_cb_t cb, void *ud)
+{
+    lv_obj_t *btn = lv_btn_create(parent);
+    lv_obj_set_style_bg_color(btn, lv_color_hex(bg), 0);
+    lv_obj_set_style_radius(btn, 8, 0);
+    lv_obj_add_event_cb(btn, cb, LV_EVENT_CLICKED, ud);
+    lv_obj_t *lbl = create_simple_label(btn, text, OPENDASH_FONT_SIZE_SMALL, 0xFFFFFF);
+    lv_obj_center(lbl);
+    return btn;
+}
+
+static void create_map_editor(lv_obj_t *parent)
+{
+    map_edit_container = lv_obj_create(parent);
+    lv_obj_set_size(map_edit_container, LCD_H_RES, LCD_V_RES - STATUS_BAR_HEIGHT - 20);
+    lv_obj_align(map_edit_container, LV_ALIGN_TOP_MID, 0, 0);
+    lv_obj_set_style_bg_color(map_edit_container,
+                              lv_color_hex(OPENDASH_COLOR_BG_SECTION), 0);
+    lv_obj_set_style_bg_opa(map_edit_container, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(map_edit_container, 0, 0);
+    lv_obj_set_style_pad_all(map_edit_container, 10, 0);
+    lv_obj_clear_flag(map_edit_container, LV_OBJ_FLAG_SCROLLABLE);
+    /* Soak up gestures while the editor is open — swipes must not cycle
+     * display modes (which would destroy the panel underneath). */
+    lv_obj_add_flag(map_edit_container, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_clear_flag(map_edit_container, LV_OBJ_FLAG_GESTURE_BUBBLE);
+
+    lv_obj_t *title = create_simple_label(map_edit_container, "BUTTON MAPPING EDITOR",
+                                          OPENDASH_FONT_SIZE_LARGE, 0xFFD700);
+    lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 0);
+
+    map_edit_info = create_simple_label(map_edit_container, "BTN —",
+                                        OPENDASH_FONT_SIZE_MEDIUM, 0xFFFFFF);
+    lv_obj_align(map_edit_info, LV_ALIGN_TOP_MID, 0, 34);
+
+    /* Node row */
+    static const struct { opendash_node_t node; const char *name; } nodes[] = {
+        { OPENDASH_NODE_RELAY_4CH,   "RLY4"  },
+        { OPENDASH_NODE_RELAY_8CH_A, "RLY-A" },
+        { OPENDASH_NODE_RELAY_8CH_B, "RLY-B" },
+        { OPENDASH_NODE_MOS_4CH_A,   "MOS-A" },
+        { OPENDASH_NODE_MOS_4CH_B,   "MOS-B" },
+    };
+    const int nbtn_w = 145, nbtn_h = 60, nsp = 6;
+    const int n_total = 5 * nbtn_w + 4 * nsp;
+    const int n_sx = (LCD_H_RES - 20 - n_total) / 2;
+    for (int i = 0; i < 5; i++) {
+        lv_obj_t *btn = map_edit_btn(map_edit_container, nodes[i].name, 0x0077B6,
+                                     map_edit_node_cb, (void *)(intptr_t)nodes[i].node);
+        lv_obj_set_size(btn, nbtn_w, nbtn_h);
+        lv_obj_set_pos(btn, n_sx + i * (nbtn_w + nsp), 70);
+    }
+
+    /* Channel row */
+    const int cbtn_w = 88, cbtn_h = 60;
+    const int c_total = 8 * cbtn_w + 7 * nsp;
+    const int c_sx = (LCD_H_RES - 20 - c_total) / 2;
+    for (uint8_t c = 0; c < 8; c++) {
+        char txt[8];
+        snprintf(txt, sizeof(txt), "CH%d", c + 1);
+        lv_obj_t *btn = map_edit_btn(map_edit_container, txt, 0x2E7D32,
+                                     map_edit_ch_cb, (void *)(uintptr_t)c);
+        lv_obj_set_size(btn, cbtn_w, cbtn_h);
+        lv_obj_set_pos(btn, c_sx + c * (cbtn_w + nsp), 140);
+    }
+
+    /* Navigation / utility row */
+    const int vbtn_w = 145, vbtn_h = 56;
+    const int v_total = 5 * vbtn_w + 4 * nsp;
+    const int v_sx = (LCD_H_RES - 20 - v_total) / 2;
+    lv_obj_t *b_prev = map_edit_btn(map_edit_container, "< PREV", 0x555555,
+                                    map_edit_prev_cb, NULL);
+    lv_obj_set_size(b_prev, vbtn_w, vbtn_h);
+    lv_obj_set_pos(b_prev, v_sx, 210);
+    lv_obj_t *b_next = map_edit_btn(map_edit_container, "NEXT >", 0x555555,
+                                    map_edit_next_cb, NULL);
+    lv_obj_set_size(b_next, vbtn_w, vbtn_h);
+    lv_obj_set_pos(b_next, v_sx + (vbtn_w + nsp), 210);
+    lv_obj_t *b_reset = map_edit_btn(map_edit_container, "RESET DEFAULTS", 0xE94560,
+                                     map_edit_reset_cb, NULL);
+    lv_obj_set_size(b_reset, vbtn_w, vbtn_h);
+    lv_obj_set_pos(b_reset, v_sx + 2 * (vbtn_w + nsp), 210);
+    lv_obj_t *b_auto = map_edit_btn(map_edit_container, "BOOT TOGGLE", 0x7B2FBE,
+                                    map_edit_auto_cb, NULL);
+    lv_obj_set_size(b_auto, vbtn_w, vbtn_h);
+    lv_obj_set_pos(b_auto, v_sx + 3 * (vbtn_w + nsp), 210);
+    lv_obj_t *b_close = map_edit_btn(map_edit_container, "CLOSE", 0xFF6F00,
+                                     map_edit_close_cb, NULL);
+    lv_obj_set_size(b_close, vbtn_w, vbtn_h);
+    lv_obj_set_pos(b_close, v_sx + 4 * (vbtn_w + nsp), 210);
+
+    /* Label editor row — on-screen text keyboard for the selected button */
+    lv_obj_t *b_rename = map_edit_btn(map_edit_container, "RENAME BUTTON", 0x00695C,
+                                     label_edit_open_cb, NULL);
+    lv_obj_set_size(b_rename, 300, 52);
+    lv_obj_align(b_rename, LV_ALIGN_BOTTOM_MID, 0, -70);
+
+    lv_obj_t *hint = create_simple_label(map_edit_container,
+        "Tap panel button to select - NODE + CH rebind - RENAME edits label",
+        OPENDASH_FONT_SIZE_SMALL, 0xCCCCCC);
+    lv_obj_align(hint, LV_ALIGN_BOTTOM_MID, 0, -6);
+
+    lv_obj_add_flag(map_edit_container, LV_OBJ_FLAG_HIDDEN);
+    ESP_LOGI(TAG, "Mapping editor created (hidden)");
 }
 
 /**
@@ -893,13 +1269,14 @@ static void create_relay_grid(lv_obj_t *parent)
             lv_obj_add_flag(box, LV_OBJ_FLAG_CLICKABLE);
 
             /* Label — SMALL (14px) fits 7-column layout */
-            lv_obj_t *label = create_simple_label(box, relay_box_map[idx].label,
+            const channel_binding_t *bnd = channel_registry_get(idx);
+            lv_obj_t *label = create_simple_label(box, bnd ? bnd->label : "?",
                                                      OPENDASH_FONT_SIZE_SMALL,
                                                      OPENDASH_COLOR_TEXT_PRIMARY);
             lv_obj_align(label, LV_ALIGN_TOP_MID, 0, 4);
 
             /* ON/OFF state indicator — LARGE (32px) for 7×4 boxes */
-            bool on = relay_box_map[idx].is_on;
+            bool on = bnd ? bnd->is_on : false;
             lv_obj_t *state = create_simple_label(box, on ? "ON" : "OFF",
                                                    OPENDASH_FONT_SIZE_LARGE,
                                                    on ? 0x00FF00 : 0xFF4444);
@@ -910,9 +1287,14 @@ static void create_relay_grid(lv_obj_t *parent)
                 lv_obj_set_style_bg_color(box,
                     lv_color_hex(0x004400), 0);
             }
+            if (s_map_edit_active && s_map_edit_sel == idx) {
+                lv_obj_set_style_border_color(box, lv_color_hex(0xFFD700), 0);
+            }
 
-            /* Touch handler — pass box index */
+            /* Touch handlers — pass box index (tap=toggle, hold=select/edit) */
             lv_obj_add_event_cb(box, relay_box_touch_cb, LV_EVENT_CLICKED,
+                                (void *)(intptr_t)idx);
+            lv_obj_add_event_cb(box, relay_box_longpress_cb, LV_EVENT_LONG_PRESSED,
                                 (void *)(intptr_t)idx);
 
             relay_boxes[idx].box = box;
@@ -921,7 +1303,9 @@ static void create_relay_grid(lv_obj_t *parent)
         }
     }
 
-    /* Start hidden — shown only in DISPLAY_MODE_RELAY */
+    /* Start hidden — shown only in DISPLAY_MODE_RELAY. The mapping editor
+     * overlay is created alongside the grid and destroyed with it. */
+    create_map_editor(parent);
     lv_obj_add_flag(relay_grid_container, LV_OBJ_FLAG_HIDDEN);
 
     ESP_LOGI(TAG, "Relay control grid created (%dx%d = %d boxes)",
@@ -3207,12 +3591,23 @@ static void toggle_grid_visibility(display_mode_t mode)
                          mode == DISPLAY_MODE_OBD ||
                          mode == DISPLAY_MODE_CONFIG);
 
+    /* Panel action buttons live only on the switch panel screen */
+    bool panel = (mode == DISPLAY_MODE_RELAY);
+    if (panel_btn_edit) {
+        if (panel) lv_obj_clear_flag(panel_btn_edit, LV_OBJ_FLAG_HIDDEN);
+        else       lv_obj_add_flag(panel_btn_edit, LV_OBJ_FLAG_HIDDEN);
+    }
+    if (panel_btn_seq) {
+        if (panel) lv_obj_clear_flag(panel_btn_seq, LV_OBJ_FLAG_HIDDEN);
+        else       lv_obj_add_flag(panel_btn_seq, LV_OBJ_FLAG_HIDDEN);
+    }
+
     /*
      * Destroy-on-leave / Create-on-enter:
      * Only ONE grid exists in memory at a time. This keeps LVGL object
      * count low (~61 per grid) and avoids OOM when the 3rd grid would
      * have been created.  Min/max values live in static C arrays and
-     * are NOT affected.  Relay is_on state is in relay_box_map[] statics.
+     * are NOT affected.  Relay is_on state lives in the NVS channel registry.
      */
 
     /* ── Tear down any grid that is NOT the one we're switching to ── */
@@ -3221,6 +3616,13 @@ static void toggle_grid_visibility(display_mode_t mode)
         lv_obj_del(relay_grid_container);
         relay_grid_container = NULL;
         memset(relay_boxes, 0, sizeof(relay_boxes));
+        /* Editor overlay is part of the panel — tear it down too */
+        s_map_edit_active = false;
+        if (map_edit_container) {
+            lv_obj_del(map_edit_container);
+            map_edit_container = NULL;
+            map_edit_info = NULL;
+        }
     }
     if (mode != DISPLAY_MODE_BMS && bms_grid_container) {
         ESP_LOGI(TAG, "Destroying BMS grid (leaving mode)");
@@ -3552,6 +3954,35 @@ static esp_err_t create_screen_layout(void)
     lv_obj_align(ota_badge_label, LV_ALIGN_RIGHT_MID, -8, 0);
     lv_obj_add_flag(ota_badge_label, LV_OBJ_FLAG_HIDDEN);  /* Hidden until any node enters BT OTA */
 
+    /* ── Panel-mode action buttons (status bar; visible only on RELAY mode)
+     * EDIT MAP enters binding-edit mode (taps select boxes, long-press also
+     * opens the editor overlay); ENGINE SEQ starts/stops the START ENGINE
+     * sequencer program. Hidden on every other screen. */
+    lv_obj_t *pb_edit = lv_btn_create(screen_layout.status_bar);
+    lv_obj_set_size(pb_edit, 120, 40);
+    lv_obj_align(pb_edit, LV_ALIGN_RIGHT_MID, -190, 0);
+    lv_obj_set_style_bg_color(pb_edit, lv_color_hex(0x7B2FBE), 0);
+    lv_obj_set_style_radius(pb_edit, 8, 0);
+    lv_obj_add_event_cb(pb_edit, panel_edit_btn_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_t *pb_edit_lbl = create_simple_label(pb_edit, "EDIT MAP",
+                                                OPENDASH_FONT_SIZE_SMALL, 0xFFFFFF);
+    lv_obj_center(pb_edit_lbl);
+    lv_obj_add_flag(pb_edit, LV_OBJ_FLAG_HIDDEN);
+    panel_btn_edit = pb_edit;
+
+    lv_obj_t *pb_seq = lv_btn_create(screen_layout.status_bar);
+    lv_obj_set_size(pb_seq, 150, 40);
+    lv_obj_align(pb_seq, LV_ALIGN_RIGHT_MID, -30, 0);
+    lv_obj_set_style_bg_color(pb_seq, lv_color_hex(0x2E7D32), 0);
+    lv_obj_set_style_radius(pb_seq, 8, 0);
+    lv_obj_add_event_cb(pb_seq, panel_seq_btn_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_t *pb_seq_lbl = create_simple_label(pb_seq, "ENGINE SEQ",
+                                               OPENDASH_FONT_SIZE_SMALL, 0xFFFFFF);
+    lv_obj_center(pb_seq_lbl);
+    lv_obj_add_flag(pb_seq, LV_OBJ_FLAG_HIDDEN);
+    panel_btn_seq  = pb_seq;
+    panel_seq_label = pb_seq_lbl;
+
     ESP_LOGI(TAG, "Screen layout created with 6 data sections + center arc (grids deferred)");
     return ESP_OK;
 }
@@ -3568,8 +3999,10 @@ static void update_display_mode(display_mode_t new_mode)
     /* Track whether we are in any debug screen.
      * OBD is only "debug" if it wasn't entered from the normal cycle
      * (i.e., when we were already in debug mode via the DEBUG button). */
-    if (new_mode == DISPLAY_MODE_RELAY || new_mode == DISPLAY_MODE_BMS) {
+    if (new_mode == DISPLAY_MODE_BMS) {
         s_debug_mode_active = true;
+    } else if (new_mode == DISPLAY_MODE_RELAY && !channel_registry_panel_auto()) {
+        s_debug_mode_active = true;  /* panel reached via DEBUG (not as home) */
     } else if (new_mode == DISPLAY_MODE_OBD && !obd_config_get()->obd_enabled) {
         s_debug_mode_active = true;  /* OBD via debug cycle */
     } else if (new_mode != DISPLAY_MODE_OBD) {
@@ -3834,8 +4267,13 @@ esp_err_t ui_manager_init(const opendash_display_layout_t *layout)
     /* Create the single screen with all LVGL objects */
     ESP_ERROR_CHECK(create_screen_layout());
     
-    /* Set initial display mode and load screen */
-    update_display_mode(DISPLAY_MODE_ENGINE);
+    /* Set initial display mode and load screen.
+     * Boot routing: with panel-auto enabled and the engine not yet running
+     * (no/low sensor data at boot = "engine running parameters not met"),
+     * the software switch panel IS the home screen. */
+    display_mode_t home = (channel_registry_panel_auto() && !engine_running_now())
+                          ? DISPLAY_MODE_RELAY : DISPLAY_MODE_ENGINE;
+    update_display_mode(home);
     lv_scr_load(screen_layout.screen);
 
     /* Register gesture handler for swipe navigation (LVGL 9 built-in) */
@@ -4149,6 +4587,18 @@ void ui_manager_update_value(uint16_t data_point_id, float value)
 {
     /* Always cache every incoming value so mode-switches can restore it */
     dp_cache_store(data_point_id, value);
+
+    /* Engine-running latch: while panel-auto routing is on, the first fresh
+     * RPM at/above idle means the "engine running" parameters are met —
+     * latch to the gauge screens until reboot. */
+    if (!s_engine_running_latched && channel_registry_panel_auto() &&
+        (data_point_id == OPENDASH_DP_RPM || data_point_id == OPENDASH_DP_MD_RPM) &&
+        value >= ENGINE_RUNNING_RPM) {
+        s_engine_running_latched = true;
+        ESP_LOGI(TAG, "Engine running (RPM >= %.0f) — home screen latched to ENGINE",
+                 (double)ENGINE_RUNNING_RPM);
+        update_display_mode(DISPLAY_MODE_ENGINE);
+    }
 
     const mode_dp_map_t *map = &mode_dp_maps[current_mode];
     char buf[32];
@@ -4512,6 +4962,60 @@ esp_err_t ui_manager_set_display_mode(display_mode_t mode)
     }
     update_display_mode(mode);
     return ESP_OK;
+}
+
+/* Public: read a cached data point (takes the LVGL lock itself). */
+bool ui_manager_get_dp(uint16_t id, float *out)
+{
+    if (!out) return false;
+    bool ok = false;
+    if (display_lvgl_lock(50)) {
+        ok = dp_cache_get(id, out);
+        display_lvgl_unlock();
+    }
+    return ok;
+}
+
+/* Public: repaint one panel box after a channel-registry edit (serial or
+ * otherwise); takes the LVGL lock itself so any task may call it. */
+esp_err_t ui_manager_apply_binding_change(int idx)
+{
+    if (idx < 0 || idx >= (int)RELAY_GRID_TOTAL) return ESP_ERR_INVALID_ARG;
+    if (!display_lvgl_lock(100)) return ESP_FAIL;
+    if (relay_grid_container) relay_box_paint(idx);
+    map_editor_refresh();
+    display_lvgl_unlock();
+    return ESP_OK;
+}
+
+/* Public: sequencer state/progress push (called from the seq task). */
+void ui_manager_seq_notify(opendash_seq_state_t state, int step_idx, int step_count)
+{
+    char buf[32];
+    switch (state) {
+        case OPENDASH_SEQ_RUNNING:
+            snprintf(buf, sizeof(buf), "SEQ %d/%d", step_idx + 1, step_count);
+            break;
+        case OPENDASH_SEQ_DONE:
+            snprintf(buf, sizeof(buf), "SEQ DONE");
+            break;
+        case OPENDASH_SEQ_FAILED:
+            snprintf(buf, sizeof(buf), "SEQ FAIL@%d", step_idx + 1);
+            break;
+        default:
+            snprintf(buf, sizeof(buf), "ENGINE SEQ");
+            break;
+    }
+
+    if (!display_lvgl_lock(50)) return;
+    if (panel_seq_label) lv_label_set_text(panel_seq_label, buf);
+    if (panel_btn_seq) {
+        uint32_t bg = (state == OPENDASH_SEQ_DONE)   ? 0x1B5E20 :
+                      (state == OPENDASH_SEQ_FAILED) ? 0x7F0000 : 0x2E7D32;
+        lv_obj_set_style_bg_color(panel_btn_seq, lv_color_hex(bg), 0);
+    }
+    display_lvgl_unlock();
+    ESP_LOGI(TAG, "Sequencer UI update: %s", buf);
 }
 
 void ui_manager_update_config_node_status(const espnow_master_node_status_t *status)

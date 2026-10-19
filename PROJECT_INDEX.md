@@ -4,7 +4,14 @@
 > **Central reference for the entire OpenDash codebase.**
 > Start here to understand the project, then follow links to detailed documents.
 >
-> **Last updated:** 2026-10-07 (A+ program ledger opened — game-plan + audit
+> **Last updated:** 2026-10-12 (documentation cleanup pass — orphaned canon docs
+> indexed below, remaining I2C-as-transport prose drift fixed — checklist now says
+> ESP-NOW, glossary I2C entry rewritten, LEFT/RIGHT main-loop row fixed, right/
+> tree line corrected; untracked duplicate `docs/archived/` copy deleted. Previous:
+> 2026-10-10 independent re-audit findings closed — see ledger
+> §10; ledger renamed `gameplan-aduit.md` → `gameplan-audit.md`; controller-node
+> READMEs landed; readme tree/node-ID/SD-logging claims corrected. Program opened
+> 2026-10-07 — game-plan + audit
 > ledger indexed below; Phase 0 hygiene completed same day — converters-in-CI
 > real, repo bloat untracked, first fully-green CI run build-smoke #30.
 > Convention: bump this line
@@ -141,7 +148,8 @@ opendash/
 │   └── README.md               Left pod documentation
 │
 ├── right/                      ── Right Gauge Pod ───────────────────────
-│   └── (same structure as left/, I2C addr 0x11 instead of 0x10)
+│   └── (same structure and pin map as left/ — identical hardware; the only
+│        difference is the logical node ID: 2 / OPENDASH_NODE_RIGHT)
 │
 ├── pod1/                       ── Pod 1 Display Unit ───────────────────
 │   ├── main/
@@ -170,7 +178,7 @@ opendash/
 │   │   ├── main.c              Entry, ESP-NOW slave (node GPS)
 │   │   ├── display_init.c/h    CO5300 AMOLED init
 │   │   ├── ui_manager.c/h      AMOLED gauge UI
-│   │   ├── gps_handler.c/h     LC76G GPS I2C driver (v15L2 PRODUCTION)
+│   │   ├── gps_handler.c/h     LC76G GPS I2C driver (v16k-port PRODUCTION)
 │   │   ├── imu_handler.c/h     QMI8658 accelerometer + gyro
 │   │   └── parachute.c/h       Gyro-triggered parachute deployment
 │   ├── sdkconfig
@@ -200,13 +208,14 @@ Every documentation file in the project, grouped by purpose.
 |---|---|
 | [**readme.md**](readme.md) | Project overview, feature list, quick links |
 | [**QUICKSTART.md**](QUICKSTART.md) | 5-minute hardware + software setup |
+| [**QUICK_REFERENCE.md**](QUICK_REFERENCE.md) | Center warning-box + multi-screen API quick reference (verified against `ui_manager.h`) |
 | [**BUILD_DEPENDENCIES.md**](BUILD_DEPENDENCIES.md) | Install ESP-IDF, Node.js, Python, ImageMagick |
 | [**docs/setup-guide.md**](docs/setup-guide.md) | Full dev environment setup walkthrough |
 | [**docs/vscode-setup.md**](docs/vscode-setup.md) | VS Code workspace, build, flash, monitor config |
 | [**agent/opendash.agent.md**](agent/opendash.agent.md) | **AI-agent / contributor playbook** (canonical) — critical rules, architecture primer, task workflow |
 | [**agent/opendash.instructions.md**](agent/opendash.instructions.md) | Editor auto-load instructions — defers to the canonical playbook above |
 | [**docs/A_PLUS_GAMEPLAN.md**](docs/A_PLUS_GAMEPLAN.md) | Roadmap-to-A+ program master game-plan (Phases P0–P6, decisions D1–D7, risk register) |
-| [**docs/gameplan-aduit.md**](docs/gameplan-aduit.md) | Live audit ledger for the game-plan — per-claim verdicts, corrected numbers, append-only change log |
+| [**docs/gameplan-audit.md**](docs/gameplan-audit.md) | Live audit ledger for the game-plan — per-claim verdicts, corrected numbers, append-only change log |
 
 ### Architecture & Design
 
@@ -215,7 +224,7 @@ Every documentation file in the project, grouped by purpose.
 | [**docs/architecture.md**](docs/architecture.md) | System block diagram, node roles, software layers |
 | [**docs/hardware.md**](docs/hardware.md) | Board specs, pin mappings, wiring for all 4 nodes |
 | [**docs/espnow-protocol.md**](docs/espnow-protocol.md) | ESP-NOW frame format, opcode map, priority channels |
-| [**docs/POLICY_GATE.md**](docs/POLICY_GATE.md) | **Roster policy-gate spec (P1.3) — RATIFIED (D4 rulings) and WIRED into MOS/center firmware: gate table, MOS-local fusion, center-pushed roster enrollment, PERSIST_ARM opt-in; bench proof + center control-panel/START ENGINE sequencer UI still owed** |
+| [**docs/POLICY_GATE.md**](docs/POLICY_GATE.md) | **Roster policy-gate spec (P1.3) — RATIFIED (D4 rulings) and WIRED into MOS/center firmware: gate table, MOS-local fusion, center-pushed roster enrollment, PERSIST_ARM opt-in; center switch-panel + START ENGINE sequencer UI LANDED (NVS channel registry, boot-to-panel routing, declarative steps); bench proof still owed** |
 | [**docs/data-points.md**](docs/data-points.md) | All data point IDs (engine, GPS, IMU, BMS, system) |
 | [**DISPLAY_SYNCHRONIZATION.md**](DISPLAY_SYNCHRONIZATION.md) | How shared code stays in sync across nodes |
 
@@ -229,6 +238,8 @@ Every documentation file in the project, grouped by purpose.
 | [`pod1/README.md`](pod1/README.md) | Pod 1 display + safety-deployment unit (CO5300 AMOLED, QMI8658 IMU votes) |
 | [`pod2/README.md`](pod2/README.md) | Pod 2 display + safety-deployment unit (same hardware as pod1) |
 | [`left-right/README.md`](left-right/README.md) | **[LEGACY]** unified pre-split pod firmware — superseded by `left/` + `right/`; historical reference only |
+| [`mos-4ch-a/README.md`](mos-4ch-a/README.md) / [`mos-4ch-b/README.md`](mos-4ch-b/README.md) | MOS FET controllers (nodes 16/17): roster gate LIVE, parachute actuator host, boost PWM channel |
+| [`relay-4ch-hd/README.md`](relay-4ch-hd/README.md) / [`relay-8ch-a/README.md`](relay-8ch-a/README.md) / [`relay-8ch-b/README.md`](relay-8ch-b/README.md) | Relay controllers (nodes 13/14/15): silent-slave relay control, pre-P1.3 center-latch trust (gate rewrite pending) |
 | [**gps/README.md**](gps/README.md) | GPS unit: LC76G I2C CASIC, IMU, AMOLED |
 | [**gps/INTENSIVE_TODO.md**](gps/INTENSIVE_TODO.md) | Phased build plan for GPS firmware (partially archived) |
 
@@ -249,6 +260,12 @@ Every documentation file in the project, grouped by purpose.
 |---|---|
 | [**wiki/system-overview.md**](wiki/system-overview.md) | Whole-system orientation for a new contributor |
 | [**docs/relay-espnow-protocol.md**](docs/relay-espnow-protocol.md) | Silent-slave relay/MOS nodes, mask format, boot-into-selftest bug |
+| [**DATAFLOW.md**](DATAFLOW.md) | **End-to-end message journey: sensor → LEFT ingest → Center fan-out → pods (the data-path canon)** |
+| [**FEATURES_AND_SENSORS.md**](FEATURES_AND_SENSORS.md) | Live/planned sensor sources and feature status matrix |
+| [**UART_CONNECTION.md**](UART_CONNECTION.md) | MultiDisplay ECU UART/HC-05 link into LEFT (the sole wired sensor ingest) |
+| [**boost-controller-opendash.md**](boost-controller-opendash.md) | Boost controller subsystem master doc (GPL-lineage flag — clean-room rewrite gates v1.0.0) |
+| [**PER_NODE_DISPLAY_CONFIG_SPEC.md**](PER_NODE_DISPLAY_CONFIG_SPEC.md) | Per-node display/layout config spec (shipped design) |
+| [**docs/rgb_lcd.rst**](docs/rgb_lcd.rst) | **Vendored vendor doc** — verbatim copy of the ESP-IDF "RGB Interfaced LCD" API page (frame-buffer/bounce-buffer modes); the exact `esp_lcd_rgb_panel` API every RGB display node's `display_init.c` drives. Upstream: https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/api-reference/peripherals/lcd.html — content not edited; re-verify against upstream before quoting |
 | [**wiki/relay-mos-controllers.md**](wiki/relay-mos-controllers.md) | Relay + MOS FET board behavior |
 | [**wiki/boost-controller.md**](wiki/boost-controller.md) | N75 boost subsystem |
 | [**wiki/safety-deployment-system.md**](wiki/safety-deployment-system.md) | Parachute/rollover deployment subsystem |
@@ -257,7 +274,9 @@ Every documentation file in the project, grouped by purpose.
 | [**wiki/obd2-integration.md**](wiki/obd2-integration.md) | CAN + UART OBD2 intake |
 | [**wiki/vesc-integration.md**](wiki/vesc-integration.md) | VESC ESC intake (planned) |
 | [**wiki/ota-bluetooth.md**](wiki/ota-bluetooth.md) | BLE OTA design |
-| [**wiki/ota-android-plan.md**](wiki/ota-android-plan.md) | Android OTA sender tool plan |
+| [**BLE_OTA.md**](BLE_OTA.md) | BLE OTA architecture & root-cause reference (fleet-wide OTA state machine) |
+| [**BLUETOOTH_PAIRING.md**](BLUETOOTH_PAIRING.md) | BLE pairing/bonding design behind `ENTER_BT_OTA` |
+| [**wiki/ota-android-plan.md**](wiki/ota-android-plan.md) | Android OTA sender plan |
 | [**wiki/data-intake-formats.md**](wiki/data-intake-formats.md) | Per-protocol payload framing |
 | [**wiki/device-identity-serial-numbers.md**](wiki/device-identity-serial-numbers.md) | Serial-number/identity design |
 | [**docs/center-display-guide.md**](docs/center-display-guide.md) | Center display guide |
@@ -283,6 +302,7 @@ Every documentation file in the project, grouped by purpose.
 | [**docs/history/FONT_ISSUE_INVESTIGATION.md**](docs/history/FONT_ISSUE_INVESTIGATION.md) | Font include path debugging |
 | [**docs/history/RESOLUTION_SUMMARY.md**](docs/history/RESOLUTION_SUMMARY.md) | Auto-gen font/lib compile-error resolutions |
 | [**SCREEN_ENHANCEMENTS.md**](SCREEN_ENHANCEMENTS.md) | Center display multi-screen + warning boxes |
+| [**TEARING.md**](TEARING.md) | Center RGB tearing investigation — CLOSED (residual shimmer is physical) |
 | [**docs/history/IMPLEMENTATION_COMPLETE.md**](docs/history/IMPLEMENTATION_COMPLETE.md) | Status: center alignment + auto font conversion |
 | [**docs/history/IMPLEMENTATION_SUMMARY.md**](docs/history/IMPLEMENTATION_SUMMARY.md) | All implementation work summary |
 | [**CHANGELOG.md**](CHANGELOG.md) | Version history |
@@ -408,7 +428,9 @@ Standard OBD2 PID constants and helper macros for CAN frame encoding/decoding.
 
 ### `opendash_checklist.h` — Pre-Flight Checklist
 
-Configurable task lists shared across I2C.  Items are touch-confirmable on any display.
+Configurable task lists shared fleet-wide over ESP-NOW (`CHECKLIST_UPDATE 0x05`
+from Center; items echo back via `CHECKLIST_STATUS 0x83`).  Items are
+touch-confirmable on any display.
 
 ### `opendash_wifi_ble.h` — Wireless Management
 
@@ -527,7 +549,10 @@ ui_manager_warning_clear();
 > local peripheral bus inside one enclosure (touch, RTC, IO expander, IMU).
 
 Nodes are addressed by **logical node ID**, not bus address. Center keeps a
-persistent MAC↔node-ID peer table; the ID travels inside every frame.
+persistent MAC↔node-ID peer table. The node ID is *not* a fixed wire field:
+it rides inside specific payloads (first byte of `STATUS_REPORT 0x82`,
+target byte of `SET_RELAY 0x08`), and the frame's sender MAC identifies the
+node on the wire.
 
 ```
                  ┌───────────┐
@@ -538,7 +563,8 @@ persistent MAC↔node-ID peer table; the ID travels inside every frame.
 ```
 
 - **Transport:** ESP-NOW, Wi-Fi channel 1, no hopping, no wired inter-node link
-- **Frame:** `[0xAA][CMD][LEN][NODE_ID][PAYLOAD...][XOR_CHECKSUM]`
+- **Frame:** `[0xAA][CMD][LEN][PAYLOAD 0-248B][XOR_CHECKSUM]` — 3-byte header;
+  sender identity = source MAC; node id travels inside payloads that carry it
 - **Topology:** peer-to-peer star around Center; Center is the logical master
 - **No polling:** slaves push on change; offline is inferred from data absence
   (`node_health`), not from a missed poll
@@ -673,7 +699,7 @@ Odometer saves to NVS every 100 meters to minimize flash wear.
 
 | Task | Priority | Core | Rate | Description |
 |---|---|---|---|---|
-| `app_main` (main loop) | Default | 0 | 50 ms | I2C receive → odometer → UI update |
+| `app_main` (main loop) | Default | 0 | 50 ms | ESP-NOW inbound data → odometer → UI update |
 | `ui_task` (LVGL) | 5 | 1 | ~5 ms | `lv_timer_handler()` rendering |
 | `button_read_task` | 3 | 0 | 10 ms | Boot button polling (GPIO 0, 50 ms debounce) |
 
@@ -750,7 +776,7 @@ See [`docs/vscode-setup.md`](docs/vscode-setup.md).
 | **FreeRTOS** | Real-time OS bundled with ESP-IDF. Manages tasks, scheduling, WDT. |
 | **GPS Node** | 1.75" AMOLED unit with LC76G GNSS + QMI8658 IMU. |
 | **GT911** | Capacitive touch controller IC on the 2.8" display boards. |
-| **I2C** | Inter-Integrated Circuit bus. 400 kHz, shared by all four nodes. |
+| **I2C** | Inter-Integrated Circuit bus. **Local peripheral bus inside ONE enclosure only** (touch, RTC, IMU, IO expander, GNSS module) — never an inter-node transport; all node-to-node traffic is ESP-NOW. |
 | **LEDC** | ESP32 LED Control peripheral. Used for backlight PWM. |
 | **Left/Right** | The two 2.8" round gauge pods flanking the center display. |
 | **LVGL** | Light and Versatile Graphics Library (v9.2). Renders all UI elements. |

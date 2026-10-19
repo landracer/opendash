@@ -131,6 +131,13 @@ bootstrap caveat:
 
 ## 8. Center control surface (what "integrate into /center" means, owner 2026-10-08)
 
+> **Status (2026-10-08): LANDED.** `center/main/channel_registry.c` is the NVS
+> `{node, channel, label, is_on}` registry the panel renders from (re-bindable
+> on-screen via long-press editor, or `chmap`/`chlabel` over serial);
+> `center/main/start_sequencer.c` is the declarative step list
+> (`SEND`/`WAIT_DP`/`DELAY`, `seq` serial grammar). Boot routing: panel is
+> home while engine-off; first RPM ≥ idle latches to the gauge screens.
+
 The physical switch panel is **eliminated**. Every subsystem the driver used to
 toggle by hand becomes a center-addressed relay channel with a user-labeled
 software switch on the center screen:

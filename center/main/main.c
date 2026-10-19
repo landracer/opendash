@@ -24,6 +24,7 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
+#include <inttypes.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_system.h"
@@ -44,6 +45,7 @@
 #include "background_center.h"
 #include "system_config.h"
 #include "boost_client.h"
+#include "channel_registry.h"
 
 static const char *TAG = "opendash_center";
 
@@ -122,6 +124,121 @@ static void trim_ascii(char *s)
     }
 }
 
+/* ── 'seq' console command ─────────────────────────────────────────────────
+ * Grammar (args = everything after the word "seq"):
+ *   seq show | clear | save | run | stop
+ *   seq add send  <node> <ch 0-7> <0|1>
+ *   seq add wait  <dp-id> <min> <max> <timeout in 100ms units>
+ *   seq add delay <ms>
+ */
+static void handle_seq_cmd(const char *rest)
+{
+    char cmd[12] = {0};
+    if (sscanf(rest, "%11s", cmd) != 1) {
+        ESP_LOGW(TAG, "Usage: seq show|clear|save|run|stop|add send|wait|delay ...");
+        return;
+    }
+
+    if (strcmp(cmd, "show") == 0) {
+        int n = start_sequencer_step_count();
+        ESP_LOGI(TAG, "Sequencer: %d steps (state=%d, at=%d)",
+                 n, (int)start_sequencer_state(), start_sequencer_step_index());
+        for (int i = 0; i < n; i++) {
+            const opendash_seq_step_t *s = start_sequencer_step(i);
+            if (!s) continue;
+            if (s->kind == OPENDASH_SEQ_SEND) {
+                ESP_LOGI(TAG, "  [%d] SEND %s ch%u = %" PRIu8,
+                         i, opendash_node_name(s->node), s->channel, s->on);
+            } else if (s->kind == OPENDASH_SEQ_WAIT_DP) {
+                ESP_LOGI(TAG, "  [%d] WAIT dp 0x%04" PRIX16 " in [%g..%g] timeout %" PRIu32 " ms",
+                         i, s->dp_id, (double)s->dp_min, (double)s->dp_max,
+                         (uint32_t)s->timeout_100ms * 100U);
+            } else {
+                ESP_LOGI(TAG, "  [%d] DELAY %" PRIu32 " ms", i,
+                         (uint32_t)s->delay_100ms * 100U);
+            }
+        }
+        return;
+    }
+    if (strcmp(cmd, "clear") == 0) {
+        esp_err_t e = start_sequencer_clear();
+        ESP_LOGI(TAG, "seq clear → %s", esp_err_to_name(e));
+        return;
+    }
+    if (strcmp(cmd, "save") == 0) {
+        esp_err_t e = start_sequencer_save();
+        ESP_LOGI(TAG, "seq save → %s", esp_err_to_name(e));
+        return;
+    }
+    if (strcmp(cmd, "run") == 0) {
+        esp_err_t e = start_sequencer_start();
+        ESP_LOGI(TAG, "seq run → %s", esp_err_to_name(e));
+        return;
+    }
+    if (strcmp(cmd, "stop") == 0) {
+        start_sequencer_stop();
+        ESP_LOGI(TAG, "seq stop requested");
+        return;
+    }
+    if (strcmp(cmd, "add") != 0) {
+        ESP_LOGW(TAG, "seq: unknown sub-command '%s'", cmd);
+        return;
+    }
+
+    char kind[12] = {0};
+    sscanf(rest, "%11s %11s", cmd, kind);
+    opendash_seq_step_t st = {0};
+
+    if (strcmp(kind, "send") == 0) {
+        char nname[16] = {0};
+        int ch = -1, on = -1;
+        if (sscanf(rest, "%*s %*s %15s %d %d", nname, &ch, &on) == 3 &&
+            ch >= 0 && ch <= 7 && (on == 0 || on == 1) &&
+            parse_node_name(nname, &st.node) &&
+            OPENDASH_NODE_IS_RELAY(st.node)) {
+            st.kind = OPENDASH_SEQ_SEND;
+            st.channel = (uint8_t)ch;
+            st.on = (uint8_t)on;
+            esp_err_t e = start_sequencer_add(&st);
+            ESP_LOGI(TAG, "seq add send %s ch%d=%d → %s ('seq save' to persist)",
+                     nname, ch, on, esp_err_to_name(e));
+        } else {
+            ESP_LOGW(TAG, "Usage: seq add send <node> <ch 0-7> <0|1>");
+        }
+        return;
+    }
+    if (strcmp(kind, "wait") == 0) {
+        int dp = 0, to = 0;
+        float mn = 0.0f, mx = 0.0f;
+        if (sscanf(rest, "%*s %*s %i %f %f %d", &dp, &mn, &mx, &to) == 4 && to > 0) {
+            st.kind = OPENDASH_SEQ_WAIT_DP;
+            st.dp_id = (uint16_t)dp;
+            st.dp_min = mn;
+            st.dp_max = mx;
+            st.timeout_100ms = (uint16_t)to;
+            esp_err_t e = start_sequencer_add(&st);
+            ESP_LOGI(TAG, "seq add wait dp=%d range=[%g..%g] timeout=%d×100ms → %s",
+                     dp, (double)mn, (double)mx, to, esp_err_to_name(e));
+        } else {
+            ESP_LOGW(TAG, "Usage: seq add wait <dp-id> <min> <max> <timeout×100ms>");
+        }
+        return;
+    }
+    if (strcmp(kind, "delay") == 0) {
+        int ms = 0;
+        if (sscanf(rest, "%*s %*s %d", &ms) == 1 && ms >= 100) {
+            st.kind = OPENDASH_SEQ_DELAY;
+            st.delay_100ms = (uint16_t)(ms / 100);
+            esp_err_t e = start_sequencer_add(&st);
+            ESP_LOGI(TAG, "seq add delay %d ms → %s", ms, esp_err_to_name(e));
+        } else {
+            ESP_LOGW(TAG, "Usage: seq add delay <ms>");
+        }
+        return;
+    }
+    ESP_LOGW(TAG, "seq add: unknown kind '%s'", kind);
+}
+
 static void ota_serial_cmd_task(void *arg)
 {
     (void)arg;
@@ -147,9 +264,15 @@ static void ota_serial_cmd_task(void *arg)
 
         if (strcmp(line, "help") == 0 || strcmp(line, "?") == 0) {
             ESP_LOGI(TAG,
-                     "Commands: ota <node>, nodes, perf, pclk <MHz>, help");
+                     "Commands: ota <node> | nodes | perf | pclk <MHz> | help");
             ESP_LOGI(TAG,
                      "Nodes: left right gps pod1 pod2 relay4 relay8a relay8b mosa mosb");
+            ESP_LOGI(TAG,
+                     "Panel: panel on|off | chmap <btn0-27> <node> <ch0-7> | chlabel <btn> <text>");
+            ESP_LOGI(TAG,
+                     "Seq:   seq show|clear|save|run|stop | seq add send <node> <ch> <0|1>");
+            ESP_LOGI(TAG,
+                     "       seq add wait <dp-id> <min> <max> <timeout x100ms> | seq add delay <ms>");
             continue;
         }
 
@@ -173,6 +296,54 @@ static void ota_serial_cmd_task(void *arg)
         if (strcmp(line, "nodes") == 0) {
             ESP_LOGI(TAG,
                      "Nodes: left right gps pod1 pod2 relay4 relay8a relay8b mosa mosb");
+            continue;
+        }
+
+        /* ── Channel registry / start-panel commands ── */
+        if (strncmp(line, "panel", 5) == 0) {
+            char arg[12] = {0};
+            if (sscanf(line + 5, "%11s", arg) == 1 &&
+                (strcmp(arg, "on") == 0 || strcmp(arg, "off") == 0)) {
+                channel_registry_set_panel_auto(strcmp(arg, "on") == 0);
+                ESP_LOGI(TAG, "Boot-to-panel routing now %s (takes effect at next boot)",
+                         arg);
+            } else {
+                ESP_LOGW(TAG, "Usage: panel on|off");
+            }
+            continue;
+        }
+
+        if (strncmp(line, "chmap", 5) == 0) {
+            int bidx = -1;
+            char nname[16] = {0};
+            int ch = -1;
+            opendash_node_t node = OPENDASH_NODE_CENTER;
+            if (sscanf(line + 5, "%d %15s %d", &bidx, nname, &ch) == 3 &&
+                bidx >= 0 && bidx < CHANNEL_REGISTRY_COUNT && ch >= 0 && ch <= 7 &&
+                parse_node_name(nname, &node) && OPENDASH_NODE_IS_RELAY(node)) {
+                channel_registry_set_binding(bidx, node, (uint8_t)ch);
+                ui_manager_apply_binding_change(bidx);
+            } else {
+                ESP_LOGW(TAG, "Usage: chmap <button 0-27> <relay4|relay8a|relay8b|mosa|mosb> <ch 0-7>");
+            }
+            continue;
+        }
+
+        if (strncmp(line, "chlabel", 7) == 0) {
+            int bidx = -1;
+            char lab[24] = {0};
+            if (sscanf(line + 7, "%d %23[^\r\n]", &bidx, lab) == 2) {
+                trim_ascii(lab);
+                channel_registry_set_label(bidx, lab);
+                ui_manager_apply_binding_change(bidx);
+            } else {
+                ESP_LOGW(TAG, "Usage: chlabel <button 0-27> <new label>");
+            }
+            continue;
+        }
+
+        if (strncmp(line, "seq", 3) == 0) {
+            handle_seq_cmd(line + 3);
             continue;
         }
 
@@ -349,6 +520,17 @@ void app_main(void)
         ESP_LOGI(TAG, "Multidisplay UART receiver active (GPIO%d, 9600 baud)",
                  OPENDASH_UART_RX_PIN);
     }
+
+    /* ────────────────────────────────────────────────────────────────────────
+     * Step 3e: Channel Registry + START ENGINE Sequencer
+     *
+     * The NVS-backed button→(node,channel) registry and the declarative
+     * startup sequence must be loaded BEFORE the UI builds the switch panel
+     * and before boot routing decides the home screen.
+     * ──────────────────────────────────────────────────────────────────────── */
+    ESP_LOGI(TAG, "Initialising channel registry + start sequencer...");
+    ESP_ERROR_CHECK(channel_registry_init());
+    ESP_ERROR_CHECK(start_sequencer_init(ui_manager_seq_notify));
 
     /* ────────────────────────────────────────────────────────────────────────
      * Step 4: Initialize LVGL UI Manager

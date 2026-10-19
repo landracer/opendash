@@ -38,15 +38,15 @@ ESP-NOW mesh, with CENTER as master.
 
 ## Communication Architecture
 
-## Communication Architecture
-
 All nodes communicate over **ESP-NOW** (Wi-Fi peer-to-peer radio). There is **no
 wired inter-node bus** — the historical I2C inter-node design was abandoned
 (see Important Note below). The **Center** display is the logical master; every
 other node is a slave that pushes data on change.
 
-Nodes are identified by a **logical node ID** carried in every frame and mapped
-to a MAC via the persistent peer table — the ID is *not* a bus address.
+Nodes are identified on the wire by their 48-bit WiFi MAC. The **logical node
+ID** is not a wire field — it rides *inside specific payloads* (first byte of
+`STATUS_REPORT`, target byte of `SET_RELAY`) and Center binds MAC↔node-ID in
+its persistent peer table. The ID is *not* a bus address.
 
 | Node | `opendash_node_t` | ID | Role | Description |
 |---|---|---|---|---|
@@ -112,7 +112,9 @@ bring-up) — it does not carry node traffic.
    (re-batched as `SET_DATA_BATCH`)
 6. **Left/Right** render their configured data points
 7. **BMS node** pushes battery data on change
-8. **SD card logging** happens on the Center unit (primary) and GPS unit (backup)
+8. **SD card logging** runs on the GPS unit (`gps/main/sd_logger.c` — the real
+   logger); the Center's `center/main/sd_logger.c` is a self-declared stub
+   (no SD hardware fitted on Center yet — honest label, not a data path)
 
 ## Software Architecture (Per Node)
 

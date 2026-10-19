@@ -20,6 +20,11 @@
 #      opendash_protocol.h must match the count TODO.md claims.
 #   6. Every .github/workflows/*.yml must parse as YAML (zero-jobs failure
 #      guard — a malformed workflow silently runs no jobs at all).
+#   7. Retired-mechanism guard (re-audit 2026-10-10): canon docs must not name
+#      the deleted `sdkconfig.defaults` mechanism as current — the committed
+#      per-node sdkconfig is the sole build-config truth. History files
+#      (CHANGELOG.md, docs/history/**, the audit ledger) are exempt: they
+#      record history and must keep recording it truthfully.
 #
 # WHY these checks exist (plain language, for new contributors):
 #   - The docs are the contract. A markdown link that goes nowhere or a doc
@@ -147,7 +152,7 @@ if f'{n_opcode} opcodes' not in todo_txt:
 # ── 6. workflow files must be valid YAML ────────────────────────────────────
 # WHY: a workflow that fails to parse runs as ZERO-JOBS failure — it looks like
 # "CI is red like always" instead of "the config file is malformed". That exact
-# class of confusion cost a re-push on 2026-10-07 (see docs/gameplan-aduit.md §8).
+# class of confusion cost a re-push on 2026-10-07 (see docs/gameplan-audit.md §8).
 try:
     import yaml as _yaml
     for wf in sorted(glob.glob('.github/workflows/*.yml') + glob.glob('.github/workflows/*.yaml')):
@@ -157,6 +162,23 @@ try:
             fail.append(f'BAD YAML      {wf} does not parse: {e}')
 except ImportError:
     fail.append('NO YAML-LINT  PyYAML unavailable — workflow syntax cannot be checked')
+
+# ── 7. retired-mechanism guard (re-audit 2026-10-10) ────────────────────────
+# WHY: the per-node defaults config files were deleted 2026-10-08 — the committed
+# per-node sdkconfig is the sole build-config truth. Yet three canon docs still
+# described the deleted mechanism in present tense; check 1 could not catch it
+# because the name sat in prose, not in a markdown link. This guard makes any
+# canon doc name a retired mechanism a build failure, forever.
+HISTORY_DOCS = {'CHANGELOG.md', 'docs/gameplan-audit.md'}
+retired_hits = []
+for md in md_files:
+    if md in HISTORY_DOCS or md.startswith('docs/history/'):
+        continue
+    txt = open(md, encoding='utf-8', errors='ignore').read()
+    if 'sdkconfig.defaults' in txt:
+        retired_hits.append(md)
+for md in retired_hits:
+    fail.append(f'RETIRED MECH  {md} names the retired `sdkconfig.defaults` mechanism as canon — rewrite to the committed sdkconfig (see ledger §10)')
 
 if fail:
     print()

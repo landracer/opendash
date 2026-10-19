@@ -41,7 +41,7 @@
 | Working displays | center (4.3" RGB), left/right (2.8C round RGB), gps + pod1/pod2 (1.75" AMOLED) |
 | BLE OTA | Working: pod1, pod2, left, right. **Fragile:** gps, pod1, pod2 still missing the full sdkconfig recipe + slave-side suspend sequence — see §1.4 |
 | Active investigations | center RGB tearing (TEARING.md), GPS/POD OTA hardening, boost-controller wire-up |
-| Git state | Clean tree, pushed to origin/main. Host unit tests + full-fleet CI landed (see §1.8). Boost clean-room (§6.0) still gates v1.0.0. |
+| Git state | (as of 2026-10-12) WIP tree mid-flight: P1.3 roster-gate + center channel-registry/START-sequencer work uncommitted at audit time — see ledger §8 change log; tree must return to clean+pushed on every phase gate. Host unit tests + full-fleet CI landed (see §1.8). Boost clean-room (§6.0) still gates v1.0.0. |
 
 ---
 
@@ -188,7 +188,7 @@
       here ("`OD_PREGENERATED_ASSETS=1` … committed generated fonts/images")
       was FALSE — that env never reached the CI build container, and the
       converters had been running unguarded all along
-      (see [docs/gameplan-aduit.md](docs/gameplan-aduit.md) §3)
+      (see [docs/gameplan-audit.md](docs/gameplan-audit.md) §3)
 - [x] `dependencies.lock` committed for every project (reproducible component
       versions across runners)
 - [x] `docs-lint` CI job = `scripts/check_docs.sh` (broken-link check,
@@ -273,6 +273,24 @@
 - [x] SD card data logging — `sd_logger.c` wired in, 5 Hz snapshots, SDMMC 1-line
 - [x] GPS UI: 4 modes (GPS, LAP, GFORCE, DEBUG) — speed/heading/sats/coords rendered
 - [x] PCF85063 RTC sync
+- [x] **2026-10-12 firmware audit (node frozen — findings recorded, NOT fixed):**
+  - **Join-path gap (explains "doesn't always connect"):** this node sends **no
+    boot `CHANNEL_MSG_ANNOUNCE`** — `espnow_master.c` auto-registration Method 1
+    (STATUS_REPORT/ANNOUNCE) can never fire for GPS; center only learns this
+    node via Method 2 (NVS MAC from a *previous* registration) or Method 3
+    (content-inference from GPS-domain DPs). Net effect: the node is invisible
+    to the fleet **until the LC76G already streams NMEA** — chicken-and-egg:
+    no GNSS stream → no registration → no downstream traffic. The slave-side
+    center-MAC latch is equally gated on receiving any bit-7-clear frame.
+  - `main.c` still handles the **legacy PING subcmd** (center abolished polling —
+    dead code path, kept for wire-compat only).
+  - **TIME_SYNC payload bug:** `day/month/year` bytes are hard-coded 0 with a
+    stale comment claiming "not parsed from NMEA yet" — `parse_rmc()` HAS parsed
+    the date into `gps_data_t` all along. If time-sync ever matters, ship the
+    real fields.
+  - Recovery/WAKE writes now target only 0x58 — the endpoint the post-mortem
+    proved intermittently NACKs at the wire level; a keep-alive write to a
+    non-ACKing endpoint is a no-op by construction.
 - [ ] **BLE OTA hardening** (see §1.4) — full recipe + suspend sequence
 - [ ] 10 Hz update rate activation (`$PAIR050,100` after first fix)
 - [ ] **Parachute deployment system** — zero code anywhere; design + implement

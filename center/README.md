@@ -18,6 +18,10 @@ This is the Center Display project for OpenDash, running on the Waveshare ESP32-
 - **Professional Layout:** RPM arc gauge, 6-section data grid, status bar
 - **Configurable Data Points:** Each section can display any data point
 - **Touch Interface:** Tap to configure, swipe to navigate
+- **Software Switch Panel:** 28 NVS-persistent soft buttons (button→relay
+  bindings editable on-screen); boots to the panel while the engine is off
+- **START ENGINE Sequencer:** declarative NVS step list (SEND/WAIT_DP/DELAY),
+  runs only on wire-proof, editable over serial
 - **I2C Master:** Coordinates communication with Left, Right, and GPS displays
 - **OBD2/CAN Support:** Direct connection to vehicle ECU
 
@@ -60,7 +64,9 @@ center/
     ├── idf_component.yml         # Component dependencies (LVGL, etc.)
     ├── main.c                    # Application entry point
     ├── display_init.c/h          # Display hardware initialization
-    └── ui_manager.c/h            # LVGL UI management
+    ├── ui_manager.c/h            # LVGL UI management
+    ├── channel_registry.c/h      # NVS-persistent button→(node,channel) registry
+    └── start_sequencer.c/h       # Declarative START ENGINE step runner
 ```
 
 ## Display System Architecture
@@ -109,6 +115,50 @@ Each display mode shows the same physical layout with different data:
 │              Status Bar (Mode Indicator)           │
 └─────────────────────────────────────────────────────┘
 ```
+
+## Switch Panel (Software Channel Control)
+
+The relay grid screen (`DISPLAY_MODE_RELAY`) is a **software switch panel**,
+not just a debug screen:
+
+- **28 soft buttons**, each bound to a `(node, channel)` pair with a human
+  label. The whole table lives in NVS (`channel_registry.c`) — bindings and
+  labels survive reboots **and reflashes**.
+- **Boot routing:** while *panel auto* is enabled and the engine is not
+  running (no RPM in the dp cache, or RPM below the idle threshold — the
+  "engine running parameters" are **not met**), the center boots **straight
+  into the panel**. The first RPM reading at/above idle latches the home
+  screen to the gauge views until the next reboot.
+- **Toggle:** tap a button → `SET_RELAY` goes out via ESP-NOW (through the
+  roster policy gate); the box repaints ON/OFF, orange border = node offline.
+- **Re-bind:** long-press any button (or tap **EDIT MAP** in the status bar) →
+  editor overlay: pick NODE (RLY4 / RLY-A / RLY-B / MOS-A / MOS-B) + CH,
+  **RENAME BUTTON** opens the on-screen text keyboard (same modal-keyboard
+  pattern as the boost numeric keypad) for a custom label, `RESET DEFAULTS`,
+  `BOOT TOGGLE` (enable/disable boot-to-panel routing), `CLOSE`. While the
+  editor is open, taps **select** — the wire is never energized by an editing
+  tap, and swipes can't cycle screens out from under the editor.
+- **Serial editing:**
+  `chmap <btn 0-27> <relay4|relay8a|relay8b|mosa|mosb> <ch 0-7>` re-binds a
+  button; `chlabel <btn> <text>` sets a custom label from the console;
+  `panel on|off` toggles boot routing. All write through to NVS immediately.
+
+## START ENGINE Sequencer
+
+The cranking routine is **data, not code** (`start_sequencer.c`): an ordered
+step list in NVS, run by the **ENGINE SEQ** button (or `seq run` over serial).
+
+| Step | Meaning |
+|------|---------|
+| `send <node> <ch> <0\|1>` | Command a channel (through the policy gate) |
+| `wait <dp-id> <min> <max> <timeout×100ms>` | Block until the data point proves the condition on the wire — **timeout fails the run**, never proceeds on assumed state |
+| `delay <ms>` | Fixed wait |
+
+Console grammar: `seq show | clear | save | run | stop`,
+`seq add send <node> <ch> <0|1>`, `seq add wait <dp-id> <min> <max> <timeout×100ms>`,
+`seq add delay <ms>`. Progress shows live on the ENGINE SEQ button
+(`SEQ 2/2`, `SEQ DONE`, `SEQ FAIL@n`). The shipped default program is a
+placeholder: fuel-pump channel ON → wait RPM ≥ 150 within 8 s.
 
 ## Creating Custom Display Modes
 

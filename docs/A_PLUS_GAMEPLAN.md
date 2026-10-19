@@ -20,7 +20,7 @@ Testing have that property (`scripts/check_docs.sh`, the host test harness).
 
 | Category | Today | Target | Why today's grade | What A-class means here |
 |---|---|---|---|---|
-| Documentation | A | A+ | Enforced links/headers, honest status culture | Auto-verified numeric claims, threat model, decision log |
+| Documentation | A− → **A** (independent re-audit 2026-10-10 found six drift findings — all closed same day; every closure evidenced in ledger §10) | A+ (sole remaining gate: P2.1 threat-model doc) | Enforced links/headers, honest status culture, evidence-backed re-audits |
 | Architecture / Code Quality | B+ | A | Defensive C, but 4.7k-line monolith + pod-pair drift exception | No >1.5k-line UI file, zero documented-exception drift |
 | Testing & CI | B | A | Real host tests + 12-node matrix — but see P0.1, the CI claim itself is broken | Coverage gate, fuzz corpus, safety-path coverage |
 | Safety Engineering | B− | A | Good interlocks; stale "inhibited" comment on live fire path; unauthenticated wireless arm/deploy | Interlock logic unit-tested in `common/`, authenticated commands, documented + checked threat model |

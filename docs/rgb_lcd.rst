@@ -1,3 +1,15 @@
+..  Licensed under Sovereign Individual License v1.0 — see LICENSE file
+..
+..  PROVENANCE: Vendored vendor reference — verbatim copy of the ESP-IDF
+..  Programming Guide page "RGB Interfaced LCD" (parallel RGB panel API:
+..  esp_lcd_new_rgb_panel, frame-buffer/bounce-buffer modes). Vendored
+..  2026-06-06 during the fleet doc-gather (commit 9ba4c82) because every
+..  OpenDash RGB display node (center/left/right) drives its panel through
+..  exactly this API — the bounce-buffer/fb_in_psram notes below are what
+..  display_init.c configures and TEARING.md analyzes. Upstream lives at
+..  https://docs.espressif.com — content below was NOT edited; treat as
+..  reference snapshot, re-verify against upstream before quoting.
+
 RGB Interfaced LCD
 ==================
 
