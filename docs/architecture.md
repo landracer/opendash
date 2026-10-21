@@ -53,7 +53,7 @@ its persistent peer table. The ID is *not* a bus address.
 | Center | `OPENDASH_NODE_CENTER` | 0 | Master | Routes frames to the owning channel task, aggregates data, primary display |
 | Left | `OPENDASH_NODE_LEFT` | 1 | Slave | Renders gauge data pushed by Center |
 | Right | `OPENDASH_NODE_RIGHT` | 2 | Slave | Renders gauge data pushed by Center |
-| GPS | `OPENDASH_NODE_GPS` | 3 | Slave | **⛔ CLOSED-FINAL 2026-10-19 (measured):** iteration-7 firmware drove + listened on GPIO17/18 (both directions × 115200/9600) — silence. The LC76G-I2C module's serial command channel is NOT connected to this board (schematic NC = No Connect); its I2C surface is data-OUT only. Fixed 1 Hz, unconfigurable — as built, permanently. On this bench unit the module is currently unresponsive on I2C too (module unseated/dead). Go-forward = POD3 conversion; `uart_bridge.c` already speaks PAIR@115200 for it. See `wiki/GPS-LC76G-POSTMORTEM.md` §9–§11. |
+| GPS | `OPENDASH_NODE_GPS` | 3 | Slave | **✅ UNFROZEN/ACTIVE 2026-10-19:** owner hand-wired the LC76G's native UART (module TXD→GPIO18, RXD→GPIO17), bypassing the read-only I2C bridge; iteration-8 `uart_bridge.c` then closed the command loop live: `$PAIR051` echo (parser ALIVE) → `$PAIR050,100*22` → **measured ≈10.0 Hz**. The LC76G always answered PAIR on native UART @115200 — only the I2C surface was data-OUT-only. Former CLOSED-FINAL/1 Hz status retracted. See `wiki/GPS-LC76G-POSTMORTEM.md` §12. |
 | BMS (ext.) | `OPENDASH_NODE_BMS` | 4 | Slave | External BMS node (rAtTrax integration) |
 | POD1–POD8 | `OPENDASH_NODE_POD1..8` | 5–12 | Slave | Expansion gauge pods |
 | Relay / MOS | `OPENDASH_NODE_RELAY_4CH` … `MOS_4CH_B` | 13–17 | Slave | Silent-slave relay + MOS FET controllers |

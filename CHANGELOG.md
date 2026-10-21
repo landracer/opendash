@@ -17,7 +17,18 @@
 
 ### Added
 
-- **GPS iteration-7 bench executed, node CLOSED-FINAL (2026-10-19):** iteration-7
+- **GPS node UNFROZEN via owner hardware surgery — 10 Hz achieved (2026-10-19):**
+  owner disassembled the AMOLED-1.75 unit and hand-wired the LC76G's native UART
+  straight to the ESP32 (module **TXD→GPIO18, RXD→GPIO17**), bypassing the
+  one-way I2C bridge. Iteration-8 `uart_bridge.c` (fixed 17/18, command injected
+  at both bauds until answered, reacting to the module's actual `$PAIR051,<ms>`
+  echo — no `$PAIR001` ACK sentence is emitted by this module) closed the loop
+  live on ACM5: `$PAIR051*3E` → `$PAIR051,1000*13` (parser ALIVE) →
+  `$PAIR050,100*22` → **measured GGA rate ≈10.0 Hz**. The LC76G always answered
+  PAIR on its native UART at 115200; only the I2C surface was read-only. All
+  former CLOSED-FINAL/1 Hz conclusions retracted — see post-mortem §12.
+- **GPS iteration-7 bench executed, node CLOSED-FINAL (2026-10-19):** *(superseded
+  by the surgery reversal above — pre-surgery, the NC UART really was silent)*
   firmware flashed to the real GPS node (ACM5 — measured port map now in the
   identity doc). Probe swept GPIO17/18 in both directions × {115200, 9600}:
   **silence** → the LC76G-I2C module's serial PAIR command channel is not

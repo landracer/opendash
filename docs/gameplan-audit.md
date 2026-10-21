@@ -341,3 +341,23 @@ swapping/resating hardware can. What software can still do is done:
 that drives those nets is seated. GPS slot's configurable-GNSS future = POD3
 conversion, not firmware. Node identity system worked as designed throughout
 (gps-tagged logs; no wrong-device flash possible without a visible warning).
+
+## 15. 2026-10-19 REVERSAL: owner surgery + iteration-8 → 10 Hz REAL. Node ACTIVE
+
+The §14 "CLOSED-FINAL" stood for hours, not days. Owner: "I'll take this matter
+into my own hands" — disassembled the unit and hand-ran wires from the LC76G's
+native UART: **module TXD→GPIO18, module RXD→GPIO17** — physically doing what
+the socket never did. Iteration-8 `uart_bridge.c` (fixed 17/18 direction;
+command injected at both bauds cycling until answered; trigger = the module's
+actual `$PAIR051,<ms>` echo format, since this module emits no `$PAIR001` ACK
+sentence) then closed the loop live on ACM5:
+
+    UART» $PAIR051*3E  →  UART« $PAIR051,1000*13  →  UART» $PAIR050,100*22
+    UART GGA rate: 9.96/9.90/10.14/9.99 Hz over last 8 fixes   ← 10 Hz, measured
+
+FINAL: the LC76G silicon always answered `$PAIR` on its native UART at 115200,
+exactly per the vendored vendor spec. The I2C bridge mirrored data OUT only —
+every frozen-era "parser is dead" result was measuring the bridge, not the
+engine. Node ACTIVE as configurable ~10 Hz GNSS source; `gps_handler.c` (I2C)
+remains the data path, `uart_bridge.c` is the command path. POD3 conversion is
+now a nice-to-have, not a requirement, for the GPS slot.

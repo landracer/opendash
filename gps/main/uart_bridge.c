@@ -1,14 +1,15 @@
 /* Licensed under Sovereign Individual License v1.0 — see LICENSE file */
 /**
  * @file uart_bridge.c
- * @brief Iteration-7 debug: LC76G UART command-path probe (see uart_bridge.h)
+ * @brief LC76G UART command-path test on HAND-WIRED lines (owner surgery
+ *        2026-10-19: module RXD → GPIO17, module TXD → GPIO18)
  *
- * Auto-probe order (dir, baud): (TX=17,RX=18)@(115200 → 9600), then
- * (TX=18,RX=17)@(115200 → 9600). 115200 first: vendor spec §2.3.43 PAIR864
- * lists UART default baud = 115200. 4 s listen window per combo.
- * If live: logs every complete line, sends $PAIR051*3E, and on a
- * $PAIR001,051 ACK sends $PAIR050,100*22 (10 Hz). If dead: logs the verdict
- * and deletes itself — I2C read path stays untouched either way.
+ * Module TXD proven live (native NMEA echoes on GPIO18). This task injects the
+ * spec'd query ($PAIR051*3E) at BOTH documented bauds (115200 default per
+ * PAIR864, 9600 fallback), cycling until a $PAIR001 ACK proves the parser
+ * consumes commands — at which point it sets 10 Hz ($PAIR050,100*22) and logs
+ * the measured rate. If the hand-wired RX line carries nothing at either baud
+ * the task says so and self-deletes. I2C read path stays untouched.
  */
 
 #include "uart_bridge.h"
@@ -26,14 +27,6 @@ static const char *TAG = "gps_uart";
 #define GPS_UART_BUF_SZ     4096
 #define GPS_UART_RX_TMO_MS  250
 #define GPS_UART_LISTEN_MS  4000
-
-typedef struct { int8_t tx; int8_t rx; int baud; } gps_uart_combo_t;
-static const gps_uart_combo_t k_combo_list[] = {
-    { .tx = 17, .rx = 18, .baud = 115200 },
-    { .tx = 17, .rx = 18, .baud = 9600 },
-    { .tx = 18, .rx = 17, .baud = 115200 },
-    { .tx = 18, .rx = 17, .baud = 9600 },
-};
 
 static volatile bool s_live = false;
 static volatile bool s_050_sent = false;
@@ -73,14 +66,15 @@ static void handle_line(char *line)
     s_last_line[sizeof(s_last_line) - 1] = '\0';
     ESP_LOGI(TAG, "UART« %s", line);
 
-    if (strstr(line, "PAIR051") && strstr(line, "001")) {
-        ESP_LOGE(TAG, "*** PARSER ALIVE: $PAIR001 ACK for 051 — the command "
-                      "path EXISTS (UART). The 'command channel is not wired' "
-                      "conclusion was FOLKLORE. Setting fix rate to 100 ms. ***");
-        if (!s_050_sent) { uart_bridge_send("$PAIR050,100*22"); s_050_sent = true; }
+    /* The module answers the 051 query by echoing the interval directly
+     * ($PAIR051,<ms>) — that echo IS the proof the parser consumes PAIR
+     * commands. React to it by setting 10 Hz. */
+    if (!s_050_sent && strstr(line, "PAIR051,")) {
+        ESP_LOGE(TAG, "*** PARSER ALIVE: module answered $PAIR051 with '%s' — "
+                      "hand-wired UART command path WORKS. Setting 10 Hz. ***", line);
+        uart_bridge_send("$PAIR050,100*22");
+        s_050_sent = true;
     }
-    if (strstr(line, "PAIR001,050"))
-        ESP_LOGE(TAG, "*** RATE COMMAND ACKED (PAIR001,050) — node UNFROZEN ***");
     if (strstr(line, "GGA")) gga_stamp_and_report();
 }
 
@@ -109,22 +103,27 @@ static void uart_bridge_drain(void)
 static void uart_bridge_task(void *arg)
 {
     (void)arg;
-    for (size_t c = 0; c < sizeof(k_combo_list) / sizeof(k_combo_list[0]); c++) {
-        const gps_uart_combo_t combo = k_combo_list[c];
-        uart_config_t cfg = {
-            .baud_rate  = combo.baud,
-            .data_bits  = UART_DATA_8_BITS,
-            .parity     = UART_PARITY_DISABLE,
-            .stop_bits  = UART_STOP_BITS_1,
-            .flow_ctrl  = UART_HW_FLOWCTRL_DISABLE,
-        };
-        ESP_ERROR_CHECK(uart_param_config(GPS_UART_PORT, &cfg));
-        ESP_ERROR_CHECK(uart_set_pin(GPS_UART_PORT, combo.tx, combo.rx,
-                                     UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
-        ESP_ERROR_CHECK(uart_driver_install(GPS_UART_PORT, GPS_UART_BUF_SZ,
-                                            GPS_UART_BUF_SZ, 8, NULL, 0));
-        ESP_LOGI(TAG, "UART probe %u/4: TX=GPIO%d RX=GPIO%d @ %d",
-                 (unsigned)(c + 1), combo.tx, combo.rx, combo.baud);
+    /* Fixed direction per owner surgery 2026-10-19: module RXD = GPIO17,
+     * module TXD = GPIO18. The live NMEA echo on GPIO18 proves that half.
+     * Command direction is now driven at BOTH documented bauds, cycling —
+     * closing the last escape hatch (command sent at a baud the module's
+     * receiver is not listening at). */
+    uart_config_t cfg = {
+        .baud_rate  = 115200,
+        .data_bits  = UART_DATA_8_BITS,
+        .parity     = UART_PARITY_DISABLE,
+        .stop_bits  = UART_STOP_BITS_1,
+        .flow_ctrl  = UART_HW_FLOWCTRL_DISABLE,
+    };
+    ESP_ERROR_CHECK(uart_param_config(GPS_UART_PORT, &cfg));
+    ESP_ERROR_CHECK(uart_set_pin(GPS_UART_PORT, 17, 18,
+                                 UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
+    ESP_ERROR_CHECK(uart_driver_install(GPS_UART_PORT, GPS_UART_BUF_SZ,
+                                        GPS_UART_BUF_SZ, 8, NULL, 0));
+    /* Liveness at each baud so the command is injected at both. */
+    for (int listen = 0; !s_live && listen < 2; listen++) {
+        int b = listen == 0 ? 115200 : 9600;
+        uart_set_baudrate(GPS_UART_PORT, b);
         int64_t t0 = esp_timer_get_time();
         while (esp_timer_get_time() - t0 < (int64_t)GPS_UART_LISTEN_MS * 1000) {
             uart_bridge_drain();
@@ -132,21 +131,33 @@ static void uart_bridge_task(void *arg)
         }
         if (s_rx_bytes > 0) {
             s_live = true;
-            ESP_LOGE(TAG, "UART LIVE on TX=GPIO%d RX=GPIO%d @ %d — module "
-                          "UART is wired exactly as the schematic says. "
-                          "Querying fix interval ($PAIR051).",
-                     combo.tx, combo.rx, combo.baud);
+            ESP_LOGE(TAG, "UART LIVE @ %d (TX=GPIO17→RXD, RX=GPIO18←TXD) — "
+                          "injecting $PAIR051 query at %d", b, b);
             uart_bridge_send("$PAIR051*3E");
-            break;
         }
-        uart_driver_delete(GPS_UART_PORT);
     }
     if (!s_live) {
-        ESP_LOGE(TAG, "UART DEAD — silence on GPIO17/18 in BOTH directions "
-                      "at 115200 AND 9600. I2C-only read-out reality stands; "
-                      "module command path stays unreachable. Node stays 1 Hz.");
+        ESP_LOGE(TAG, "UART DEAD — silence on GPIO18 even on the hand-wired "
+                      "lines at both bauds. Module is dead, not mis-wired.");
         vTaskDelete(NULL);
     }
+    /* Live loop: cycle bauds until the parser answers. Each pass re-sends the
+     * query at the new baud; the 051 echo flips s_050_sent (10 Hz set). */
+    int bauds[2] = {115200, 9600};
+    int cycle = 1;
+    while (!s_050_sent) {
+        for (int b = 0; b < 2 && !s_050_sent; b++) {
+            uart_set_baudrate(GPS_UART_PORT, bauds[b]);
+            ESP_LOGI(TAG, "ladder pass %d @ %d: re-sending $PAIR051", ++cycle, bauds[b]);
+            uart_bridge_send("$PAIR051*3E");
+            int64_t t0 = esp_timer_get_time();
+            while (esp_timer_get_time() - t0 < 10LL * 1000 * 1000) {
+                uart_bridge_drain();
+                if (s_050_sent) break;
+            }
+        }
+    }
+    ESP_LOGE(TAG, "*** 10 Hz COMMAND INJECTED — node UNFROZEN. Watching rate. ***");
     for (;;) uart_bridge_drain();
 }
 

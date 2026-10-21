@@ -1,13 +1,19 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # OpenDash LC76G I2C GPS Driver — Definitive Implementation Guide
 
-> ## ⛔ CLOSED 2026-09-29 — READ-ONLY DATA PIPE, BY DESIGN
+> ## ⛔ CLOSED 2026-09-29 — READ-ONLY DATA PIPE, BY DESIGN *(REVERSED 2026-10-19 — see below)*
 >
 > > ## ✅ CLOSED-FINAL 2026-09-30 — iteration-5/6 settled the reopened case:
 > > spec-exact `$PAIR051`/`$PAIR050,100` delivered with verified I2C write-ACKs
 > > produce zero parser response (post-mortem §8). The `$PAIR010/011` bursts are
 > > periodic (~55 s) unsolicited chatter — they appear even when nothing was
 > > delivered. Data-out-only: PROVEN with the right evidence this time.
+> >
+> > ## ⚠️ REVERSAL 2026-10-19 (post-mortem §12): the I2C-only verdict held for
+> > I2C — but the owner then hand-wired the module's native UART straight to the
+> > ESP32 (TXD→GPIO18, RXD→GPIO17). PAIR commands work there at 115200; the node
+> > now runs at 10 Hz. This guide documents the I2C DATA path, still in production
+> > as the data feed; the COMMAND path is `gps/main/uart_bridge.c` (iteration-8).
 >
 > > ## 🔔 REOPENED 2026-09-30 — see post-mortem §7: per the official LC76G
 > > protocol spec the module IS configurable (PAIR packets, `$PAIR050` rate

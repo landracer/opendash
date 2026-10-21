@@ -301,20 +301,19 @@
       suspect: the wiring is. If a future node ever exposes LC76G UART (or an
       equivalent command path), every command in that spec becomes live — including
       the never-yet-probed `$PAIR062/063` per-sentence output rates.
-- [x] **2026-10-19: iteration-7 BENCH EXECUTED — CLOSED-FINAL (measured).**
-      Flashed ACM5 (GPS node confirmed by `opendash_gps` live logs). Probe swept
-      GPIO17/18 both directions × {115200, 9600}: silence → the module's serial
-      PAIR command channel is NOT connected on this board ("NC/GPS RX|TX" =
-      No Connect, now measured). Same log: module also unresponsive on I2C on
-      this unit (every TX NACKed, PMIC read 0xFF, Sats 0) — module unseated or
-      dead; only hardware can settle which. GPS slot's configurable-GNSS future
-      = POD3 module swap (`uart_bridge.c` in-tree already speaks PAIR@115200).
-- [ ] **BLE OTA hardening** (see §1.4) — full recipe + suspend sequence
+- [x] **2026-10-19: iteration-7 BENCH EXECUTED → then UNFROZEN by owner surgery
+      (same day, §14 below).** Pre-surgery measured: GPIO17/18 carried nothing
+      ("NC/GPS RX|TX" = No Connect, measured). Owner then disassembled the unit
+      and hand-wired the LC76G's native UART: module TXD→GPIO18, RXD→GPIO17.
+      Iteration-8 `uart_bridge.c` (fixed 17/18; command at both bauds until
+      answered; reacts to the module's `$PAIR051,<ms>` echo — the module emits
+      no `$PAIR001` ACK) closed the loop on ACM5: `$PAIR051*3E` →
+      `$PAIR051,1000*13` → `$PAIR050,100*22` → **measured ≈10.0 Hz**.
 - [x] ~~10 Hz update rate activation (`$PAIR050,100` after first fix)~~ —
-      **CANCELLED by the CLOSED-FINAL verdict**: the path to the module's (real,
-      spec'd) rate command does not exist over this board's read-only I2C.
-      Node stays 1 Hz; the spec vendored 2026-10-19 proves the command exists —
-      just not reachable here.
+      **DONE 2026-10-19 via the hand-wired native-UART command path** (see item
+      above; post-mortem §12). Rate set at boot by uart_bridge; `Sats: 0 / NO
+      FIX` on the bench is placement (indoors), not the command path.
+- [ ] **BLE OTA hardening** (see §1.4) — full recipe + suspend sequence
 - [ ] **Parachute deployment system** — zero code anywhere; design + implement
 - [ ] GPS → RTC time sync on valid fix (gps_handler.c)
 - [ ] Track map overlay (if 466×466 allows)

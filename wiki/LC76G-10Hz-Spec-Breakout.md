@@ -1,7 +1,7 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # LC76G 10 Hz GPS Data Logging — Specification Breakout
 
-> ## ⛔ CLOSED 2026-09-29: THE PREMISE OF THIS DOCUMENT IS FALSE
+> ## ⛔ CLOSED 2026-09-29: THE PREMISE OF THIS DOCUMENT IS FALSE *(REVERSED — it became true)*
 >
 > > ## ✅ CLOSED-FINAL 2026-09-30 (see post-mortem §7–§8): the LC76G module
 > > family IS spec'd as `$PAIR050`-rate-configurable (100–1000 ms, up to
@@ -10,6 +10,12 @@
 > > `$PAIR051`/`$PAIR050,100` with verified write-ACKs produce zero response.
 > > On this hardware, 10 Hz is unreachable — as this document's original
 > > closure claimed.
+> >
+> > ## ✅ REVERSED 2026-10-19 (post-mortem §12): owner hand-wired the module's
+> > native UART (TXD→GPIO18, RXD→GPIO17); `$PAIR051*3E` → `$PAIR051,1000*13`
+> > echo → `$PAIR050,100*22` → **measured ≈10 Hz**. The premise was only false
+> > *over I2C*. The node is ACTIVE and configurable (100–1000 ms) via
+> > `gps/main/uart_bridge.c`.
 >
 >
 > **The LC76G on this board cannot be rate-configured at all.** Every `$PAIR`

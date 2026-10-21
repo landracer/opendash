@@ -1,14 +1,16 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # GPS Driver Debugging Journal — v16 Series (v16a through v16k)
 
-> ## ⛔ PROJECT CLOSED 2026-09-29
+> ## ⛔ PROJECT CLOSED 2026-09-29 *(REVERSED 2026-10-19 — post-mortem §12: owner
+> hand-wired the module native UART TXD→GPIO18/RXD→GPIO17; PAIR works at 115200;
+> `$PAIR050,100` → measured ≈10 Hz; node ACTIVE. Journal below = I2C-era history)*
 >
 > > ## ✅ CLOSED-FINAL 2026-09-30 — iteration-5/6 spec-exact probes ran (§13).
 > > The reopening resolved against rehabilitation: spec-exact `$PAIR051`/
 > > `$PAIR050,100` delivered with verified transport-ACKs produce ZERO parser
 > > response; the `$PAIR010/011` bursts are periodic unsolicited chatter
 > > (anti-correlated with delivery). Read-only pipe: PROVEN with correct
-> > evidence. Post-mortem §8 is the final word.
+> > evidence — over I2C. Post-mortem §8 was the I2C-era final word; §12 reversed it.
 >
 > This journal documents the full v16 debugging arc. Its final entry (§10-11)
 > closes the case: the LC76G's I2C interface has **no usable command channel**,

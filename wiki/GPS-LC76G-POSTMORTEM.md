@@ -1,11 +1,15 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # LC76G GPS Node — Final Post-Mortem: Why This Hardware Fails Racing Telemetry
 
-> **Verdict: UNUSABLE for racing/performance telemetry. Development ended 2026-09-29.**
-> **✅ CLOSED-FINAL 2026-09-30 — iteration-5/6 probes ran. The read-only conclusion is now
-> PROVEN with spec-exact commands (see §8). The reopening resolved against rehabilitation:
-> spec-exact `$PAIR051`/`$PAIR050,100` delivered with verified transport-ACKs produce ZERO
-> parser response. §§1–3 stand, this time on correct evidence.**
+> **Verdict (2026-09-29, since REVERSED — see §12): UNUSABLE for racing/performance
+> telemetry. Development ended 2026-09-29.**
+> **⛔ CLOSED-FINAL 2026-09-30 — iteration-5/6 probes ran. The read-only conclusion was
+> PROVEN on the I2C path with spec-exact commands (see §8). §§1–3 stand as the record of
+> the I2C-era investigation: spec-exact `$PAIR051`/`$PAIR050,100` delivered over I2C with
+> verified transport-ACKs produce ZERO parser response — because the I2C bridge mirrors
+> data OUT only. ⚠️ READ §12 FIRST: owner later hand-wired the module's native UART
+> (TXD→GPIO18, RXD→GPIO17); PAIR commands then worked at 115200 and the node now runs
+> at 10 Hz. The engine was never deaf; only the bridge was.**
 > **Board:** Waveshare ESP32-S3-Touch-AMOLED-1.75 · **Module:** Quectel LC76G (LC76GABNR12A03S, 2024-04-14)
 > **Companion docs:** `gps-driver-debugging-v16.md` (full debugging journal),
 > `LC76G-I2C-GPS-Driver-Guide.md` (read-path reference), `LC76G-10Hz-Spec-Breakout.md` (debunked spec)
@@ -332,3 +336,33 @@ iteration can settle that distinction; it is physical.
 4. "NC/GPS RX|TX" on the Waveshare sheet: NC = **No Connect** — the UART
    signals are simply not connected for this module variant. No legend
    needed; it means exactly what it says.
+
+## 12. 2026-10-19 FINAL TWIST — owner surgery (direct wires) UNFROZE the node. 10 Hz achieved
+
+Owner terminated the software archaeology with hardware: disassembled the unit
+and ran direct wires — LC76G **TXD → GPIO18, RXD → GPIO17** (bypassing whatever
+one-way bridge the I2C surface was). Then iteration-8 firmware (fixed direction
+17/18, command injected at BOTH bauds cycling until answered, and — the final
+key — reacting to the module's actual response format) was flashed. Captured
+bench log:
+
+    UART» $PAIR051*3E
+    UART« $PAIR051,1000*13        ← module ANSWERS PAIR commands
+    [handle_line] → UART» $PAIR050,100*22
+    UART GGA rate: 9.96/9.90/10.14/9.99 Hz over last 8 fixes   ← 10 Hz, real
+
+**FINAL TRUTH:** the LC76G silicon always spoke (and answered) `$PAIR` over its
+native UART at 115200, exactly as the vendored vendor spec documents. The
+module's I2C surface only ever mirrored data OUT. Every frozen-era conclusion
+was the *bridge's* limitation, never the GNSS engine's. With direct wires, the
+first command ladder closed the loop: 051 echo → 050,100 → measured ~10 Hz.
+
+Notes for the record:
+- The module answers queries with the direct echo (`$PAIR051,<ms>`), no
+  `$PAIR001` ACK sentence — earlier ACK-detection logic was looking for a
+  sentence this module doesn't emit.
+- `Sats: 0 / NO FIX` on the bench is placement (indoors), unrelated to the fix
+  path — rate control demonstrably works.
+- Node status: **UNFROZEN / ACTIVE** as of 2026-10-19. `uart_bridge.c`
+  (iteration-8) is now the node's real command path; the I2C handler stays as
+  the (still-used) data path.

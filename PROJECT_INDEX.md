@@ -4,10 +4,11 @@
 > **Central reference for the entire OpenDash codebase.**
 > Start here to understand the project, then follow links to detailed documents.
 >
-> **Last updated:** 2026-10-19 (GPS CLOSED-FINAL, measured: iteration-7 probe
-> flashed to ACM5 swept GPIO17/18 both dirs × 115200/9600 — silence; module UART
-> command channel NC on this board; module also currently dead on I2C. Go-forward
-> = POD3 module swap. Previous: vendor ground truth — the real Quectel
+> **Last updated:** 2026-10-19 (GPS UNFROZEN — owner surgery hand-wired the LC76G
+> native UART (TXD→GPIO18, RXD→GPIO17); iteration-8 uart_bridge closed the PAIR
+> command loop live; `$PAIR050,100` → **measured ≈10 Hz**. Engine never was deaf;
+> only the I2C bridge was read-only. Previous: iteration-7 measured silence on
+> the *then-unwired* UART → CLOSED-FINAL; vendor Quectel spec vendored)
 > LC26G&LC76G&LC86G GNSS Protocol Specification vendored + indexed;
 > 10-12 documentation cleanup
 > pass — orphaned canon docs indexed below, remaining I2C-as-transport prose
@@ -184,12 +185,13 @@ opendash/
 │   │   ├── main.c              Entry, ESP-NOW slave (node GPS)
 │   │   ├── display_init.c/h    CO5300 AMOLED init
 │   │   ├── ui_manager.c/h      AMOLED gauge UI
-│   │   ├── gps_handler.c/h     LC76G GPS I2C driver (v16k-port PRODUCTION)
+│   │   ├── gps_handler.c/h     LC76G GPS I2C driver (v16k-port PRODUCTION — data path)
+│   │   ├── uart_bridge.c/h     LC76G native-UART PAIR command path (iteration-8 — ACTIVE)
 │   │   ├── imu_handler.c/h     QMI8658 accelerometer + gyro
 │   │   └── parachute.c/h       Gyro-triggered parachute deployment
 │   ├── sdkconfig
 │   ├── INTENSIVE_TODO.md       Detailed phased build TODO (partially archived)
-│   └── README.md               GPS unit documentation (I2C, NOT UART)
+│   └── README.md               GPS unit documentation (I2C data path + UART command path)
 │
 ├── wiki/                       ── Authoritative Reference Docs ─────────
 │   ├── LC76G-I2C-GPS-Driver-Guide.md   read-path reference (v2.0.0); module
@@ -251,11 +253,11 @@ Every documentation file in the project, grouped by purpose.
 | [**gps/README.md**](gps/README.md) | GPS unit: LC76G I2C CASIC, IMU, AMOLED |
 | [**gps/INTENSIVE_TODO.md**](gps/INTENSIVE_TODO.md) | Phased build plan for GPS firmware (partially archived) |
 
-### GPS / GNSS Reference (unit frozen — reference only)
+### GPS / GNSS Reference (unit ACTIVE — 10 Hz since 2026-10-19 surgery)
 
 | Document | What You'll Learn |
 |---|---|
-| [**GPS-LC76G-POSTMORTEM.md**](wiki/GPS-LC76G-POSTMORTEM.md) | **WHY GPS IS CLOSED-FINAL** — §11: iteration-7 firmware drove+listened on GPIO17/18 (both dirs × 115200/9600): silence. Module UART command channel is NC on this board (measured, not folklore). Module also currently dead on I2C on this unit. Read before touching `gps/` |
+| [**GPS-LC76G-POSTMORTEM.md**](wiki/GPS-LC76G-POSTMORTEM.md) | **FULL GPS HISTORY, §12 = THE REVERSAL:** owner hand-wired module native UART (TXD→GPIO18, RXD→GPIO17); iteration-8 uart_bridge closed the PAIR loop live → `$PAIR050,100` → measured ≈10 Hz. Engine always answered PAIR@115200; only the I2C bridge was read-only. Read before touching `gps/` |
 | [**Quectel LC76G GNSS Protocol Specification V1.0.0 (PDF)**](docs/p1185254-Quectel_LC26G&LC76G&LC86G_GNSS_Protocol_Specification_V1.0.0_Preliminary.pdf) | **★ VENDOR GROUND TRUTH** — the module's real command set (PAIR001 ACK / 002–007 power+start / 050–051 fix rate / 062–063 sentence rates / 066 search mode / 382 sleep-lock / 513 NVRAM save); serial-layer spec, defines no I2C transport |
 | [**wiki/LC76G-I2C-GPS-Driver-Guide.md**](wiki/LC76G-I2C-GPS-Driver-Guide.md) | CASIC-over-I2C driver reference (0x50 W / 0x54 R / 0x58 DWR) for the local GNSS chip |
 | [**wiki/LC76G-10Hz-Spec-Breakout.md**](wiki/LC76G-10Hz-Spec-Breakout.md) | The 10 Hz plan that was rejected, and the math showing why |

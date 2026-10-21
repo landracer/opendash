@@ -4,23 +4,20 @@
 This is the GPS and Telemetry Unit project for OpenDash, running on the
 Waveshare ESP32-S3-Touch-AMOLED-1.75 hardware.
 
-> **⛔ CLOSED-FINAL 2026-10-19 — MEASURED.** The iteration-7 UART probe was
-> flashed to the node (`opendash_gps` live logs, ACM5) and swept GPIO17/18 in
-> BOTH directions at 115200 AND 9600: **silence** (`UART DEAD`). The module's
-> serial `$PAIR` command channel never reaches this board — the schematic's
-> "NC/GPS RX|TX" = **No Connect** for this module variant. (On this bench unit
-> the module is right now unresponsive on I2C too — `ESP_ERR_INVALID_RESPONSE`
-> everywhere, PMIC read 0xFF — so the module is either unseated or dead; see
-> post-mortem §11 before any new software attempt.) Practical result on this
-> board, now measured, not folklore: **fixed 1 Hz, data-OUT only,
-> unconfigurable.** The go-forward path for this slot remains the POD3
-> conversion (`wiki/POD3-CONVERSION-PLAN.md`): a UART-native pod module drives
-> the RXD17/TXD18 nets, and `uart_bridge.c` is already in-tree to speak PAIR
-> at 115200 the day one is seated.
+> **✅ UNFROZEN / ACTIVE 2026-10-19 — OWNER SURGERY + ITERATION-8.** Owner
+> disassembled the unit and ran direct wires: LC76G **TXD → GPIO18, RXD →
+> GPIO17**, bypassing the one-way I2C bridge. Iteration-8 `uart_bridge.c`
+> (fixed 17/18 direction, command at both bauds, reacting to the module's
+> actual `$PAIR051,<ms>` echo format) then closed the loop on the bench, live
+> in `opendash_gps` logs (ACM5): `UART» $PAIR051*3E` → `UART« $PAIR051,1000*13`
+> → `UART» $PAIR050,100*22` → **measured GGA rate ~10.0 Hz**. FINAL TRUTH: the
+> LC76G silicon always answered `$PAIR` on its native UART at 115200; only the
+> module's I2C surface was read-only. The node is now a **configurable ≤10 Hz
+> GNSS source**. Bench note: `Sats: 0 / NO FIX` is placement (indoors), not the
+> command path. Full reversal: `wiki/GPS-LC76G-POSTMORTEM.md` §12.
 >
-> **Last updated:** 2026-10-19 (iteration-7 bench verdict captured — §11; node
-> status now measured-final)
-> **Production Code:** `gps_handler.c` v16k-port (v15L2 base + v16 fixes — see file header) + `uart_bridge.c` (iteration-7 debug)
+> **Last updated:** 2026-10-19 (surgery + iteration-8: 10 Hz achieved — §12)
+> **Production Code:** `gps_handler.c` v16k-port (v15L2 base + v16 fixes — see file header) + `uart_bridge.c` (iteration-8 command path)
 > **Authoritative References:** `wiki/LC76G-I2C-GPS-Driver-Guide.md` (v2.0.0,
 > read-path) + the vendored Quectel GNSS Protocol Specification PDF (command set)
 

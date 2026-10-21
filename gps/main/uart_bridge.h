@@ -1,18 +1,17 @@
 /* Licensed under Sovereign Individual License v1.0 — see LICENSE file */
 /**
  * @file uart_bridge.h
- * @brief LC76G UART command-path probe — ITERATION-7 DEBUG (2026-10-19)
+ * @brief LC76G native-UART command path — ACTIVE (iteration-8, 2026-10-19)
  *
- * Rationale: the owner's schematic review of the AMOLED-1.75 shows the LC76G
- * module UART is routed to the ESP32 (RXD net on GPIO17, TXD net on GPIO18 —
- * the same nets the POD3 conversion plan uses). All prior firmware treated
- * UART as "disabled — do NOT enable" folklore and never initialized UART1,
- * so every $PAIR command ever sent landed on the I2C-only read surface.
- *
- * This module enables UART1, auto-probes TX/RX direction and baud, and — if
- * the line is live — runs the spec'd command ladder:
- *   $PAIR051*3E (query fix interval) → expect $PAIR001,051 ACK + $PAIR051 echo
- *   $PAIR050,100*22 (set fix interval 100 ms) → expect $PAIR001,050 ACK
+ * Rationale: the LC76G module's native UART was never connected to the ESP32
+ * by the module socket (schematic "NC/GPS RX|TX" = No Connect — later proven by
+ * measurement AND by owner surgery: the owner hand-wired module TXD→GPIO18 and
+ * RXD→GPIO17). With the wires in place, this module enables UART1 and runs the
+ * spec'd command ladder at both documented bauds (115200 default per PAIR864,
+ * 9600 fallback) until the module answers. Bench-proven behavior:
+ *   $PAIR051*3E (query fix interval) → module echoes $PAIR051,<ms>  (no PAIR001
+ *   ACK sentence is emitted by this module — the echo IS the response)
+ *   → uart_bridge sends $PAIR050,100*22 → measured ≈10 Hz output.
  * The measured GGA sentence rate is logged so the bench verdict is explicit.
  */
 
@@ -24,7 +23,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/** Start the iteration-7 UART probe task (called once from app_main). */
+/** Start the UART command-path task (called once from app_main). */
 esp_err_t esp_uart_bridge_probe_start(void);
 
 /** True once the probe confirmed live bytes on the module UART. */
