@@ -313,6 +313,11 @@
       **DONE 2026-10-19 via the hand-wired native-UART command path** (see item
       above; post-mortem §12). Rate set at boot by uart_bridge; `Sats: 0 / NO
       FIX` on the bench is placement (indoors), not the command path.
+- [x] **2026-10-19: iteration-9 config audit — Sats-0 exonerates software.**
+      Module self-reports: min-SNR 9 dB default, all constellations enabled,
+      rate config persists across power cycles; real GNSS-style time appeared.
+      Residual Sats-0 cause on this bench unit = its physical RF path, not
+      config/firmware (post-mortem §13). Mod documented MANDATORY in gps/README.
 - [ ] **BLE OTA hardening** (see §1.4) — full recipe + suspend sequence
 - [ ] **Parachute deployment system** — zero code anywhere; design + implement
 - [ ] GPS → RTC time sync on valid fix (gps_handler.c)

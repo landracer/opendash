@@ -100,7 +100,8 @@ bring-up) — it does not carry node traffic.
 ### Data Flow Steps
 
 1. **Center** unit acts as the ESP-NOW master and system coordinator
-2. **GPS unit** (⛔ frozen — read-only 1 Hz data pipe) reads GNSS and IMU
+2. **GPS unit** (✅ ACTIVE since the mandatory UART mod — ≤10 Hz; without the
+   mod it is only a read-only 1 Hz data pipe) reads GNSS and IMU
    data, stores latest readings
 3. **GPS unit** pushes position, speed, and g-force (no polling — see
    `docs/espnow-protocol.md` §4)
@@ -169,11 +170,12 @@ internally whether the window has elapsed.
 | `touch_rd` | 3 | 0 | Touch controller polling |
 | `boot_btn` | 2 | 0 | Boot/GPIO0 button reader |
 
-### GPS unit (frozen)
+### GPS unit (ACTIVE)
 
 | Task | Priority | Core | Description |
 |---|---|---|---|
 | `gps_task` | 8 | 0 | GNSS read/parse — above touch/IMU/UI so GPS is never starved |
+| `gps_uart` | 5 | 1 | `uart_bridge` command path: config audit + `$PAIR` rate ladder (iteration-9) |
 | `imu_task` | 5 | 0 | QMI8658 motion sampling |
 | `gps_broadcast` | 4 | 0 | Reads sensors + handles inbound ESP-NOW messages |
 

@@ -17,6 +17,16 @@
 
 ### Added
 
+- **GPS iteration-9 config audit + mandatory-mod canon (2026-10-19):** with the
+  real command channel, the module's config was read out live: min-SNR mask =
+  9 dB (factory default), `$PAIR067` search mode = GPS/GLO/GAL/BDS/QZSS all
+  enabled, rate setting survives module power cycles; the module also began
+  emitting genuine GNSS-style date/time. The bench unit's `Sats: 0` is thereby
+  exonerated of config/protocol/firmware — residual cause is that unit's
+  physical RF path (its own pre-surgery history: 3D FIX, Sats 12). The surgery
+  is now documented as a **MANDATORY modification** for any unit running this
+  firmware (`gps/README.md` §MANDATORY MODIFICATION). `uart_bridge.c` iteration-9
+  computes PAIR checksums on-device and auto-fixes a disabled search mode.
 - **GPS node UNFROZEN via owner hardware surgery — 10 Hz achieved (2026-10-19):**
   owner disassembled the AMOLED-1.75 unit and hand-wired the LC76G's native UART
   straight to the ESP32 (module **TXD→GPIO18, RXD→GPIO17**), bypassing the

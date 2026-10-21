@@ -342,7 +342,7 @@ that drives those nets is seated. GPS slot's configurable-GNSS future = POD3
 conversion, not firmware. Node identity system worked as designed throughout
 (gps-tagged logs; no wrong-device flash possible without a visible warning).
 
-## 15. 2026-10-19 REVERSAL: owner surgery + iteration-8 → 10 Hz REAL. Node ACTIVE
+## 15. 2026-10-19 REVERSAL: owner surgery + iteration-8/9 → 10 Hz REAL. Node ACTIVE
 
 The §14 "CLOSED-FINAL" stood for hours, not days. Owner: "I'll take this matter
 into my own hands" — disassembled the unit and hand-ran wires from the LC76G's
@@ -361,3 +361,18 @@ every frozen-era "parser is dead" result was measuring the bridge, not the
 engine. Node ACTIVE as configurable ~10 Hz GNSS source; `gps_handler.c` (I2C)
 remains the data path, `uart_bridge.c` is the command path. POD3 conversion is
 now a nice-to-have, not a requirement, for the GPS slot.
+
+## 16. 2026-10-19: iteration-9 config audit — Sats-0 exonerates software entirely
+
+With the real command channel, iteration-9 read the module's config: min-SNR
+mask = 9 dB (factory default), constellation search mode = all enabled, rate
+setting persists across module power cycles. The module also emitted genuine
+GNSS-style date/time (replacing the 1980 default). Conclusion: on the bench
+unit, Sats-0 is NOT config, protocol, or firmware — every one of those is now
+measured-good via module self-reports. Residual cause is that unit's physical
+RF path (antenna/feed, plausibly disturbed during the same disassembly).
+The mod is documented as MANDATORY for anyone using this module with our code
+(`gps/README.md` §MANDATORY MODIFICATION): a unit without the two wires is, and
+always was, a fixed-1 Hz read-only pipe. Owner's standing position: a module
+whose command channel ships "NC" is garbage-by-design for telemetry — the
+documentation now says so plainly while keeping the mod recipe canonical.

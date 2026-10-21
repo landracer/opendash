@@ -13,7 +13,9 @@
 > > I2C — but the owner then hand-wired the module's native UART straight to the
 > > ESP32 (TXD→GPIO18, RXD→GPIO17). PAIR commands work there at 115200; the node
 > > now runs at 10 Hz. This guide documents the I2C DATA path, still in production
-> > as the data feed; the COMMAND path is `gps/main/uart_bridge.c` (iteration-8).
+> > as the data feed; the COMMAND path is `gps/main/uart_bridge.c` (iteration-8/9).
+> > The surgery is documented as MANDATORY for any unit running this firmware —
+> > see `gps/README.md` §MANDATORY MODIFICATION.
 >
 > > ## 🔔 REOPENED 2026-09-30 — see post-mortem §7: per the official LC76G
 > > protocol spec the module IS configurable (PAIR packets, `$PAIR050` rate

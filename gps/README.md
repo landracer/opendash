@@ -16,7 +16,10 @@ Waveshare ESP32-S3-Touch-AMOLED-1.75 hardware.
 > GNSS source**. Bench note: `Sats: 0 / NO FIX` is placement (indoors), not the
 > command path. Full reversal: `wiki/GPS-LC76G-POSTMORTEM.md` §12.
 >
-> **Last updated:** 2026-10-19 (surgery + iteration-8: 10 Hz achieved — §12)
+> **Last updated:** 2026-10-19 (iteration-9 config diagnostics: `$PAIR059`=9 dB
+> default, `$PAIR067` all-constellations-enabled — config fully exonerated for
+> the bench unit's Sats-0; that unit additionally decoded real GNSS time, so
+> its RF path is the suspect vs its own pre-mod history of 3D FIX/12 sats)
 > **Production Code:** `gps_handler.c` v16k-port (v15L2 base + v16 fixes — see file header) + `uart_bridge.c` (iteration-8 command path)
 > **Authoritative References:** `wiki/LC76G-I2C-GPS-Driver-Guide.md` (v2.0.0,
 > read-path) + the vendored Quectel GNSS Protocol Specification PDF (command set)
@@ -29,7 +32,7 @@ Waveshare ESP32-S3-Touch-AMOLED-1.75 hardware.
 | **MCU** | ESP32-S3R8 dual-core LX7 @ 240 MHz |
 | **Display** | 466×466 Round AMOLED (CO5300 controller, QSPI) |
 | **Touch** | CST9217 capacitive touch (I2C 0x5A) |
-| **GPS** | LC76G GNSS module — **I2C ONLY** (CASIC protocol) |
+| **GPS** | LC76G GNSS module — I2C data path (CASIC mirror) + native UART (RXD/TXD **hand-wired** by mandatory mod, see below) |
 | **IMU** | QMI8658 6-axis accelerometer + gyroscope (I2C 0x6B) |
 | **PMIC** | AXP2101 power management (I2C 0x34) |
 | **GPIO Expander** | TCA9554 (I2C 0x20) — GPS FORCE_ON (P4), NRESET (P5) |
@@ -39,10 +42,39 @@ Waveshare ESP32-S3-Touch-AMOLED-1.75 hardware.
 | **PSRAM** | 8 MB Octal SPI |
 | **I2C Bus** | GPIO15 (SDA) / GPIO14 (SCL) — **SHARED** by all I2C devices |
 
-## GPS Communication — I2C (NOT UART)
+## GPS Communication — I2C data path + UART command path (MANDATORY MOD)
 
-The LC76G communicates via the **CASIC I2C protocol** on a shared bus.
-**UART is NOT functional** on this board — GPIO17/18 are I2C routed only.
+The LC76G module presents two interfaces, and this board's socket only wires
+ONE of them:
+
+1. **I2C data path (as sold, read-only).** The module's I2C surface (CASIC-style
+   protocol behind a one-way bridge) only mirrors module output OUT to the
+   ESP32. Commands written to 0x50/0x58 are transport-ACKed but NEVER reach the
+   GNSS parser — bench-proven across iterations 5/6. This is why every pre-mod
+   node "could not be configured".
+2. **Native `$PAIR` UART command path — requires the mandatory mod below.**
+
+### ⚠️ MANDATORY MODIFICATION (required for any unit running this firmware)
+
+Waveshare did not wire the LC76G's native UART to the ESP32 (schematic marks
+those module pins "NC/GPS RX|TX" = No Connect). To make the module
+configurable as sold-by-spec, the owner must open the unit and run two wires:
+
+| From | To | Net |
+|---|---|---|
+| LC76G module **TXD** pin | ESP32 GPIO**18** | module NMEA out → ESP RX |
+| LC76G module **RXD** pin | ESP32 GPIO**17** | ESP TX → module command in |
+
+With the wires in place, firmware `main/uart_bridge.c` (iteration-9) runs at
+boot: live-detect → `$PAIR059`/`$PAIR067` config readout → (auto-fix search
+mode if disabled) → `$PAIR051` query → `$PAIR051,<ms>` echo → `$PAIR050,100` →
+**measured ≈10 Hz**. Checksums are computed on-device. The module answers
+queries with direct echoes — it emits no `$PAIR001` ACK sentence.
+
+Measured facts (bench, 2026-10-19): UART baud 115200 (spec default); min-SNR
+mask = 9 dB default; search mode = GPS/GLO/GAL/BDS/QZSS all enabled; rate
+setting **survives module power cycles** (later boots echo `$PAIR051,100*23`
+before any new 050 write).
 
 | Address | Direction | Handle | Purpose |
 |---------|-----------|--------|---------|
@@ -100,13 +132,14 @@ gps/
 ├── sdkconfig            # ESP-IDF configuration defaults
 ├── INTENSIVE_TODO.md             # Build TODO (partially archived)
 ├── README.md                     # This file
-└── main/
+├── main/
     ├── CMakeLists.txt            # Main component CMake file
     ├── idf_component.yml         # Component dependencies
     ├── main.c                    # Application entry point
     ├── display_init.c/h          # Display hardware + I2C bus init
     ├── ui_manager.c/h            # LVGL UI management
-    ├── gps_handler.c/h           # LC76G GPS I2C driver (v15L2 PRODUCTION)
+    ├── gps_handler.c/h           # LC76G GPS I2C data path (v16k-port PRODUCTION)
+    ├── uart_bridge.c/h           # LC76G native-UART command path (iteration-9)
     └── imu_handler.c/h           # QMI8658 IMU interface
 ```
 
@@ -118,8 +151,9 @@ gps/
 | Accuracy | <2.5m CEP (50%) |
 | Cold start | <30s |
 | Hot start | <1s |
-| Default update rate | **1 Hz — fixed on this board** (nav engine produces one solution/s here) |
-| Max update rate | module spec: configurable 100–1000 ms fix interval (`$PAIR050`) — **unreachable over this board's read-only I2C**; the pre-vendoring "10 Hz via `$PAIR050,100`" note is refuted *for this board* (post-mortem §8/§9) |
+| Default update rate | 1 Hz module default (1000 ms) |
+| Max update rate | **≈10 Hz ACHIEVED** via `$PAIR050,100` over the hand-wired UART command path (mandatory mod above). Rate setting survives module power cycles |
+| NMEA command quirks | queries answered by direct echo (`$PAIR051,1000*13`); **no `$PAIR001` ACK sentence is emitted** |
 | I2C buffer | ~4096 bytes |
 | Protocol | CASIC I2C (0x50/0x54/0x58) |
 | Firmware | LC76GABNR12A03S (2024/04/14) |
@@ -151,7 +185,8 @@ gps/
 
 ### GPS not getting data
 
-1. **NOT UART** — This board uses I2C CASIC protocol, not UART.
+1. **Check the mandatory UART mod first** — module TXD→GPIO18 / RXD→GPIO17
+   wires intact? (`uart_bridge` logs `UART LIVE @ 115200` + config readouts.)
 2. Check PMIC power rails: ALDO3 + ALDO4 + BLDO2 (bitmask 0x2C on register 0x90)
 3. Check TCA9554: P4 (FORCE_ON) HIGH, P5 (NRESET) HIGH after boot
 4. Ensure WAKE sequence includes both CW(0x50) AND dummy(0x58) writes

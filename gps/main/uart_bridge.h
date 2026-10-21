@@ -1,17 +1,17 @@
 /* Licensed under Sovereign Individual License v1.0 — see LICENSE file */
 /**
  * @file uart_bridge.h
- * @brief LC76G native-UART command path — ACTIVE (iteration-8, 2026-10-19)
+ * @brief LC76G native-UART command path — ACTIVE (iteration-9, 2026-10-19)
  *
  * Rationale: the LC76G module's native UART was never connected to the ESP32
  * by the module socket (schematic "NC/GPS RX|TX" = No Connect — later proven by
  * measurement AND by owner surgery: the owner hand-wired module TXD→GPIO18 and
  * RXD→GPIO17). With the wires in place, this module enables UART1 and runs the
- * spec'd command ladder at both documented bauds (115200 default per PAIR864,
- * 9600 fallback) until the module answers. Bench-proven behavior:
- *   $PAIR051*3E (query fix interval) → module echoes $PAIR051,<ms>  (no PAIR001
- *   ACK sentence is emitted by this module — the echo IS the response)
- *   → uart_bridge sends $PAIR050,100*22 → measured ≈10 Hz output.
+ * spec'd diagnostics + command ladder, checksums computed on-device:
+ *   $PAIR059 → min-SNR mask readout;  $PAIR067 → constellation search mode
+ *   (if any constellation search disabled → $PAIR066,1,1,1,1,0,0 fixes it)
+ *   $PAIR051 → module echoes $PAIR051,<ms> (no PAIR001 ACK is emitted by this
+ *   module — the echo IS the response) → $PAIR050,100 → measured ≈10 Hz.
  * The measured GGA sentence rate is logged so the bench verdict is explicit.
  */
 

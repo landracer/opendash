@@ -17,7 +17,7 @@ Each source connects to a different ESP32 node.
 | Source | Connection | Node | Status |
 |---|---|---|---|
 | **MultiDisplay (MD)** | HC-05 Bluetooth → UART1 @ 115200, batched onto ESP-NOW (`MD_*` ids, 0x0800 block) | Left gauge pod | **LIVE** |
-| **GPS (LC76G)** | I2C CASIC @ 100 kHz | GPS/Telemetry unit | **LIVE** — closed as read-only 1 Hz data pipe (wiki/GPS-LC76G-POSTMORTEM.md) |
+| **GPS (LC76G)** | I2C CASIC @ 100 kHz (data) + native UART via mandatory mod (command) | GPS/Telemetry unit | **LIVE/ACTIVE** — ≤10 Hz via `$PAIR050,100` after the mandatory UART mod (gps/README §MANDATORY MODIFICATION; post-mortem §12–§13) |
 | **IMU (QMI8658)** | I2C @ 0x6B | GPS unit + pod1/pod2 | **LIVE** — g-force display + parachute rollover votes |
 | **OBD2 / ECU domain** | Decoded PIDs relayed by MD serial (0x0100-range ids) | Center → fan-out to pods | **LIVE via MD** — direct CAN planned (wiki/vesc-integration.md) |
 | **VESC ESC** | CAN @ 500 kbps (planned via BMS Logger) | rAtTrax BMS Logger | Planned |

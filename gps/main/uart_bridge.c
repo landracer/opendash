@@ -1,15 +1,15 @@
 /* Licensed under Sovereign Individual License v1.0 — see LICENSE file */
 /**
  * @file uart_bridge.c
- * @brief LC76G UART command-path test on HAND-WIRED lines (owner surgery
- *        2026-10-19: module RXD → GPIO17, module TXD → GPIO18)
+ * @brief LC76G native-UART command path (iteration-9) — ACTIVE since owner
+ *        surgery 2026-10-19: module RXD → GPIO17, module TXD → GPIO18
  *
- * Module TXD proven live (native NMEA echoes on GPIO18). This task injects the
- * spec'd query ($PAIR051*3E) at BOTH documented bauds (115200 default per
- * PAIR864, 9600 fallback), cycling until a $PAIR001 ACK proves the parser
- * consumes commands — at which point it sets 10 Hz ($PAIR050,100*22) and logs
- * the measured rate. If the hand-wired RX line carries nothing at either baud
- * the task says so and self-deletes. I2C read path stays untouched.
+ * Module TXD proven live (native NMEA echoes on GPIO18). The task reads the
+ * module's CONFIG first ($PAIR059 min-SNR mask, $PAIR067 constellation search
+ * mode — the answer to "valid NMEA but Sats 0"), auto-fixes a disabled search
+ * config via $PAIR066,1,1,1,1,0,0, then runs the rate ladder: $PAIR051 query →
+ * module echo → $PAIR050,100 → measured ≈10 Hz. All checksums computed
+ * on-device. The I2C read path stays untouched.
  */
 
 #include "uart_bridge.h"
@@ -19,6 +19,7 @@
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include <stdio.h>
 #include <string.h>
 
 static const char *TAG = "gps_uart";
@@ -30,6 +31,9 @@ static const char *TAG = "gps_uart";
 
 static volatile bool s_live = false;
 static volatile bool s_050_sent = false;
+static volatile bool s_search_disabled = false;   /* from $PAIR067 readout */
+static volatile int  s_min_snr = -1;              /* from $PAIR059 readout */
+static volatile bool s_059_seen = false, s_067_seen = false;
 static volatile uint32_t s_rx_bytes = 0;
 static char s_last_line[160];
 
@@ -60,11 +64,42 @@ static void uart_bridge_send(const char *line)
     ESP_LOGI(TAG, "UART» %s", line);
 }
 
+/* Send a PAIR command body (without '$' and checksum): checksum is computed
+ * on-device so no hand-typed checksum can ever be wrong. */
+static void uart_bridge_cmd(const char *body)
+{
+    uint8_t cs = 0;
+    for (const char *p = body; *p; p++) cs ^= (uint8_t)*p;
+    char sent[176];
+    snprintf(sent, sizeof(sent), "$%s*%02X", body, cs);
+    uart_bridge_send(sent);
+}
+
 static void handle_line(char *line)
 {
     strncpy(s_last_line, line, sizeof(s_last_line) - 1);
     s_last_line[sizeof(s_last_line) - 1] = '\0';
     ESP_LOGI(TAG, "UART« %s", line);
+
+    /* Diagnostics: min-SNR mask (059) and search-mode config (067). */
+    if (strncmp(line, "$PAIR059,", 9) == 0) {
+        int v = -1;
+        if (sscanf(line, "$PAIR059,%d", &v) == 1) { s_min_snr = v; s_059_seen = true; }
+        ESP_LOGE(TAG, "MIN-SNR CONFIG: %d dB (default 9 = all usable sats allowed)", v);
+    }
+    if (strncmp(line, "$PAIR067,", 9) == 0) {
+        int f[6] = {1, 1, 1, 1, 0, 0};
+        int got = sscanf(line, "$PAIR067,%d,%d,%d,%d,%d,%d",
+                         &f[0], &f[1], &f[2], &f[3], &f[4], &f[5]);
+        if (got >= 4) {
+            s_067_seen = true;
+            bool off = (f[0] == 0 || f[1] == 0 || f[2] == 0 || f[3] == 0);
+            s_search_disabled = off;
+            ESP_LOGE(TAG, "SEARCH CONFIG: GPS=%d GLO=%d GAL=%d BDS=%d QZSS=%d "
+                          "(1=search,0=DISABLED) → %s",
+                     f[0], f[1], f[2], f[3], f[4], off ? "FIX NEEDED" : "all OK");
+        }
+    }
 
     /* The module answers the 051 query by echoing the interval directly
      * ($PAIR051,<ms>) — that echo IS the proof the parser consumes PAIR
@@ -72,7 +107,7 @@ static void handle_line(char *line)
     if (!s_050_sent && strstr(line, "PAIR051,")) {
         ESP_LOGE(TAG, "*** PARSER ALIVE: module answered $PAIR051 with '%s' — "
                       "hand-wired UART command path WORKS. Setting 10 Hz. ***", line);
-        uart_bridge_send("$PAIR050,100*22");
+        uart_bridge_cmd("PAIR050,100");
         s_050_sent = true;
     }
     if (strstr(line, "GGA")) gga_stamp_and_report();
@@ -104,10 +139,10 @@ static void uart_bridge_task(void *arg)
 {
     (void)arg;
     /* Fixed direction per owner surgery 2026-10-19: module RXD = GPIO17,
-     * module TXD = GPIO18. The live NMEA echo on GPIO18 proves that half.
-     * Command direction is now driven at BOTH documented bauds, cycling —
-     * closing the last escape hatch (command sent at a baud the module's
-     * receiver is not listening at). */
+     * module TXD = GPIO18 (this half was proven by the live NMEA echo).
+     * Iteration-9: on-device checksum, then read the module's CONFIG before
+     * touching the rate — a disabled constellation or a mis-set min-SNR mask
+     * explains "valid NMEA, Sats 0" far better than a dead RF chain. */
     uart_config_t cfg = {
         .baud_rate  = 115200,
         .data_bits  = UART_DATA_8_BITS,
@@ -120,7 +155,7 @@ static void uart_bridge_task(void *arg)
                                  UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
     ESP_ERROR_CHECK(uart_driver_install(GPS_UART_PORT, GPS_UART_BUF_SZ,
                                         GPS_UART_BUF_SZ, 8, NULL, 0));
-    /* Liveness at each baud so the command is injected at both. */
+    int live_baud = 0;
     for (int listen = 0; !s_live && listen < 2; listen++) {
         int b = listen == 0 ? 115200 : 9600;
         uart_set_baudrate(GPS_UART_PORT, b);
@@ -129,32 +164,42 @@ static void uart_bridge_task(void *arg)
             uart_bridge_drain();
             if (s_rx_bytes > 0) break;
         }
-        if (s_rx_bytes > 0) {
-            s_live = true;
-            ESP_LOGE(TAG, "UART LIVE @ %d (TX=GPIO17→RXD, RX=GPIO18←TXD) — "
-                          "injecting $PAIR051 query at %d", b, b);
-            uart_bridge_send("$PAIR051*3E");
-        }
+        if (s_rx_bytes > 0) { s_live = true; live_baud = b; }
     }
     if (!s_live) {
-        ESP_LOGE(TAG, "UART DEAD — silence on GPIO18 even on the hand-wired "
-                      "lines at both bauds. Module is dead, not mis-wired.");
+        ESP_LOGE(TAG, "UART DEAD — silence on GPIO18 at both bauds. Module "
+                      "dead, not mis-wired.");
         vTaskDelete(NULL);
     }
-    /* Live loop: cycle bauds until the parser answers. Each pass re-sends the
-     * query at the new baud; the 051 echo flips s_050_sent (10 Hz set). */
-    int bauds[2] = {115200, 9600};
-    int cycle = 1;
+    ESP_LOGE(TAG, "UART LIVE @ %d (TX=GPIO17→RXD, RX=GPIO18←TXD)", live_baud);
+    uart_set_baudrate(GPS_UART_PORT, live_baud);
+
+    /* Phase 1 — config diagnostics: min-SNR mask + constellation search mode. */
+    uart_bridge_cmd("PAIR059");
+    uart_bridge_cmd("PAIR067");
+    int64_t t0 = esp_timer_get_time();
+    while (esp_timer_get_time() - t0 < 3LL * 1000 * 1000) {
+        uart_bridge_drain();
+        if (s_059_seen && s_067_seen) break;
+    }
+    if (s_067_seen && s_search_disabled) {
+        ESP_LOGE(TAG, "*** SEARCH WAS DISABLED by config — sending spec fix "
+                      "$PAIR066,1,1,1,1,0,0 (module REBOOTS on this command; "
+                      "rate must be re-set after its reboot) ***");
+        uart_bridge_cmd("PAIR066,1,1,1,1,0,0");
+        vTaskDelay(pdMS_TO_TICKS(5000));   /* let the module reboot + stream */
+        if (live_baud != 115200) uart_set_baudrate(GPS_UART_PORT, live_baud);
+    }
+
+    /* Phase 2 — rate ladder: query until echo, then set 100 ms. */
+    int cycle = 0;
     while (!s_050_sent) {
-        for (int b = 0; b < 2 && !s_050_sent; b++) {
-            uart_set_baudrate(GPS_UART_PORT, bauds[b]);
-            ESP_LOGI(TAG, "ladder pass %d @ %d: re-sending $PAIR051", ++cycle, bauds[b]);
-            uart_bridge_send("$PAIR051*3E");
-            int64_t t0 = esp_timer_get_time();
-            while (esp_timer_get_time() - t0 < 10LL * 1000 * 1000) {
-                uart_bridge_drain();
-                if (s_050_sent) break;
-            }
+        ESP_LOGI(TAG, "rate ladder pass %d: querying $PAIR051", ++cycle);
+        uart_bridge_cmd("PAIR051");
+        t0 = esp_timer_get_time();
+        while (esp_timer_get_time() - t0 < 8LL * 1000 * 1000) {
+            uart_bridge_drain();
+            if (s_050_sent) break;
         }
     }
     ESP_LOGE(TAG, "*** 10 Hz COMMAND INJECTED — node UNFROZEN. Watching rate. ***");

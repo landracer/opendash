@@ -357,12 +357,36 @@ module's I2C surface only ever mirrored data OUT. Every frozen-era conclusion
 was the *bridge's* limitation, never the GNSS engine's. With direct wires, the
 first command ladder closed the loop: 051 echo → 050,100 → measured ~10 Hz.
 
-Notes for the record:
-- The module answers queries with the direct echo (`$PAIR051,<ms>`), no
-  `$PAIR001` ACK sentence — earlier ACK-detection logic was looking for a
-  sentence this module doesn't emit.
-- `Sats: 0 / NO FIX` on the bench is placement (indoors), unrelated to the fix
-  path — rate control demonstrably works.
-- Node status: **UNFROZEN / ACTIVE** as of 2026-10-19. `uart_bridge.c`
-  (iteration-8) is now the node's real command path; the I2C handler stays as
-  the (still-used) data path.
+## 13. 2026-10-19 Sats-0 investigation: config fully exonerated (iteration-9)
+
+The owner correctly called the "it's indoors" hand-wave suspicious: the BMS
+node's GNSS locks fine at this exact bench spot, and THIS unit's own history
+(`gps/v15k2_summary.txt` and siblings) shows `GPS: 3D FIX | Sats: 12` — 12
+sats, 3D fix, at this bench, pre-surgery. With the command channel now real,
+iteration-9 read the module's configuration directly:
+
+    UART LIVE @ 115200
+    UART« $PAIR059,9*23          ← min-SNR mask = 9 dB = factory default
+    UART« $PAIR067,1,1,1,1,1...  ← GPS/GLO/GAL/BDS/QZSS search ALL ENABLED
+    UART« $PAIR051,100*23        ← rate setting survived module power cycles
+
+And in the same session the module output genuine GNSS-style date/time
+(`$GNRMC,...,211026` + `$PAIR010,0,x,2441,310341` time messages, replacing the
+earlier-era `060180`/1980 default). That time is either demodulated from live
+nav messages or is backup-rail-retained from an earlier real fix — either way
+it is more evidence the engine itself is fine and the residual Sats-0 cause is
+physical, not logical.
+
+**Verdict:** the module's search configuration is stock and correct — software
+and config are now EXONERATED for the Sats-0 symptom, with the module's own
+answers as proof. Whatever suppresses satellite counts on this bench unit is
+its RF/antenna path (plausibly disturbed by the same disassembly that made the
+UART mod possible), not the engine config, not the protocol, not the firmware.
+This is the honest final limit: the last variable is physical, and only the
+owner's bench can settle it.
+
+Corrections to earlier doc claims: the pre-mod summaries' `Sats: 0` lines were
+NOT proof the RF ever worked-failed-in-place — the module was unseated/dead
+during that era; the SAME unit demonstrably ran 3D FIX/12 sats earlier. Also
+confirmed: rate config persists across module power cycles (no 513 NVRAM-save
+needed in practice).

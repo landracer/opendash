@@ -186,7 +186,7 @@ opendash/
 │   │   ├── display_init.c/h    CO5300 AMOLED init
 │   │   ├── ui_manager.c/h      AMOLED gauge UI
 │   │   ├── gps_handler.c/h     LC76G GPS I2C driver (v16k-port PRODUCTION — data path)
-│   │   ├── uart_bridge.c/h     LC76G native-UART PAIR command path (iteration-8 — ACTIVE)
+│   │   ├── uart_bridge.c/h     LC76G native-UART PAIR command path (iteration-9 — ACTIVE)
 │   │   ├── imu_handler.c/h     QMI8658 accelerometer + gyro
 │   │   └── parachute.c/h       Gyro-triggered parachute deployment
 │   ├── sdkconfig

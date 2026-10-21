@@ -1,6 +1,13 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # OpenDash - GPS Unit (1.75" AMOLED)
 
+> **✅ ACTIVE 2026-10-19 — the UART command path is real (by surgery) and the
+> mandatory mod recipe now lives in [`gps/README.md`](../gps/README.md)
+> (§MANDATORY MODIFICATION: module TXD→GPIO18, RXD→GPIO17).** Without those two
+> wires this module is a fixed-1 Hz read-only pipe — that is Waveshare's design
+> choice ("NC/GPS RX|TX"), not ours. With them: `$PAIR` works at 115200, ≈10 Hz
+> achieved, config audit complete (post-mortem §12–§13).
+
 > **See also:** The definitive LC76G I2C driver guide with complete byte sequences,  
 > timing, power management, recovery mechanisms, and code-from-scratch instructions:  
 > **[LC76G-I2C-GPS-Driver-Guide.md](LC76G-I2C-GPS-Driver-Guide.md)**  
