@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # Safety Deployment System (Rollover Parachute)
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 > **STATUS: GO.** Code-complete, built clean for all targets, flashed and
 > tag-verified on `center`, `right`, `pod1`, `pod2`. Autonomous rollover
 > auto-deploy is opt-in (`AUTO_DETECT`, default OFF); manual deploy is always

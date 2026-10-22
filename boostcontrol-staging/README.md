@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # OpenDash Boost Control — STAGING (peer review baseline)
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 > ## ⚠️ GPL-3.0 HERITAGE — READ BEFORE USING THIS CODE
 >
 > The algorithm and wire format captured in this folder **descend from

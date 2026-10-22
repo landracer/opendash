@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # OpenDash BLE OTA — Wireless Firmware Flashing
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 Flash any OpenDash node from this laptop over Bluetooth Low Energy — no USB
 cable, no opening the dash.
 

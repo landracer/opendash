@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # Resolution Summary - Compile Errors and Missing Libraries
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 ## Problem Statement
 After recent commits, compilation errors persisted when trying to build OpenDash projects. The user requested investigation of compilation errors and missing library callouts that were somehow overlooked.
 

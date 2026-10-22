@@ -1,5 +1,8 @@
 # OpenDash Roster Policy Gate — design (A+ P1.3)
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 > **Status: RATIFIED (owner rulings 2026-10-08) — IMPLEMENTED (pure core +
 > wiring landed; bench proof on the second ESP32 pending).** This doc converts
 > ruling D4 ("silence never disarms" while powered; trust = ROSTER, not

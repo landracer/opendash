@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # Display Codebase Synchronization
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 This document explains how the OpenDash display projects (center, left, right, gps, pod1, pod2 — the unified `left-right/` tree is [LEGACY](left-right/README.md), superseded by the split `left/` + `right/` projects) stay synchronized and share common code. Headless nodes (mos/relay/openDstream) reuse the same `common/` component without a display.
 
 ## Architecture Overview

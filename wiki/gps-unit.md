@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # OpenDash - GPS Unit (1.75" AMOLED)
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 > **✅ ACTIVE 2026-10-19 — the UART command path is real (by surgery) and the
 > mandatory mod recipe now lives in [`gps/README.md`](../gps/README.md)
 > (§MANDATORY MODIFICATION: module TXD→GPIO18, RXD→GPIO17).** Without those two
@@ -17,7 +20,7 @@
 
 ## Overview
 
-The GPS unit is a WaveShare ESP32-S3-Touch-AMOLED-1.75 display node that provides GPS positioning data to the OpenDash system. This unit interfaces with the LC76G GNSS module via I2C to extract position, speed, heading, and satellite information.
+The GPS unit is a WaveShare ESP32-S3-Touch-AMOLED-1.75 display node that provides GPS positioning data to the OpenDash system. This unit extracts position, speed, heading, and satellite information from the LC76G GNSS module over its I2C CASIC mirror (data read path); the module's native UART — hand-wired by the MANDATORY MOD — carries the command/config path (`uart_bridge.c`).
 
 ## Hardware Specifications
 

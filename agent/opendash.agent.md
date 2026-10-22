@@ -4,7 +4,10 @@
 ## Identity
 Specialized agent for the **OpenDash** project — a modular, multi-display racecar dashboard and vehicle-control system built on ESP-IDF v6.1 + LVGL 9 + ESP-NOW across twelve ESP32 node families.
 
-> **Last updated:** 2026-10-03 (v0.1.0 baseline — cross-checked against `opendash_protocol.h`, `opendash_common.h`, `espnow_master.c`).
+> **Last updated:** 2026-10-21 (GPS canon pass: the retracted I2C-only wording is gone — the LC76G is
+> dual-interface: I2C CASIC mirror is still the DATA read path; the hand-wired native-UART command path
+> (`uart_bridge.c`, mandatory mod 2026-10-19) is what revived the node → measured ≈10 Hz).
+> Prior: 2026-10-03 (v0.1.0 baseline — cross-checked against `opendash_protocol.h`, `opendash_common.h`, `espnow_master.c`).
 > **This is the canonical agent playbook.** The IDE entry points
 > (`.claude/agents/opendash.agent.md`, `agent/opendash.instructions.md`) defer to this file.
 > Linked from [`readme.md`](../readme.md) → Quick Links: any task that enters via the readme finds this file first.
@@ -107,9 +110,12 @@ opendash/
 │   ├── ui_manager.c     — Round gauge UI (arc, labels, min/max)
 │   └── display_init.c   — ST7701S display init
 ├── right/main/          ← Right gauge pod (identical code to left, addr 0x11)
-├── gps/main/            ← GPS/IMU sensor node
+├── gps/main/            ← GPS/IMU sensor node (revived 2026-10-19 by the mandatory UART mod)
 │   ├── main.c           — Entry point, ESP-NOW broadcaster (5 Hz)
-│   ├── gps_handler.c    — LC76G GNSS via I2C CASIC protocol
+│   ├── gps_handler.c    — LC76G DATA path — CASIC-over-I2C mirror read (unchanged)
+│   ├── uart_bridge.c    — LC76G native-UART COMMAND path — hand-wired mod (module
+│   │                      TXD→GPIO18, RXD→GPIO17) running the $PAIR rate ladder →
+│   │                      ≈10 Hz; this is the interface that revived the node
 │   ├── imu_handler.c    — QMI8658 6-axis IMU
 │   ├── sd_logger.c      — SD card logging (5 Hz mixed CSV)
 │   └── display_init.c   — CO5300 AMOLED init
@@ -180,10 +186,16 @@ Checksum = XOR of SYNC, CMD, LENGTH, and all PAYLOAD bytes.
 - Left pod additionally ingests MultiDisplay UART data and relays it to center as two DATA_BATCH frames per UART frame
 - Multi-page gauge system with configurable data point display (LEFT/RIGHT `s_gauge_pages[]` are identical by design)
 
-### GPS (active sensor node)
-- **5 Hz data broadcast task**: GPS + IMU data proactively sent
+### GPS (active sensor node — revived 2026-10-19)
+- **Dual-interface LC76G:** the DATA path still arrives over the I2C CASIC mirror
+  (`gps_handler.c` read path unchanged); the COMMAND/CONFIG path is native UART
+  (`uart_bridge.c`) via the owner's MANDATORY MOD (module TXD→GPIO18, RXD→GPIO17) —
+  that hand-wired command loop is what revived the node: `$PAIR051` echo (parser
+  alive) → `$PAIR050,100` → measured ≈10 Hz. Pre-surgery I2C-only/retired state is
+  history — see `wiki/GPS-LC76G-POSTMORTEM.md` §12
+- **5 Hz data broadcast task**: GPS + IMU data proactively sent (module sentences now
+  arrive at ≈10 Hz; the ESP-NOW fan-out task cadence is unchanged)
 - Responds to REQUEST_DATA with specific sensor values
-- GPS via LC76G I2C CASIC protocol (not UART)
 - IMU via QMI8658 6-axis
 - SD logging at 5 Hz (mixed CSV format)
 - TIME_SYNC broadcast every 2 seconds (when GPS fix valid)

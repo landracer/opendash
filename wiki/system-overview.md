@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # OpenDash — End-User System Guide
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 > **Updated June 2026.** Detailed, hands-on walkthrough of what OpenDash is,
 > how the pieces fit together, and how to operate it day-to-day. If you're
 > new, read this in order; if you're returning, jump to the section you need.

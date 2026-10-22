@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # Boost Controller — OpenDash Implementation Instructions
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 > **Audience:** advanced ESP-IDF / LVGL devs working in [opendash](./readme.md).
 > **Scope:** turn the staged boost-controller scaffolding into a shipping subsystem
 > with on-dash map authoring, mode switching, OTA distribution, and runtime PID

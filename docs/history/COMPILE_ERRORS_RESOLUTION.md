@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # Compile Errors Resolution Guide
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 ## Issue Summary
 
 After the initial repository setup, users encountered compilation errors when trying to build OpenDash projects. This document explains the root causes and how they have been resolved.

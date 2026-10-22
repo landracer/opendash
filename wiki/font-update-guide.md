@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # Font Update Guide for OpenDash
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 This guide provides step-by-step instructions for updating fonts in the OpenDash project, including adding new font sizes and modifying existing font configurations.
 
 ## Prerequisites

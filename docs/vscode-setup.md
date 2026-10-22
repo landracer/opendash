@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # Visual Studio Code Setup for OpenDash
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 This guide provides detailed instructions for setting up Visual Studio Code to build and flash all OpenDash display projects (center, left, right, gps, pod1, pod2).
 
 ## Quick Start

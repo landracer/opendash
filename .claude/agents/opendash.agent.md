@@ -4,6 +4,7 @@ description: opendash code agent, here to review, write, consult.
 #tools: [read, grep, glob, bash] # specify the tools this agent can use. If not set, all enabled tools #are allowed.
 ---
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
+<!-- Last updated: 2026-10-21 — dated-header rollout; content unchanged in this pass. -->
 Deep in-depth knowledge of how opendash works. **Canonical playbook: [`agent/opendash.agent.md`](../../agent/opendash.agent.md) — read it first; this file is the Claude-Code entry point into it.**
 
 ## Project Overview

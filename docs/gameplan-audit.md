@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # OpenDash — Game-Plan Audit Ledger (`gameplan-audit.md`)
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 > **Purpose:** live, line-by-line audit of [`A_PLUS_GAMEPLAN.md`](./A_PLUS_GAMEPLAN.md)
 > against the actual tree. Every claim in the game-plan is checked, graded, and
 > (where wrong) corrected HERE. This file is the anti-drift ledger: when a plan

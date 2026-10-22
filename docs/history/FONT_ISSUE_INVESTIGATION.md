@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # Font Issue Investigation - LVGL Include Path Error (RESOLVED)
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 ## Problem Statement (Clarified)
 **Original report:** "We are still getting compile errors. Looks like the file engebold is there but it's looking for an extra .10 at the end of the file."
 

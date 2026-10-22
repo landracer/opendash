@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # OpenDash Changelog
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 >
 > **Versioning policy.** Public versioning starts at **v0.1.0 (2026-10-02)** — the first
 > true baseline. Every label below it (`v0.2.0-beta` … `v0.9.0-beta`, and the `v0.1.0`

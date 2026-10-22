@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # LC76G GPS Node — Final Post-Mortem: Why This Hardware Fails Racing Telemetry
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 > **Verdict (2026-09-29, since REVERSED — see §12): UNUSABLE for racing/performance
 > telemetry. Development ended 2026-09-29.**
 > **⛔ CLOSED-FINAL 2026-09-30 — iteration-5/6 probes ran. The read-only conclusion was

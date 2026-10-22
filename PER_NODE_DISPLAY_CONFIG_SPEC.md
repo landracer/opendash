@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # Per-Node Display Configuration — Implementation Spec
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 **Status:** Phase 1 integrated into `common/` + `center/` + all slaves; Phase 2 (UI editor + live apply) pending
 **Owner of spec:** prepared for jr-dev hand-off
 **Target version:** v0.1.0 baseline (Phase 1 shipped; internal codename was "v0.9.0")

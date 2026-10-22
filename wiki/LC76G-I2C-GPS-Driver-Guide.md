@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # OpenDash LC76G I2C GPS Driver — Definitive Implementation Guide
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 > ## ⛔ CLOSED 2026-09-29 — READ-ONLY DATA PIPE, BY DESIGN *(REVERSED 2026-10-19 — see below)*
 >
 > > ## ✅ CLOSED-FINAL 2026-09-30 — iteration-5/6 settled the reopened case:
@@ -232,7 +235,7 @@ These were all tested exhaustively during development. **Do not retry them.**
 | 7 | Any read from 0x50 after data was expected at 0x54 | Poisons state | A single read from 0x50 corrupts the LC76G I2C state. Recovery requires full PMIC power cycle. |
 | 8 | TX delay < 10ms                                  | 0 bytes      | Module hasn't populated response register yet.              |
 | 9 | Polling without WAKE mechanism                   | avail=0 forever | LC76G I2C slave enters idle mode after inactivity.         |
-| 10| UART GPIOs (17/18) for NMEA                      | No data      | On this board, NMEA is routed through I2C, not UART.        |
+| 10| UART GPIOs (17/18) for NMEA                      | No data (pre-mod era) | As sold, the socket routed no UART at all — data was I2C-only. The 2026-10-19 MANDATORY MOD hand-wires the module's native UART; `gps/main/uart_bridge.c` runs the live command path on it (see gps/README.md §MANDATORY MODIFICATION). |
 | 11| Skipping power cycle on init                     | Intermittent | If the module was in a bad I2C state, only power cycling recovers it. |
 
 > **Observation from Test 7:** A single wrong read attempt on 0x50 poisons the
@@ -810,7 +813,7 @@ typedef struct {
 - More robust TCA9554 FORCE_ON/NRESET handling
 
 **What it proved:**
-- On this board, LC76G NMEA data is NOT available on UART — I2C only
+- (pre-surgery era) As sold, this board routed no UART at all — NMEA arrived I2C-only. The 2026-10-19 mandatory mod changed this: the module's native UART is now hand-wired and `uart_bridge.c` is the live command path (post-mortem §12)
 - The PMIC power cycle sequence is essential and correct
 - TCA9554 P4/P5 control works and is required
 

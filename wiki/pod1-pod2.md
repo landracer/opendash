@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # OpenDash Pod 1 and Pod 2 — Display and Safety Deployment Units
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 > **STATUS: ACTIVE**. Pod 1 and Pod 2 are fully functional display units that also serve as safety deployment detectors.
 
 Pod 1 and Pod 2 are specialized display units that extend the OpenDash system beyond the standard left/right gauge pods. These units are designed to provide additional display capabilities while also serving as safety deployment detectors in the rollover parachute system.

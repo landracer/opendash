@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # OpenDash Data Intake Formats
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 This document describes the data intake formats and callouts for interfacing with OpenDash. It provides a complete reference for other projects to integrate with OpenDash's data system.
 
 ## Overview

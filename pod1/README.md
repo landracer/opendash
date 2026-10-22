@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # OpenDash — Pod 1 (1.75" Round AMOLED)
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 **Active node.** Display + safety-deployment unit. Full subsystem reference:
 [`wiki/pod1-pod2.md`](../wiki/pod1-pod2.md).
 

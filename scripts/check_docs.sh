@@ -25,6 +25,13 @@
 #      per-node sdkconfig is the sole build-config truth. History files
 #      (CHANGELOG.md, docs/history/**, the audit ledger) are exempt: they
 #      record history and must keep recording it truthfully.
+#   8. GPS transport canon guard (audit 2026-10-21): gps/main/uart_bridge.c is
+#      on-tree (the mandatory owner mod — LC76G native UART command path,
+#      $PAIR rate ladder → ≈10 Hz, node revived 2026-10-19). Every live GPS-domain
+#      doc MUST name uart_bridge; the two highest-traffic orientation docs
+#      (readme.md, agent/opendash.agent.md) MUST ALSO carry no retracted wording:
+#      a standalone FROZEN or a "not UART" claim there fails the build.
+#      ("UNFROZEN"/lowercase "frozen" pass; history docs keep their narrative.)
 #
 # WHY these checks exist (plain language, for new contributors):
 #   - The docs are the contract. A markdown link that goes nowhere or a doc
@@ -179,6 +186,24 @@ for md in md_files:
         retired_hits.append(md)
 for md in retired_hits:
     fail.append(f'RETIRED MECH  {md} names the retired `sdkconfig.defaults` mechanism as canon — rewrite to the committed sdkconfig (see ledger §10)')
+
+# ── 8. GPS transport canon guard (audit 2026-10-21) ─────────────────────────
+# WHY: the MANDATORY owner mod (2026-10-19) hand-wired the LC76G's native UART
+# (module TXD→GPIO18, RXD→GPIO17) to the ESP32 — uart_bridge.c's $PAIR command
+# loop is what REVIVED this node (measured ≈10 Hz; the I2C CASIC mirror stays
+# the data-read path). Pre-surgery canon said I2C-only and closed the node;
+# that is retracted history. Derive, don't hand-maintain — same culture as 5.
+if os.path.isfile('gps/main/uart_bridge.c'):
+    # every live GPS-domain doc must name the command path that revived the node…
+    for md in ('readme.md', 'agent/opendash.agent.md', 'gps/README.md', 'gps/INTENSIVE_TODO.md',
+               'wiki/gps-unit.md', 'wiki/LC76G-I2C-GPS-Driver-Guide.md'):
+        if 'uart_bridge' not in open(md, encoding='utf-8', errors='ignore').read():
+            fail.append(f'GPS CANON     {md} does not name gps/main/uart_bridge.c — the live UART command path of the revived GPS node')
+    # …and the orientation docs must carry NO shadow of the retracted pre-surgery wording.
+    for md in ('readme.md', 'agent/opendash.agent.md'):
+        txt = open(md, encoding='utf-8', errors='ignore').read()
+        if re.search(r'(?<!UN)FROZEN|not UART', txt):
+            fail.append(f'GPS CANON     {md} still carries the retracted pre-surgery GPS wording (frozen / I2C-only) as current — see wiki/GPS-LC76G-POSTMORTEM.md §12')
 
 if fail:
     print()

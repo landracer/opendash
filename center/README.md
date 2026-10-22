@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # OpenDash — Center Display (4.3" LCD)
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 This is the Center Display project for OpenDash, running on the Waveshare ESP32-S3-Touch-LCD-4.3 hardware.
 
 ## Hardware Specifications

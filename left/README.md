@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # OpenDash — Left Gauge Pod (2.8" Round LCD)
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 ESP-IDF project for the Left gauge pod in the OpenDash racecar dashboard system.
 
 > **Central project reference:** [`../PROJECT_INDEX.md`](../PROJECT_INDEX.md)

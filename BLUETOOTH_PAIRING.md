@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # Bluetooth Pairing Guide — HC-05 Master ↔ HC-06 Slave
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 > End-user guide for setting up the Bluetooth link between the MultiDisplay
 > sensor package (HC-06 slave) and the OpenDash left gauge pod (HC-05 master).
 >

@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # GPS Driver Debugging Journal — v16 Series (v16a through v16k)
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 > ## ⛔ PROJECT CLOSED 2026-09-29 *(REVERSED 2026-10-19 — post-mortem §12: owner
 > hand-wired the module native UART TXD→GPIO18/RXD→GPIO17; PAIR works at 115200;
 > `$PAIR050,100` → measured ≈10 Hz; node ACTIVE. Journal below = I2C-era history)*

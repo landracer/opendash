@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # POD3 Conversion Plan — Repurpose the GPS Node as a Standard Gauge Pod
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 > **Goal:** The LC76G GPS unit (Waveshare ESP32-S3-Touch-AMOLED-1.75) is unusable
 > as a telemetry sensor (see `GPS-LC76G-POSTMORTEM.md`). Its firmware is
 > effectively identical to pod1/pod2 except for the dead GNSS handler and the

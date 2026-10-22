@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # OpenDash BLE OTA — Deep Assessment for External Review
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 **Date:** 2026-05-28
 **Author:** automated session log, audited for accuracy
 **Audience:** internal + 3rd-party BLE / ESP-IDF reviewers

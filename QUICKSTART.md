@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # OpenDash — Quick Start Guide
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 Get up and running with OpenDash in 5 minutes!
 
 ## What You Need
@@ -77,7 +80,7 @@ Or: File → Open Workspace from File → Select `opendash.code-workspace`
 cd center/
 idf.py set-target esp32s3
 idf.py build
-idf.py -p /dev/ttyUSB0 flash monitor
+idf.py -p /dev/ttyACM0 flash monitor
 ```
 
 **Left/Right Gauge:**
@@ -85,7 +88,7 @@ idf.py -p /dev/ttyUSB0 flash monitor
 cd left/          # or right/
 idf.py set-target esp32s3
 idf.py build
-idf.py -p /dev/ttyUSB0 flash monitor
+idf.py -p /dev/ttyACM0 flash monitor
 ```
 
 **GPS/Telemetry:**
@@ -93,11 +96,12 @@ idf.py -p /dev/ttyUSB0 flash monitor
 cd gps/
 idf.py set-target esp32s3
 idf.py build
-idf.py -p /dev/ttyUSB0 flash monitor
+idf.py -p /dev/ttyACM0 flash monitor
 ```
 
-**Replace `/dev/ttyUSB0` with your serial port:**
-- Linux: `/dev/ttyUSB0` or `/dev/ttyACM0`
+**Replace `/dev/ttyACM0` with your serial port:**
+- Linux: ESP32-S3 display units (native USB) enumerate `/dev/ttyACM0`…`/dev/ttyACM5` —
+  check with `ls /dev/ttyACM*`; WROOM-32E controller nodes (USB-UART bridge) appear as `/dev/ttyUSB0`
 - macOS: `/dev/cu.usbmodem*`
 - Windows: `COM3`, `COM4`, etc.
 

@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # UART Connection: Multidisplay → OpenDash
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 Receives serial telemetry from the **multidisplay** Arduino ECU logger via UART.
 Data arrives through an **HC-05** Bluetooth SPP bridge (HC-05 in master mode,
 pre-configured to auto-connect to the multidisplay's HC-06 slave named `mdv2`).

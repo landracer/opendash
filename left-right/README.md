@@ -6,6 +6,10 @@
 > [`right/`](../right/README.md) projects (which carry all current features:
 > batched ESP-NOW, MD/OBD domain split, BLE OTA recipe). Kept only as the
 > historical record of the pre-split architecture.
+>
+> **Last updated:** 2026-10-21 (audited — every inter-node claim below is now written in PAST tense on
+> purpose: this generation predates the ESP-NOW transport. The current system is ESP-NOW-only; I2C is
+> only ever a local peripheral bus inside one enclosure. See [`docs/espnow-protocol.md`](../docs/espnow-protocol.md).)
 
 This is the Left and Right Gauge Pods project for OpenDash, running on the Waveshare ESP32-S3-LCD-2.8C hardware.
 
@@ -16,13 +20,15 @@ This is the Left and Right Gauge Pods project for OpenDash, running on the Waves
 - **MCU:** ESP32-S3 dual-core @ 240MHz
 - **Flash:** 16MB
 - **PSRAM:** 8MB Octal SPI
-- **Role:** I2C Slave, displays data from Center unit
+- **Role (of that era):** display-only slave — data was presented from Center unit pushes
+- **Inter-node transport (of that era):** a wired I2C bus — **retired design**; the
+  fleet has since moved to ESP-NOW (wireless), and no wired inter-node bus exists today
 
 ## Features
 
 - **Professional Round Layout:** Circular arc gauge with primary and secondary data displays
 - **Configurable Data Points:** Display any two data points from the system
-- **I2C Slave:** Receives display commands from the Center unit
+- **Legacy bus:** display commands arrived from the Center unit over the then-wired I2C bus (historical)
 - **Low Power:** Efficient rendering optimized for gauge display
 
 ## Building & Flashing
@@ -40,7 +46,7 @@ cd left-right/
 source ~/esp/esp-idf/export.sh
 idf.py set-target esp32s3
 idf.py build
-idf.py -p /dev/ttyUSB0 flash monitor
+idf.py -p /dev/ttyACM0 flash monitor
 ```
 
 ### Visual Studio Code Build
@@ -86,26 +92,31 @@ left-right/
         └──────────────────┘
 ```
 
-## Left vs. Right Node
+## Left vs. Right Node (pre-split design — historical)
 
-The same firmware can be used for both Left and Right gauge pods. The node ID is determined by:
+In this legacy generation the same firmware served both pods, and node identity was determined by:
 
-1. **GPIO Configuration:** Set a GPIO pin high/low to select Left vs. Right
-2. **NVS Configuration:** Store the node ID in NVS
-3. **I2C Address:** Left uses 0x10, Right uses 0x11
+1. **GPIO Configuration (of the era):** a GPIO pin was wired high/low to select Left vs. Right
+2. **NVS Configuration (of the era):** the node ID was stored in NVS
+3. **I2C address (retired bus design):** Left was 0x10, Right was 0x11 — the wired-bus
+   addressing was retired; current nodes are addressed by 48-bit WiFi MAC and identified
+   logically by `opendash_node_t` (see [`docs/espnow-protocol.md`](../docs/espnow-protocol.md))
 
-## Configuration
+## Configuration (of that era)
 
-Display configuration is stored in NVS and can be modified via:
-- Center unit (over I2C)
+Display configuration was stored in NVS and could be modified via:
+- Center unit (over the then-wired inter-node bus — today this is ESP-NOW)
 - Companion app (over WiFi/BLE)
 - Direct flashing with custom configuration
 
-## Next Steps
+## Next Steps (as they stood at freeze time — historical record)
 
-- **Add I2C Slave Implementation:** Respond to commands from Center unit
-- **Add Node ID Detection:** Auto-detect Left vs. Right from GPIO
-- **Add Dynamic Data Updates:** Update display values from I2C data
+These are what this pre-split firmware still lacked when it was superseded; the
+successor `left/` + `right/` ESP-NOW lines are where that work actually landed.
+
+- **Add inter-node command handling:** respond to pushes from Center unit
+- **Add node ID detection:** auto-detect Left vs. Right from GPIO
+- **Add dynamic data updates:** update display values from inbound data
 
 ## License
 

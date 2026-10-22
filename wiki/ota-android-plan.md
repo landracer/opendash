@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # OTA via Android — Plan & Options
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 > Decision document for adding an Android-based OTA path so a phone in the
 > pits can flash any pod without needing a laptop. Not yet implemented.
 

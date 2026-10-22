@@ -4,7 +4,14 @@
 > **Central reference for the entire OpenDash codebase.**
 > Start here to understand the project, then follow links to detailed documents.
 >
-> **Last updated:** 2026-10-19 (GPS UNFROZEN — owner surgery hand-wired the LC76G
+> **Last updated:** 2026-10-21 (GPS canon-propagation pass: readme + agent playbook now carry the
+> dual-interface truth — the LC76G's I2C CASIC mirror is still the DATA read path, while the
+> hand-wired native-UART command path (`gps/main/uart_bridge.c`, mandatory mod) is what REVIVED
+> the node; residual pre-surgery claims in `gps/INTENSIVE_TODO.md`, `wiki/gps-unit.md` and
+> `wiki/LC76G-I2C-GPS-Driver-Guide.md` re-factored into explicit past-tense historical framing;
+> legacy `left-right/README.md` de-present-tensed likewise; docs-lint check #8 now machine-guards
+> this drift class (every live GPS-domain doc must name uart_bridge); serial examples unified).
+> Previous: 2026-10-19 (GPS UNFROZEN — owner surgery hand-wired the LC76G
 > native UART (TXD→GPIO18, RXD→GPIO17); iteration-8 uart_bridge closed the PAIR
 > command loop live; `$PAIR050,100` → **measured ≈10 Hz**. Engine never was deaf;
 > only the I2C bridge was read-only. Previous: iteration-7 measured silence on
@@ -23,8 +30,9 @@
 > real, repo bloat untracked, first fully-green CI run build-smoke #30.
 > Convention: bump this line
 > on every documentation pass on a *core reference* doc (this index, the readme,
-> CHANGELOG, QUICKSTART, and the top-level design docs). Not every wiki/ doc carries
-> one yet — rollout is in progress; do not assume absence means the doc is stale.
+> CHANGELOG, QUICKSTART, and the top-level design docs). 2026-10-21: rollout COMPLETE — every
+> `docs/*.md`, `wiki/*.md`, and node README now carries a dated header; stamped "content
+> unchanged" on files this pass did not otherwise change.
 
 ---
 

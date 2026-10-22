@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # OpenDash Device Identity & Serial Numbers
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 ## Overview
 
 OpenDash uses a **device identity system** to prevent flashing the wrong firmware to the wrong ESP32 unit. With 5+ physically similar devices in the car (Center, Left, Right, GPS, BMS), it's easy to accidentally flash GPS firmware onto the Left gauge pod — this system catches that mistake at boot.

@@ -1,13 +1,19 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # OpenDash GPS Unit Firmware — Intensive Build TODO
 
-> **⛔ UNIT FROZEN — DO NOT DEVELOP.** The GPS/telemetry node was frozen on
-> 2026-09-29: the LC76G is a hard-fixed **1 Hz** receiver with no usable command
-> channel, and the abort criteria for the 10 Hz effort were met. The GNSS chip's
-> CASIC-over-I2C interface is *real* (it is a local chip-on-board bus) — what was
-> never viable is the **data rate**. See `wiki/GPS-LC76G-POSTMORTEM.md` before
-> reading anything below. Inter-node traffic in this project is ESP-NOW only;
-> this file predates that and its old I2C-node wiring steps are obsolete.
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
+> **CLOSED ERA — SUPERSEDED 2026-10-19 (historical record; DO NOT develop from this file as current).**
+> This TODO was written when the node was closed as a hard-fixed 1 Hz receiver with
+> "no usable command channel" and the abort criteria for the 10 Hz effort were judged
+> met. On 2026-10-19 that verdict was OVERTURNED: the owner's MANDATORY MOD hand-wired
+> the LC76G's native UART (module TXD→GPIO18, RXD→GPIO17), and `uart_bridge.c`'s
+> `$PAIR` command loop REVIVED the node — measured ≈10 Hz. Truth now: I2C CASIC mirror
+> = DATA read path; native UART = COMMAND/config path. See
+> `wiki/GPS-LC76G-POSTMORTEM.md` §12 and `gps/README.md` §MANDATORY MODIFICATION before
+> reading anything below. Inter-node traffic in this project is ESP-NOW only; this file
+> predates that and its old I2C-node wiring steps are obsolete.
 >
 > **⚠️ PARTIAL ARCHIVE:** This TODO was created before the GNSS driver was
 > understood. Some items are completed, some were superseded by the production
@@ -32,7 +38,7 @@
 - [ ] Research Waveshare ESP32-S3-Touch-AMOLED-1.75 pinout
 - [ ] Identify touch controller: CST9217 (not CST816S)
 - [ ] Map CST9217 I2C address (0x5A), RST (GPIO40), INT (GPIO11)
-- [ ] Confirm GPS module: LC76G via I2C (not UART)
+- [ ] Confirm GPS module: LC76G DATA over I2C mirror (pre-mod era had no UART; the mandatory mod later made native UART the live command path — `gps/main/uart_bridge.c`)
 - [x] Map LC76G I2C addresses (write **0x50**, read **0x54**, data-write **0x58** at 100 kHz)
   - ~~0x28/0x2A were WRONG~~ — Corrected per CASIC protocol. See wiki §2.3.
 - [ ] Identify IMU: QMI8658 at address 0x6B

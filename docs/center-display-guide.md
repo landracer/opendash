@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # Center Display — Implementation Guide & Lessons Learned
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 > **Hardware:** Waveshare ESP32-S3-Touch-LCD-4.3 (800×480 IPS RGB565)
 > **Framework:** ESP-IDF v6.1 + LVGL 9.2.2 + ESP-NOW
 > **Last Updated:** March 2026

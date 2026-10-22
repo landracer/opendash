@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # OpenDash Host Unit Tests
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 Hardware-free unit tests for the pure-logic core of `common/`. The real
 source files (`opendash_protocol.c`, `opendash_data_model.c`, `node_health.c`,
 `opendash_parachute.c`) are compiled **verbatim** against a thin fake layer

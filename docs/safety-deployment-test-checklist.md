@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # Safety Deployment System — Bench & Track Verification Checklist
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 > **Purpose.** Repeatable verification checklist for the parachute / rollover-recovery
 > deployment subsystem (Center fusion master, RIGHT/POD1/POD2 gyro detectors,
 > MOS-4CH-A/B actuators). Written against the **v0.1.0 baseline**.

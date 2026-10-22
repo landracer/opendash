@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # mos-4ch-b — 4-Channel MOS FET Controller (node 17)
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 **Active node.** Twin of [`mos-4ch-a/README.md`](../mos-4ch-a/README.md) — same
 firmware shape, same safety architecture, second physical module:
 

@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # Center Display Tearing — Debug Session
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 > **Scope:** ESP32-S3-Touch-LCD-4.3 (800×480 RGB IPS, ST7262) running as `center`.
 > **Symptom (user-reported, 2026-05):** intermittent horizontal tearing, often bleeding bottom-half pixels over the top half. Comes and goes; can persist for many seconds at a time. **Other devices (`left`, `right`, `gps`, `pod1/2`) show no tearing — only `center`.**
 >

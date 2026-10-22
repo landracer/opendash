@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # relay-8ch-b — 8-Channel Relay Controller B (node 15)
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 **Active node.** Twin of [`relay-8ch-a/README.md`](../relay-8ch-a/README.md),
 second physical module:
 

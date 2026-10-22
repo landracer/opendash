@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # LC76G 10 Hz GPS Data Logging — Specification Breakout
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 > ## ⛔ CLOSED 2026-09-29: THE PREMISE OF THIS DOCUMENT IS FALSE *(REVERSED — it became true)*
 >
 > > ## ✅ CLOSED-FINAL 2026-09-30 (see post-mortem §7–§8): the LC76G module

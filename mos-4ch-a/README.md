@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # mos-4ch-a — 4-Channel MOS FET Controller (node 16)
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 **Active node.** Headless ESP32-WROOM-32E controller — no display. This node
 **hosts the parachute/squib actuator path** (with `mos-4ch-b`) and is the only
 node family where the **P1.3 roster policy-gate is LIVE** (`docs/POLICY_GATE.md`).

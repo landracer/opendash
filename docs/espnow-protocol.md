@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # OpenDash Inter-Node Protocol (ESP-NOW)
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 > **There is no wired inter-node bus in this system, and there never will be.**
 > Nodes are separate ESP32-S3 boards in separate enclosures with no shared
 > signal between them. All node-to-node traffic is **ESP-NOW** (WiFi

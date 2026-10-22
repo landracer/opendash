@@ -35,6 +35,11 @@
 >
 > **Detailed project roadmap:** [`TODO.md`](./TODO.md) | **Central reference:** [`PROJECT_INDEX.md`](./PROJECT_INDEX.md)
 >
+> **Last updated:** 2026-10-21 (GPS canon propagation: the LC76G's hand-wired native-UART command path is
+> now stated in every orientation doc — it is the interface that revived the node; the I2C CASIC mirror
+> remains the unchanged data-read path. Dated-header convention rollout completed across `docs/`/`wiki/`/
+> node READMEs; ESP32-S3 display units enumerate `/dev/ttyACM0…5` in all examples.)
+>
 > **A+ improvement program:** master game-plan [`docs/A_PLUS_GAMEPLAN.md`](./docs/A_PLUS_GAMEPLAN.md),
 > live line-by-line audit ledger [`docs/gameplan-audit.md`](./docs/gameplan-audit.md) (append-only — every
 > program change is logged there with its evidence; file renamed from the mispelled
@@ -118,12 +123,17 @@ opendash/
 │   ├── sdkconfig
 │   └── README.md
 │
-├── gps/                         ← GPS/Telemetry unit (ESP32-S3-Touch-AMOLED-1.75) — ⛔ FROZEN (wiki/GPS-LC76G-POSTMORTEM.md)
+├── gps/                         ← GPS/Telemetry unit (ESP32-S3-Touch-AMOLED-1.75) — ✅ ACTIVE sensor node;
+│                                    revived 2026-10-19 by the MANDATORY MOD: LC76G native UART hand-wired
+│                                    (module TXD→GPIO18, RXD→GPIO17) — uart_bridge.c $PAIR command loop →
+│                                    measured ≈10 Hz (wiki/GPS-LC76G-POSTMORTEM.md §12)
     ├── main/
     │   ├── main.c
     │   ├── display_init.c/h     — CO5300 AMOLED init
     │   ├── ui_manager.c/h
-    │   ├── gps_handler.c/h      — LC76G GNSS module
+    │   ├── gps_handler.c/h      — LC76G DATA path — CASIC-over-I2C mirror read (unchanged)
+    │   ├── uart_bridge.c/h      — LC76G native-UART COMMAND path — the hand-wired mod that revived
+    │   │                          this node: $PAIR config readout + rate ladder → 10 Hz
     │   ├── imu_handler.c/h      — QMI8658 6-axis IMU
     │   ├── sd_logger.c/h        — SD telemetry logging (the real logger; center's sd_logger is a stub)
     │   └── assets/
@@ -138,6 +148,10 @@ opendash/
 ├── relay-8ch-a/                 ← Headless 8-ch relay controller (node 14) — see its README.md
 ├── relay-8ch-b/                 ← Headless 8-ch relay controller (node 15) — see its README.md
 ├── openDstream/                 ← ESP-NOW → UART data-point bridge to host PC — see its README.md
+├── boostcontrol-staging/        ← frozen boost-controller review baseline (boost-controller-opendash.md
+│   │                              Rule 1 — do not modify; clean-room rewrite gates v1.0.0)
+├── left-right/                  ← [LEGACY] unified pre-split pod firmware — DO NOT BUILD,
+│   │                              historical record of the pre-ESP-NOW architecture only
 ├── agent/                       ← AI-agent / contributor playbooks
 ├── wiki/                        ← Subsystem references + postmortems (see PROJECT_INDEX tables)
 ├── scripts/                     ← Tooling: check_docs.sh (docs-lint), coverage_gate.sh, od-flash.py…
@@ -186,6 +200,7 @@ The original design intended to use I2C for inter-node communication, but due to
 
 ### 🛰️ GPS & Telemetry (GPS Unit)
 - **LC76G GNSS** — Multi-constellation (GPS, GLONASS, BeiDou, Galileo) positioning
+- **Dual-interface LC76G** — data still arrives over the I2C CASIC mirror (read path unchanged); **command/config runs over native UART** — the 2026-10-19 hand-wired MANDATORY MOD (module TXD→GPIO18, RXD→GPIO17) that revived this node: `$PAIR051` echo (parser alive) → `$PAIR050,100` → measured ≈10 Hz (`gps/main/uart_bridge.c`)
 - **Predictive lap timing** — Real-time delta vs. best lap, sector-based predictions
 - **QMI8658 6-axis IMU** — Accelerometer + gyroscope for g-force, orientation, motion
 - **Parachute deployment** — Gyro-triggered safety system with configurable thresholds

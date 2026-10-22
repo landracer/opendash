@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # OpenDash Relay / MOS — ESP-NOW Protocol Guide
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 > **Wiki:** How-to, dos, and don'ts for all relay and MOS FET slave nodes.  
 > **Boards covered:** relay-8ch-a, relay-8ch-b, relay-4ch-hd, mos-4ch-a, mos-4ch-b
 

@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # OpenDash — Features & Sensor Capabilities
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 > Complete matrix of sensor data available in OpenDash and the source systems
 > that provide it. Updated 2026-10-04 — matrix sections reconciled with the wire
 > truth in `left/main/main.c` (`forward_md_data_to_center()` /

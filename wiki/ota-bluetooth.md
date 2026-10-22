@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # OTA over Bluetooth Low Energy — End-User Guide
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 > **Updated June 2026** to cover all 11 OpenDash node families.
 > Step-by-step procedure for updating any node wirelessly from a Linux laptop
 > or Android phone (Android path: see [`ota-android-plan.md`](./ota-android-plan.md)).

@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # relay-8ch-a — 8-Channel Relay Controller A (node 14)
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 **Active node.** Headless ESP32-WROOM-32E controller for low-amp device loads.
 
 ## Identity

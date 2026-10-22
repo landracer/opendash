@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # OpenDash — Project TODO
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 > Comprehensive tracking of planned features, known issues, and shipped subsystems.
 > Organized by priority, then by subsystem and per-node.
 >
@@ -41,7 +44,7 @@
 | Working displays | center (4.3" RGB), left/right (2.8C round RGB), gps + pod1/pod2 (1.75" AMOLED) |
 | BLE OTA | Working: pod1, pod2, left, right. **Fragile:** gps, pod1, pod2 still missing the full sdkconfig recipe + slave-side suspend sequence — see §1.4 |
 | Active investigations | center RGB tearing (TEARING.md), GPS/POD OTA hardening, boost-controller wire-up |
-| Git state | (as of 2026-10-12) WIP tree mid-flight: P1.3 roster-gate + center channel-registry/START-sequencer work uncommitted at audit time — see ledger §8 change log; tree must return to clean+pushed on every phase gate. Host unit tests + full-fleet CI landed (see §1.8). Boost clean-room (§6.0) still gates v1.0.0. |
+| Git state | (as of 2026-10-21) clean+pushed — P1.3 roster-gate + center channel-registry/START-sequencer work committed; GPS node revived and its UART-command canon propagated repo-wide (§2.4, post-mortem §12). Tree must return to clean+pushed on every phase gate. Host unit tests + full-fleet CI landed (see §1.8). Boost clean-room (§6.0) still gates v1.0.0. |
 
 ---
 

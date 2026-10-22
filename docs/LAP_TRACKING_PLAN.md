@@ -1,6 +1,9 @@
 <!-- Licensed under Sovereign Individual License v1.0 — see LICENSE file -->
 # Lap Tracking Plan — BonoGPS-Inspired On-Device Implementation
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 > Detailed design for integrating GPS-based lap timing, sector tracking, and
 > predictive delta into OpenDash. Inspired by the BonoGPS project's u-blox
 > configuration patterns, but with **all computation done on-device** (ESP32-S3)

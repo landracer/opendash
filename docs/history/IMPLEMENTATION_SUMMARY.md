@@ -3,6 +3,9 @@
 
 # OpenDash Implementation Summary
 
+> **Last updated:** 2026-10-21 — dated-header rollout (convention: see PROJECT_INDEX header). Content
+> unchanged in this pass; content changes stay recorded in git history and the audit ledger.
+
 This document summarizes the work completed to prepare the OpenDash repository for display project development.
 
 ## What Was Accomplished
